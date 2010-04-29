@@ -1402,7 +1402,7 @@ static long sock_wait_for_wmem(struct sock *sk, long timeo)
 			break;
 		if (sk->sk_err)
 			break;
-		timeo = schedule_timeout(timeo);
+		timeo = io_schedule_timeout(timeo);
 	}
 	finish_wait(sk->sk_sleep, &wait);
 	return timeo;
@@ -1512,7 +1512,7 @@ static void __lock_sock(struct sock *sk)
 		prepare_to_wait_exclusive(&sk->sk_lock.wq, &wait,
 					TASK_UNINTERRUPTIBLE);
 		spin_unlock_bh(&sk->sk_lock.slock);
-		schedule();
+		io_schedule();
 		spin_lock_bh(&sk->sk_lock.slock);
 		if (!sock_owned_by_user(sk))
 			break;
