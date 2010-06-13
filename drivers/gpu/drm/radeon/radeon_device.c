@@ -36,6 +36,54 @@
 #include "radeon.h"
 #include "atom.h"
 
+static const char radeon_family_name[][16] = {
+	"R100",
+	"RV100",
+	"RS100",
+	"RV200",
+	"RS200",
+	"R200",
+	"RV250",
+	"RS300",
+	"RV280",
+	"R300",
+	"R350",
+	"RV350",
+	"RV380",
+	"R420",
+	"R423",
+	"RV410",
+	"RS400",
+	"RS480",
+	"RS600",
+	"RS690",
+	"RS740",
+	"RV515",
+	"R520",
+	"RV530",
+	"RV560",
+	"RV570",
+	"R580",
+	"R600",
+	"RV610",
+	"RV630",
+	"RV670",
+	"RV620",
+	"RV635",
+	"RS780",
+	"RS880",
+	"RV770",
+	"RV730",
+	"RV710",
+	"RV740",
+	"CEDAR",
+	"REDWOOD",
+	"JUNIPER",
+	"CYPRESS",
+	"HEMLOCK",
+	"LAST",
+};
+
 /*
  * Clear GPU surface registers.
  */
@@ -251,24 +299,24 @@ void radeon_update_bandwidth_info(struct radeon_device *rdev)
 		sclk = radeon_get_engine_clock(rdev);
 		mclk = rdev->clock.default_mclk;
 
-		a.full = rfixed_const(100);
-		rdev->pm.sclk.full = rfixed_const(sclk);
-		rdev->pm.sclk.full = rfixed_div(rdev->pm.sclk, a);
-		rdev->pm.mclk.full = rfixed_const(mclk);
-		rdev->pm.mclk.full = rfixed_div(rdev->pm.mclk, a);
+		a.full = dfixed_const(100);
+		rdev->pm.sclk.full = dfixed_const(sclk);
+		rdev->pm.sclk.full = dfixed_div(rdev->pm.sclk, a);
+		rdev->pm.mclk.full = dfixed_const(mclk);
+		rdev->pm.mclk.full = dfixed_div(rdev->pm.mclk, a);
 
-		a.full = rfixed_const(16);
+		a.full = dfixed_const(16);
 		/* core_bandwidth = sclk(Mhz) * 16 */
-		rdev->pm.core_bandwidth.full = rfixed_div(rdev->pm.sclk, a);
+		rdev->pm.core_bandwidth.full = dfixed_div(rdev->pm.sclk, a);
 	} else {
 		sclk = radeon_get_engine_clock(rdev);
 		mclk = radeon_get_memory_clock(rdev);
 
-		a.full = rfixed_const(100);
-		rdev->pm.sclk.full = rfixed_const(sclk);
-		rdev->pm.sclk.full = rfixed_div(rdev->pm.sclk, a);
-		rdev->pm.mclk.full = rfixed_const(mclk);
-		rdev->pm.mclk.full = rfixed_div(rdev->pm.mclk, a);
+		a.full = dfixed_const(100);
+		rdev->pm.sclk.full = dfixed_const(sclk);
+		rdev->pm.sclk.full = dfixed_div(rdev->pm.sclk, a);
+		rdev->pm.mclk.full = dfixed_const(mclk);
+		rdev->pm.mclk.full = dfixed_div(rdev->pm.mclk, a);
 	}
 }
 
@@ -498,8 +546,10 @@ static void radeon_switcheroo_set_state(struct pci_dev *pdev, enum vga_switchero
 		/* don't suspend or resume card normally */
 		rdev->powered_down = false;
 		radeon_resume_kms(dev);
+		drm_kms_helper_poll_enable(dev);
 	} else {
 		printk(KERN_INFO "radeon: switched off\n");
+		drm_kms_helper_poll_disable(dev);
 		radeon_suspend_kms(dev, pmm);
 		/* don't suspend or resume card normally */
 		rdev->powered_down = true;
@@ -526,7 +576,6 @@ int radeon_device_init(struct radeon_device *rdev,
 	int r;
 	int dma_bits;
 
-	DRM_INFO("radeon: Initializing kernel modesetting.\n");
 	rdev->shutdown = false;
 	rdev->dev = &pdev->dev;
 	rdev->ddev = ddev;
@@ -538,6 +587,10 @@ int radeon_device_init(struct radeon_device *rdev,
 	rdev->mc.gtt_size = radeon_gart_size * 1024 * 1024;
 	rdev->gpu_lockup = false;
 	rdev->accel_working = false;
+
+	DRM_INFO("initializing kernel modesetting (%s 0x%04X:0x%04X).\n",
+		radeon_family_name[rdev->family], pdev->vendor, pdev->device);
+
 	/* mutex initialization are all done here so we
 	 * can recall function without having locking issues */
 	mutex_init(&rdev->cs_mutex);
@@ -548,9 +601,11 @@ int radeon_device_init(struct radeon_device *rdev,
 		spin_lock_init(&rdev->ih.lock);
 	mutex_init(&rdev->gem.mutex);
 	mutex_init(&rdev->pm.mutex);
+	mutex_init(&rdev->vram_mutex);
 	rwlock_init(&rdev->fence_drv.lock);
 	INIT_LIST_HEAD(&rdev->gem.objects);
 	init_waitqueue_head(&rdev->irq.vblank_queue);
+	init_waitqueue_head(&rdev->irq.idle_queue);
 
 	/* setup workqueue */
 	rdev->wq = create_workqueue("radeon");
@@ -620,7 +675,7 @@ int radeon_device_init(struct radeon_device *rdev,
 		/* Acceleration not working on AGP card try again
 		 * with fallback to PCI or PCIE GART
 		 */
-		radeon_gpu_reset(rdev);
+		radeon_asic_reset(rdev);
 		radeon_fini(rdev);
 		radeon_agp_disable(rdev);
 		r = radeon_init(rdev);
@@ -640,6 +695,8 @@ void radeon_device_fini(struct radeon_device *rdev)
 {
 	DRM_INFO("radeon: finishing device.\n");
 	rdev->shutdown = true;
+	/* evict vram memory */
+	radeon_bo_evict_vram(rdev);
 	radeon_fini(rdev);
 	destroy_workqueue(rdev->wq);
 	vga_switcheroo_unregister_client(rdev->pdev);
@@ -656,6 +713,7 @@ int radeon_suspend_kms(struct drm_device *dev, pm_message_t state)
 {
 	struct radeon_device *rdev;
 	struct drm_crtc *crtc;
+	struct drm_connector *connector;
 	int r;
 
 	if (dev == NULL || dev->dev_private == NULL) {
@@ -668,6 +726,12 @@ int radeon_suspend_kms(struct drm_device *dev, pm_message_t state)
 
 	if (rdev->powered_down)
 		return 0;
+
+	/* turn off display hw */
+	list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
+		drm_helper_connector_dpms(connector, DRM_MODE_DPMS_OFF);
+	}
+
 	/* unpin the front buffers */
 	list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
 		struct radeon_framebuffer *rfb = to_radeon_framebuffer(crtc->fb);
@@ -677,9 +741,10 @@ int radeon_suspend_kms(struct drm_device *dev, pm_message_t state)
 			continue;
 		}
 		robj = rfb->obj->driver_private;
-		if (robj != rdev->fbdev_rbo) {
+		/* don't unpin kernel fb objects */
+		if (!radeon_fbdev_robj_is_fb(rdev, robj)) {
 			r = radeon_bo_reserve(robj, false);
-			if (unlikely(r == 0)) {
+			if (r == 0) {
 				radeon_bo_unpin(robj);
 				radeon_bo_unreserve(robj);
 			}
@@ -692,10 +757,13 @@ int radeon_suspend_kms(struct drm_device *dev, pm_message_t state)
 
 	radeon_save_bios_scratch_regs(rdev);
 
+	radeon_pm_suspend(rdev);
 	radeon_suspend(rdev);
 	radeon_hpd_fini(rdev);
 	/* evict remaining vram memory */
 	radeon_bo_evict_vram(rdev);
+
+	radeon_agp_suspend(rdev);
 
 	pci_save_state(dev->pdev);
 	if (state.event == PM_EVENT_SUSPEND) {
@@ -704,7 +772,7 @@ int radeon_suspend_kms(struct drm_device *dev, pm_message_t state)
 		pci_set_power_state(dev->pdev, PCI_D3hot);
 	}
 	acquire_console_sem();
-	fb_set_suspend(rdev->fbdev_info, 1);
+	radeon_fbdev_set_suspend(rdev, 1);
 	release_console_sem();
 	return 0;
 }
@@ -727,8 +795,9 @@ int radeon_resume_kms(struct drm_device *dev)
 	/* resume AGP if in use */
 	radeon_agp_resume(rdev);
 	radeon_resume(rdev);
+	radeon_pm_resume(rdev);
 	radeon_restore_bios_scratch_regs(rdev);
-	fb_set_suspend(rdev->fbdev_info, 0);
+	radeon_fbdev_set_suspend(rdev, 0);
 	release_console_sem();
 
 	/* reset hpd state */
@@ -736,6 +805,26 @@ int radeon_resume_kms(struct drm_device *dev)
 	/* blat the mode back in */
 	drm_helper_resume_force_mode(dev);
 	return 0;
+}
+
+int radeon_gpu_reset(struct radeon_device *rdev)
+{
+	int r;
+
+	radeon_save_bios_scratch_regs(rdev);
+	radeon_suspend(rdev);
+
+	r = radeon_asic_reset(rdev);
+	if (!r) {
+		dev_info(rdev->dev, "GPU reset succeed\n");
+		radeon_resume(rdev);
+		radeon_restore_bios_scratch_regs(rdev);
+		drm_helper_resume_force_mode(rdev->ddev);
+		return 0;
+	}
+	/* bad news, how to tell it to userspace ? */
+	dev_info(rdev->dev, "GPU reset failed\n");
+	return r;
 }
 
 

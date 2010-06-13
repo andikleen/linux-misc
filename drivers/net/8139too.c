@@ -860,6 +860,7 @@ retry:
 		}
 
 	/* if unknown chip, assume array element #0, original RTL-8139 in this case */
+	i = 0;
 	dev_dbg(&pdev->dev, "unknown chip version, assuming RTL-8139\n");
 	dev_dbg(&pdev->dev, "TxConfig = 0x%lx\n", RTL_R32 (TxConfig));
 	tp->chipset = 0;
@@ -1716,8 +1717,6 @@ static netdev_tx_t rtl8139_start_xmit (struct sk_buff *skb,
 	RTL_W32_F (TxStatus0 + (entry * sizeof (u32)),
 		   tp->tx_flag | max(len, (unsigned int)ETH_ZLEN));
 
-	dev->trans_start = jiffies;
-
 	tp->cur_tx++;
 
 	if ((tp->cur_tx - NUM_TX_DESC) == tp->dirty_tx)
@@ -1944,7 +1943,7 @@ static int rtl8139_rx(struct net_device *dev, struct rtl8139_private *tp,
 		netif_dbg(tp, rx_status, dev, "%s() status %04x, size %04x, cur %04x\n",
 			  __func__, rx_status, rx_size, cur_rx);
 #if RTL8139_DEBUG > 2
-		print_dump_hex(KERN_DEBUG, "Frame contents: ",
+		print_hex_dump(KERN_DEBUG, "Frame contents: ",
 			       DUMP_PREFIX_OFFSET, 16, 1,
 			       &rx_ring[ring_offset], 70, true);
 #endif
@@ -2090,8 +2089,8 @@ static int rtl8139_poll(struct napi_struct *napi, int budget)
 		 * again when we think we are done.
 		 */
 		spin_lock_irqsave(&tp->lock, flags);
-		RTL_W16_F(IntrMask, rtl8139_intr_mask);
 		__napi_complete(napi);
+		RTL_W16_F(IntrMask, rtl8139_intr_mask);
 		spin_unlock_irqrestore(&tp->lock, flags);
 	}
 	spin_unlock(&tp->rx_lock);
@@ -2503,11 +2502,11 @@ static void __set_rx_mode (struct net_device *dev)
 		rx_mode = AcceptBroadcast | AcceptMulticast | AcceptMyPhys;
 		mc_filter[1] = mc_filter[0] = 0xffffffff;
 	} else {
-		struct dev_mc_list *mclist;
+		struct netdev_hw_addr *ha;
 		rx_mode = AcceptBroadcast | AcceptMyPhys;
 		mc_filter[1] = mc_filter[0] = 0;
-		netdev_for_each_mc_addr(mclist, dev) {
-			int bit_nr = ether_crc(ETH_ALEN, mclist->dmi_addr) >> 26;
+		netdev_for_each_mc_addr(ha, dev) {
+			int bit_nr = ether_crc(ETH_ALEN, ha->addr) >> 26;
 
 			mc_filter[bit_nr >> 5] |= 1 << (bit_nr & 31);
 			rx_mode |= AcceptMulticast;

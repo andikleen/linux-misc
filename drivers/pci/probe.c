@@ -10,7 +10,6 @@
 #include <linux/module.h>
 #include <linux/cpumask.h>
 #include <linux/pci-aspm.h>
-#include <acpi/acpi_hest.h>
 #include "pci.h"
 
 #define CARDBUS_LATENCY_TIMER	176	/* secondary latency timer */
@@ -174,19 +173,14 @@ int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
 	pci_read_config_dword(dev, pos, &sz);
 	pci_write_config_dword(dev, pos, l);
 
-	if (!sz)
-		goto fail;	/* BAR not implemented */
-
 	/*
 	 * All bits set in sz means the device isn't working properly.
-	 * If it's a memory BAR or a ROM, bit 0 must be clear; if it's
-	 * an io BAR, bit 1 must be clear.
+	 * If the BAR isn't implemented, all bits must be 0.  If it's a
+	 * memory BAR or a ROM, bit 0 must be clear; if it's an io BAR, bit
+	 * 1 must be clear.
 	 */
-	if (sz == 0xffffffff) {
-		dev_err(&dev->dev, "reg %x: invalid size %#x; broken device?\n",
-			pos, sz);
+	if (!sz || sz == 0xffffffff)
 		goto fail;
-	}
 
 	/*
 	 * I don't know how l can have all bits set.  Copied from old code.
@@ -249,17 +243,13 @@ int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
 				   pos, res);
 		}
 	} else {
-		u32 size = pci_size(l, sz, mask);
+		sz = pci_size(l, sz, mask);
 
-		if (!size) {
-			dev_err(&dev->dev, "reg %x: invalid size "
-			        "(l %#x sz %#x mask %#x); broken device?",
-				pos, l, sz, mask);
+		if (!sz)
 			goto fail;
-		}
 
 		res->start = l;
-		res->end = l + size;
+		res->end = l + sz;
 
 		dev_printk(KERN_DEBUG, &dev->dev, "reg %x: %pR\n", pos, res);
 	}
@@ -913,12 +903,6 @@ void set_pcie_hotplug_bridge(struct pci_dev *pdev)
 		pdev->is_hotplug_bridge = 1;
 }
 
-static void set_pci_aer_firmware_first(struct pci_dev *pdev)
-{
-	if (acpi_hest_firmware_first_pci(pdev))
-		pdev->aer_firmware_first = 1;
-}
-
 #define LEGACY_IO_RESOURCE	(IORESOURCE_IO | IORESOURCE_PCI_FIXED)
 
 /**
@@ -948,7 +932,6 @@ int pci_setup_device(struct pci_dev *dev)
 	dev->multifunction = !!(hdr_type & 0x80);
 	dev->error_state = pci_channel_io_normal;
 	set_pcie_port_type(dev);
-	set_pci_aer_firmware_first(dev);
 
 	list_for_each_entry(slot, &dev->bus->slots, list)
 		if (PCI_SLOT(dev->devfn) == slot->number)

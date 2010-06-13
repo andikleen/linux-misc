@@ -74,7 +74,7 @@ static void dma_direct_free_coherent(struct device *dev, size_t size,
 			      void *vaddr, dma_addr_t dma_handle)
 {
 #ifdef NOT_COHERENT_CACHE
-	consistent_free(vaddr);
+	consistent_free(size, vaddr);
 #else
 	free_pages((unsigned long)vaddr, get_order(size));
 #endif
@@ -90,7 +90,6 @@ static int dma_direct_map_sg(struct device *dev, struct scatterlist *sgl,
 	/* FIXME this part of code is untested */
 	for_each_sg(sgl, sg, nents, i) {
 		sg->dma_address = sg_phys(sg) + get_dma_direct_offset(dev);
-		sg->dma_length = sg->length;
 		__dma_sync_page(page_to_phys(sg_page(sg)), sg->offset,
 							sg->length, direction);
 	}
