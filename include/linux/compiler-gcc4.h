@@ -55,6 +55,11 @@
 #define __visible __attribute__((externally_visible))
 #endif
 
+#if __GNUC_MINOR__ >= 5
+#define compiler_cond_syscall(x) \
+	long __attribute__((weak,alias("sys_ni_syscall"))) x(void);
+#endif
+
 #if __GNUC_MINOR__ > 0
 #define __compiletime_object_size(obj) __builtin_object_size(obj, 0)
 #endif

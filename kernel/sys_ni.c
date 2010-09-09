@@ -1,4 +1,4 @@
-
+#include <linux/compiler.h>
 #include <linux/linkage.h>
 #include <linux/errno.h>
 
@@ -15,6 +15,14 @@ asmlinkage long sys_ni_syscall(void)
 {
 	return -ENOSYS;
 }
+
+#ifdef compiler_cond_syscall
+#define cond_syscall(x) compiler_cond_syscall(x)
+#elif defined(asm_cond_syscall)
+#define cond_syscall(x) asm_cond_syscall(x)
+#else
+#define cond_syscall(x) asm(".weak\t" #x "\n\t.set\t" #x ",sys_ni_syscall");
+#endif
 
 cond_syscall(sys_quotactl);
 cond_syscall(sys32_quotactl);

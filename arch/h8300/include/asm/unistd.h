@@ -357,12 +357,5 @@
 #define __ARCH_WANT_SYS_SIGPROCMASK
 #define __ARCH_WANT_SYS_RT_SIGACTION
 
-/*
- * "Conditional" syscalls
- */
-#define cond_syscall(name)						\
-  asm (".weak\t_" #name "\n"				\
-       ".set\t_" #name ",_sys_ni_syscall");
-
 #endif /* __KERNEL__ */
 #endif /* _ASM_H8300_UNISTD_H_ */
