@@ -423,7 +423,7 @@
 /*
  * "Conditional" syscalls
  */
-#define cond_syscall(x) \
+#define compiler_cond_syscall(x) \
 	asmlinkage long x (void) __attribute__((weak,alias("sys_ni_syscall")))
 
 #endif		/* __ASSEMBLY__ */

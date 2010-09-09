@@ -468,14 +468,6 @@
 #endif
 
 /*
- * "Conditional" syscalls
- *
- * What we want is __attribute__((weak,alias("sys_ni_syscall"))),
- * but it doesn't work on all toolchains, so we just do it by hand
- */
-#define cond_syscall(x) asm(".weak\t" #x "\n\t.set\t" #x ",sys_ni_syscall")
-
-/*
  * Unimplemented (or alternatively implemented) syscalls
  */
 #define __IGNORE_fadvise64_64		1
