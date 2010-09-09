@@ -1,0 +1,56 @@
+#
+# Support for gcc link time optimization
+#
+
+#
+# -fuse-linker-plugin is needed to handle .a files
+#
+
+DISABLE_LTO :=
+LTO_CFLAGS :=
+
+export DISABLE_LTO
+export LTO_CFLAGS
+
+ifdef CONFIG_LTO
+ifeq ($(call cc-ifversion, -ge, 0406,y),y)
+ifneq ($(call cc-option,${LTO_CFLAGS},n),n)
+	LTO_CFLAGS := -fuse-linker-plugin -flto=jobserver
+	DISABLE_LTO := -fno-lto
+
+	# enable whole program optimization mode
+	# needed to work around weak bugs in gcc 4.6
+	# this also makes gcc's optimizer more aggressive
+	# and we need to make sure to add __visible to everything
+	# touched outside the compiler's view.
+	LTO_FINAL_CFLAGS += ${LTO_CFLAGS} -fwhole-program
+
+	# need to explicitely enable the optimizer again on the link
+	# stage
+ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
+	LTO_FINAL_CFLAGS   += -Os
+else
+	LTO_FINAL_CFLAGS   += -O2
+endif
+
+	LTO_FINAL_CFLAGS += $(filter -m32,${KBUILD_CFLAGS})
+	LTO_FINAL_CFLAGS += $(filter -m64,${KBUILD_CFLAGS})
+
+	KBUILD_CFLAGS += ${LTO_CFLAGS}
+
+	#
+	# Don't pass all flags to the optimization stage
+	# We assume the compiler remembers those in the object files.
+	# Currently gcc is a little dumb in this and uses the flags
+	# from the first file, which implies that setting special
+	# flags on files does not work.
+	LDFINAL := ${CONFIG_SHELL} ${srctree}/scripts/gcc-ld \
+                  ${LTO_FINAL_CFLAGS}
+
+else
+        X += $(warning "WARNING: Compiler/Linker does not support LTO/WHOPR with linker plugin. CONFIG_LTO disabled."))
+endif
+else
+	X += $(warning "WARNING: GCC too old for LTO/WHOPR. CONFIG_LTO disabled")
+endif
+endif

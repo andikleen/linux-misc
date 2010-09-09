@@ -909,6 +909,26 @@ config CC_OPTIMIZE_FOR_SIZE
 
 	  If unsure, say Y.
 
+config LTO
+	bool "Enable gcc link time optimizations (needs gcc 4.6/new binutils)"
+	depends on EXPERIMENTAL
+	# lto does not support excluding flags for specific files
+	# right now. Can be removed if that is fixed.
+	depends on !FUNCTION_TRACER
+	help
+	  With this option gcc will do whole program optimizations for
+	  the whole kernel and module. This increases compile time, but can
+	  lead to better code. It might also trigger bugs due to more
+	  aggressive operation.
+
+	  This requires a gcc 4.6 compiler (gcc 4.5 whopr) built
+	  with gold support (--enable-plug-ld=path/to/gold) and
+	  binutils with the gold linker and plugins enabled
+	  (--enable-gold --enable-plugins)
+
+	  When the toolchain support is not available this will
+	  be automatically disabled.
+
 config SYSCTL
 	bool
 
