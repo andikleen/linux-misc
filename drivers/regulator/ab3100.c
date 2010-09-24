@@ -286,7 +286,7 @@ static int ab3100_list_voltage_regulator(struct regulator_dev *reg,
 {
 	struct ab3100_regulator *abreg = reg->reg_data;
 
-	if (selector > abreg->voltages_len)
+	if (selector >= abreg->voltages_len)
 		return -EINVAL;
 	return abreg->typ_voltages[selector];
 }
@@ -318,7 +318,7 @@ static int ab3100_get_voltage_regulator(struct regulator_dev *reg)
 	regval &= 0xE0;
 	regval >>= 5;
 
-	if (regval > abreg->voltages_len) {
+	if (regval >= abreg->voltages_len) {
 		dev_err(&reg->dev,
 			"regulator register %02x contains an illegal voltage setting\n",
 			abreg->regreg);
@@ -634,12 +634,9 @@ static int __devinit ab3100_regulators_probe(struct platform_device *pdev)
 				"%s: failed to register regulator %s err %d\n",
 				__func__, ab3100_regulator_desc[i].name,
 				err);
-			i--;
 			/* remove the already registered regulators */
-			while (i > 0) {
+			while (--i >= 0)
 				regulator_unregister(ab3100_regulators[i].rdev);
-				i--;
-			}
 			return err;
 		}
 

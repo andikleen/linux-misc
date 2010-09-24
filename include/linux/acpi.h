@@ -253,7 +253,7 @@ int acpi_resources_are_enforced(void);
 #ifdef CONFIG_PM_SLEEP
 void __init acpi_no_s4_hw_signature(void);
 void __init acpi_old_suspend_ordering(void);
-void __init acpi_s4_no_nvs(void);
+void __init acpi_nvs_nosave(void);
 #endif /* CONFIG_PM_SLEEP */
 
 struct acpi_osc_context {
@@ -304,8 +304,8 @@ acpi_status acpi_run_osc(acpi_handle handle, struct acpi_osc_context *context);
 				OSC_PCI_EXPRESS_PME_CONTROL |		\
 				OSC_PCI_EXPRESS_AER_CONTROL |		\
 				OSC_PCI_EXPRESS_CAP_STRUCTURE_CONTROL)
-
-extern acpi_status acpi_pci_osc_control_set(acpi_handle handle, u32 flags);
+extern acpi_status acpi_pci_osc_control_set(acpi_handle handle,
+					     u32 *mask, u32 req);
 extern void acpi_early_init(void);
 
 #else	/* !CONFIG_ACPI */

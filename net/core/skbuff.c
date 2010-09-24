@@ -817,7 +817,7 @@ int pskb_expand_head(struct sk_buff *skb, int nhead, int ntail,
 	memcpy(data + nhead, skb->head, skb->tail - skb->head);
 #endif
 	memcpy(data + size, skb_end_pointer(skb),
-	       sizeof(struct skb_shared_info));
+	       offsetof(struct skb_shared_info, frags[skb_shinfo(skb)->nr_frags]));
 
 	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++)
 		get_page(skb_shinfo(skb)->frags[i].page);
@@ -843,7 +843,9 @@ int pskb_expand_head(struct sk_buff *skb, int nhead, int ntail,
 	skb->network_header   += off;
 	if (skb_mac_header_was_set(skb))
 		skb->mac_header += off;
-	skb->csum_start       += nhead;
+	/* Only adjust this if it actually is csum_start rather than csum */
+	if (skb->ip_summed == CHECKSUM_PARTIAL)
+		skb->csum_start += nhead;
 	skb->cloned   = 0;
 	skb->hdr_len  = 0;
 	skb->nohdr    = 0;
@@ -930,7 +932,8 @@ struct sk_buff *skb_copy_expand(const struct sk_buff *skb,
 	copy_skb_header(n, skb);
 
 	off                  = newheadroom - oldheadroom;
-	n->csum_start       += off;
+	if (n->ip_summed == CHECKSUM_PARTIAL)
+		n->csum_start += off;
 #ifdef NET_SKBUFF_DATA_USES_OFFSET
 	n->transport_header += off;
 	n->network_header   += off;
@@ -2483,7 +2486,6 @@ unsigned char *skb_pull_rcsum(struct sk_buff *skb, unsigned int len)
 	skb_postpull_rcsum(skb, skb->data, len);
 	return skb->data += len;
 }
-
 EXPORT_SYMBOL_GPL(skb_pull_rcsum);
 
 /**
@@ -2570,6 +2572,10 @@ struct sk_buff *skb_segment(struct sk_buff *skb, int features)
 
 		__copy_skb_header(nskb, skb);
 		nskb->mac_len = skb->mac_len;
+
+		/* nskb and skb might have different headroom */
+		if (nskb->ip_summed == CHECKSUM_PARTIAL)
+			nskb->csum_start += skb_headroom(nskb) - headroom;
 
 		skb_reset_mac_header(nskb);
 		skb_set_network_header(nskb, skb->mac_len);
@@ -2701,7 +2707,7 @@ int skb_gro_receive(struct sk_buff **head, struct sk_buff *skb)
 		return -E2BIG;
 
 	headroom = skb_headroom(p);
-	nskb = netdev_alloc_skb(p->dev, headroom + skb_gro_offset(p));
+	nskb = alloc_skb(headroom + skb_gro_offset(p), GFP_ATOMIC);
 	if (unlikely(!nskb))
 		return -ENOMEM;
 

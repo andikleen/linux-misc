@@ -1129,7 +1129,7 @@ static unsigned int wm8350_dcdc_get_mode(struct regulator_dev *rdev)
 			mode = REGULATOR_MODE_NORMAL;
 	} else if (!active && !sleep)
 		mode = REGULATOR_MODE_IDLE;
-	else if (!sleep)
+	else if (sleep)
 		mode = REGULATOR_MODE_STANDBY;
 
 	return mode;
@@ -1495,7 +1495,7 @@ int wm8350_register_regulator(struct wm8350 *wm8350, int reg,
 	if (ret != 0) {
 		dev_err(wm8350->dev, "Failed to register regulator %d: %d\n",
 			reg, ret);
-		platform_device_del(pdev);
+		platform_device_put(pdev);
 		wm8350->pmic.pdev[reg] = NULL;
 	}
 
