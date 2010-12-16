@@ -4,6 +4,7 @@
 #include <linux/sys.h>
 #include <linux/cache.h>
 #include <asm/asm-offsets.h>
+#include <asm/syscall.h>
 
 #define __NO_STUBS
 
@@ -14,8 +15,6 @@
 #undef __SYSCALL
 #define __SYSCALL(nr, sym) [nr] = sym,
 #undef _ASM_X86_UNISTD_64_H
-
-typedef void (*sys_call_ptr_t)(void);
 
 extern void sys_ni_syscall(void);
 
