@@ -261,6 +261,12 @@ static inline void boot_delay_msec(void)
 }
 #endif
 
+#ifdef CONFIG_SECURITY_DMESG_RESTRICT
+int dmesg_restrict = 1;
+#else
+int dmesg_restrict;
+#endif
+
 int do_syslog(int type, char __user *buf, int len, bool from_file)
 {
 	unsigned i, j, limit, count;
@@ -268,7 +274,20 @@ int do_syslog(int type, char __user *buf, int len, bool from_file)
 	char c;
 	int error = 0;
 
-	error = security_syslog(type, from_file);
+	/*
+	 * If this is from /proc/kmsg we only do the capabilities checks
+	 * at open time.
+	 */
+	if (type == SYSLOG_ACTION_OPEN || !from_file) {
+		if (dmesg_restrict && !capable(CAP_SYS_ADMIN))
+			return -EPERM;
+		if ((type != SYSLOG_ACTION_READ_ALL &&
+		     type != SYSLOG_ACTION_SIZE_BUFFER) &&
+		    !capable(CAP_SYS_ADMIN))
+			return -EPERM;
+	}
+
+	error = security_syslog(type);
 	if (error)
 		return error;
 
@@ -1055,21 +1074,23 @@ static DEFINE_PER_CPU(int, printk_pending);
 
 void printk_tick(void)
 {
-	if (__get_cpu_var(printk_pending)) {
-		__get_cpu_var(printk_pending) = 0;
+	if (__this_cpu_read(printk_pending)) {
+		__this_cpu_write(printk_pending, 0);
 		wake_up_interruptible(&log_wait);
 	}
 }
 
 int printk_needs_cpu(int cpu)
 {
-	return per_cpu(printk_pending, cpu);
+	if (cpu_is_offline(cpu))
+		printk_tick();
+	return __this_cpu_read(printk_pending);
 }
 
 void wake_up_klogd(void)
 {
 	if (waitqueue_active(&log_wait))
-		__raw_get_cpu_var(printk_pending) = 1;
+		this_cpu_write(printk_pending, 1);
 }
 
 /**

@@ -1749,7 +1749,7 @@ static inline int armv7_pmnc_has_overflowed(unsigned long pmnc)
 static inline int armv7_pmnc_counter_has_overflowed(unsigned long pmnc,
 					enum armv7_counters counter)
 {
-	int ret;
+	int ret = 0;
 
 	if (counter == ARMV7_CYCLE_COUNTER)
 		ret = pmnc & ARMV7_FLAG_C;
@@ -3034,11 +3034,11 @@ init_hw_perf_events(void)
 		pr_info("no hardware support available\n");
 	}
 
-	perf_pmu_register(&pmu);
+	perf_pmu_register(&pmu, "cpu", PERF_TYPE_RAW);
 
 	return 0;
 }
-arch_initcall(init_hw_perf_events);
+early_initcall(init_hw_perf_events);
 
 /*
  * Callchain handling code.

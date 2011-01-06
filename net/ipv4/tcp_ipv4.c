@@ -415,6 +415,9 @@ void tcp_v4_err(struct sk_buff *icmp_skb, u32 info)
 		    !icsk->icsk_backoff)
 			break;
 
+		if (sock_owned_by_user(sk))
+			break;
+
 		icsk->icsk_backoff--;
 		inet_csk(sk)->icsk_rto = __tcp_set_rto(tp) <<
 					 icsk->icsk_backoff;
@@ -429,11 +432,6 @@ void tcp_v4_err(struct sk_buff *icmp_skb, u32 info)
 		if (remaining) {
 			inet_csk_reset_xmit_timer(sk, ICSK_TIME_RETRANS,
 						  remaining, TCP_RTO_MAX);
-		} else if (sock_owned_by_user(sk)) {
-			/* RTO revert clocked out retransmission,
-			 * but socket is locked. Will defer. */
-			inet_csk_reset_xmit_timer(sk, ICSK_TIME_RETRANS,
-						  HZ/20, TCP_RTO_MAX);
 		} else {
 			/* RTO revert clocked out retransmission.
 			 * Will retransmit now */
@@ -2032,7 +2030,7 @@ static void *listening_get_next(struct seq_file *seq, void *cur)
 get_req:
 			req = icsk->icsk_accept_queue.listen_opt->syn_table[st->sbucket];
 		}
-		sk	  = sk_next(st->syn_wait_sk);
+		sk	  = sk_nulls_next(st->syn_wait_sk);
 		st->state = TCP_SEQ_STATE_LISTENING;
 		read_unlock_bh(&icsk->icsk_accept_queue.syn_wait_lock);
 	} else {
@@ -2041,11 +2039,13 @@ get_req:
 		if (reqsk_queue_len(&icsk->icsk_accept_queue))
 			goto start_req;
 		read_unlock_bh(&icsk->icsk_accept_queue.syn_wait_lock);
-		sk = sk_next(sk);
+		sk = sk_nulls_next(sk);
 	}
 get_sk:
 	sk_nulls_for_each_from(sk, node) {
-		if (sk->sk_family == st->family && net_eq(sock_net(sk), net)) {
+		if (!net_eq(sock_net(sk), net))
+			continue;
+		if (sk->sk_family == st->family) {
 			cur = sk;
 			goto out;
 		}

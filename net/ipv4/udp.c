@@ -110,7 +110,7 @@
 struct udp_table udp_table __read_mostly;
 EXPORT_SYMBOL(udp_table);
 
-int sysctl_udp_mem[3] __read_mostly;
+long sysctl_udp_mem[3] __read_mostly;
 EXPORT_SYMBOL(sysctl_udp_mem);
 
 int sysctl_udp_rmem_min __read_mostly;
@@ -119,7 +119,7 @@ EXPORT_SYMBOL(sysctl_udp_rmem_min);
 int sysctl_udp_wmem_min __read_mostly;
 EXPORT_SYMBOL(sysctl_udp_wmem_min);
 
-atomic_t udp_memory_allocated;
+atomic_long_t udp_memory_allocated;
 EXPORT_SYMBOL(udp_memory_allocated);
 
 #define MAX_UDP_PORTS 65536
@@ -1899,6 +1899,7 @@ struct proto udp_prot = {
 	.compat_setsockopt = compat_udp_setsockopt,
 	.compat_getsockopt = compat_udp_getsockopt,
 #endif
+	.clear_sk	   = sk_prot_clear_portaddr_nulls,
 };
 EXPORT_SYMBOL(udp_prot);
 
