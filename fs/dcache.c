@@ -1357,8 +1357,8 @@ EXPORT_SYMBOL(d_alloc_name);
 
 void d_set_d_op(struct dentry *dentry, const struct dentry_operations *op)
 {
-	BUG_ON(dentry->d_op);
-	BUG_ON(dentry->d_flags & (DCACHE_OP_HASH	|
+	WARN_ON_ONCE(dentry->d_op);
+	WARN_ON_ONCE(dentry->d_flags & (DCACHE_OP_HASH	|
 				DCACHE_OP_COMPARE	|
 				DCACHE_OP_REVALIDATE	|
 				DCACHE_OP_DELETE ));
@@ -1380,8 +1380,11 @@ EXPORT_SYMBOL(d_set_d_op);
 static void __d_instantiate(struct dentry *dentry, struct inode *inode)
 {
 	spin_lock(&dentry->d_lock);
-	if (inode)
+	if (inode) {
+		if (unlikely(IS_AUTOMOUNT(inode)))
+			dentry->d_flags |= DCACHE_NEED_AUTOMOUNT;
 		list_add(&dentry->d_alias, &inode->i_dentry);
+	}
 	dentry->d_inode = inode;
 	dentry_rcuwalk_barrier(dentry);
 	spin_unlock(&dentry->d_lock);

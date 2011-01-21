@@ -2001,7 +2001,7 @@ static bool can_checksum_protocol(unsigned long features, __be16 protocol)
 
 static int harmonize_features(struct sk_buff *skb, __be16 protocol, int features)
 {
-	if (!can_checksum_protocol(protocol, features)) {
+	if (!can_checksum_protocol(features, protocol)) {
 		features &= ~NETIF_F_ALL_CSUM;
 		features &= ~NETIF_F_SG;
 	} else if (illegal_highdma(skb->dev, skb)) {
@@ -2023,13 +2023,13 @@ int netif_skb_features(struct sk_buff *skb)
 		return harmonize_features(skb, protocol, features);
 	}
 
-	features &= skb->dev->vlan_features;
+	features &= (skb->dev->vlan_features | NETIF_F_HW_VLAN_TX);
 
 	if (protocol != htons(ETH_P_8021Q)) {
 		return harmonize_features(skb, protocol, features);
 	} else {
 		features &= NETIF_F_SG | NETIF_F_HIGHDMA | NETIF_F_FRAGLIST |
-				NETIF_F_GEN_CSUM;
+				NETIF_F_GEN_CSUM | NETIF_F_HW_VLAN_TX;
 		return harmonize_features(skb, protocol, features);
 	}
 }
@@ -5523,34 +5523,6 @@ void netdev_run_todo(void)
 	}
 }
 
-/**
- *	dev_txq_stats_fold - fold tx_queues stats
- *	@dev: device to get statistics from
- *	@stats: struct rtnl_link_stats64 to hold results
- */
-void dev_txq_stats_fold(const struct net_device *dev,
-			struct rtnl_link_stats64 *stats)
-{
-	u64 tx_bytes = 0, tx_packets = 0, tx_dropped = 0;
-	unsigned int i;
-	struct netdev_queue *txq;
-
-	for (i = 0; i < dev->num_tx_queues; i++) {
-		txq = netdev_get_tx_queue(dev, i);
-		spin_lock_bh(&txq->_xmit_lock);
-		tx_bytes   += txq->tx_bytes;
-		tx_packets += txq->tx_packets;
-		tx_dropped += txq->tx_dropped;
-		spin_unlock_bh(&txq->_xmit_lock);
-	}
-	if (tx_bytes || tx_packets || tx_dropped) {
-		stats->tx_bytes   = tx_bytes;
-		stats->tx_packets = tx_packets;
-		stats->tx_dropped = tx_dropped;
-	}
-}
-EXPORT_SYMBOL(dev_txq_stats_fold);
-
 /* Convert net_device_stats to rtnl_link_stats64.  They have the same
  * fields in the same order, with only the type differing.
  */
@@ -5594,7 +5566,6 @@ struct rtnl_link_stats64 *dev_get_stats(struct net_device *dev,
 		netdev_stats_to_stats64(storage, ops->ndo_get_stats(dev));
 	} else {
 		netdev_stats_to_stats64(storage, &dev->stats);
-		dev_txq_stats_fold(dev, storage);
 	}
 	storage->rx_dropped += atomic_long_read(&dev->rx_dropped);
 	return storage;
