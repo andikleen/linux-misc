@@ -18,6 +18,7 @@
 #endif
 
 struct task_struct; /* one of the stranger aspects of C forward declarations */
+asmregparm
 struct task_struct *__switch_to(struct task_struct *prev,
 				struct task_struct *next);
 struct tss_struct;
@@ -148,7 +149,7 @@ do {									\
 
 #ifdef __KERNEL__
 
-extern void native_load_gs_index(unsigned);
+extern asmlinkage void native_load_gs_index(unsigned);
 
 /*
  * Load a segment. Fall back on loading the zero
