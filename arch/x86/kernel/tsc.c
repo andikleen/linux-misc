@@ -39,7 +39,7 @@ static int tsc_clocksource_reliable;
 /*
  * Scheduler clock - returns current time in nanosec units.
  */
-u64 native_sched_clock(void)
+__visible u64 native_sched_clock(void)
 {
 	u64 this_offset;
 
@@ -72,7 +72,7 @@ unsigned long long sched_clock(void)
 }
 #else
 unsigned long long
-sched_clock(void) __attribute__((alias("native_sched_clock")));
+sched_clock(void) __attribute__((alias("native_sched_clock"))) __visible;
 #endif
 
 int check_tsc_unstable(void)
