@@ -26,7 +26,7 @@ do {								\
 	unsigned int dummy;					\
 								\
 	typecheck(atomic_t *, count);				\
-	typecheck_fn(void (*)(atomic_t *), fail_fn);		\
+	typecheck_fn(asmlinkage void (*)(atomic_t *), fail_fn);	\
 								\
 	asm volatile(LOCK_PREFIX "   decl (%%eax)\n"		\
 		     "   jns 1f	\n"				\
@@ -75,7 +75,7 @@ do {								\
 	unsigned int dummy;					\
 								\
 	typecheck(atomic_t *, count);				\
-	typecheck_fn(void (*)(atomic_t *), fail_fn);		\
+	typecheck_fn(asmlinkage void (*)(atomic_t *), fail_fn);	\
 								\
 	asm volatile(LOCK_PREFIX "   incl (%%eax)\n"		\
 		     "   jg	1f\n"				\
