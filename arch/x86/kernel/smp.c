@@ -257,7 +257,7 @@ static void native_smp_disable_nmi_ipi(void)
 /*
  * Reschedule call back.
  */
-void smp_reschedule_interrupt(struct pt_regs *regs)
+asmregparm void smp_reschedule_interrupt(struct pt_regs *regs)
 {
 	ack_APIC_irq();
 	inc_irq_stat(irq_resched_count);
@@ -267,7 +267,7 @@ void smp_reschedule_interrupt(struct pt_regs *regs)
 	 */
 }
 
-void smp_call_function_interrupt(struct pt_regs *regs)
+asmregparm void smp_call_function_interrupt(struct pt_regs *regs)
 {
 	ack_APIC_irq();
 	irq_enter();
@@ -276,7 +276,7 @@ void smp_call_function_interrupt(struct pt_regs *regs)
 	irq_exit();
 }
 
-void smp_call_function_single_interrupt(struct pt_regs *regs)
+asmregparm void smp_call_function_single_interrupt(struct pt_regs *regs)
 {
 	ack_APIC_irq();
 	irq_enter();
