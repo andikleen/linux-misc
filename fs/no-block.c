@@ -21,3 +21,35 @@ const struct file_operations def_blk_fops = {
 	.open		= no_blkdev_open,
 	.llseek		= noop_llseek,
 };
+
+struct bio *bio_alloc(gfp_t gfp_mask, int nr_iovecs)
+{
+	return NULL;
+}
+EXPORT_SYMBOL(bio_alloc);
+
+void bio_put(struct bio *bio)
+{
+}
+EXPORT_SYMBOL(bio_put);
+
+void bio_endio(struct bio *bio, int error)
+{
+}
+EXPORT_SYMBOL(bio_endio);
+
+int bio_get_nr_vecs(struct block_device *bdev)
+{
+	return 0;
+}
+EXPORT_SYMBOL(bio_get_nr_vecs);
+
+void bio_check_pages_dirty(struct bio *bio)
+{
+}
+EXPORT_SYMBOL(bio_check_pages_dirty);
+
+void bio_set_pages_dirty(struct bio *bio)
+{
+}
+EXPORT_SYMBOL(bio_set_pages_dirty);
