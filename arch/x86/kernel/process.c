@@ -262,7 +262,7 @@ void __switch_to_xtra(struct task_struct *prev_p, struct task_struct *next_p,
 	propagate_user_return_notify(prev_p, next_p);
 }
 
-int sys_fork(struct pt_regs *regs)
+__visible int sys_fork(struct pt_regs *regs)
 {
 	return do_fork(SIGCHLD, regs->sp, regs, 0, NULL, NULL);
 }
@@ -277,13 +277,13 @@ int sys_fork(struct pt_regs *regs)
  * do not have enough call-clobbered registers to hold all
  * the information you need.
  */
-int sys_vfork(struct pt_regs *regs)
+__visible int sys_vfork(struct pt_regs *regs)
 {
 	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->sp, regs, 0,
 		       NULL, NULL);
 }
 
-long
+__visible long
 sys_clone(unsigned long clone_flags, unsigned long newsp,
 	  void __user *parent_tid, void __user *child_tid, struct pt_regs *regs)
 {
