@@ -34,17 +34,17 @@ asmlinkage int sys_get_thread_area(struct user_desc __user *);
 #ifdef CONFIG_X86_32
 
 /* kernel/signal.c */
-unsigned long sys_sigreturn(void);
+asmlinkage unsigned long sys_sigreturn(void);
 
 /* kernel/vm86_32.c */
-int sys_vm86old(struct vm86_struct __user *);
-int sys_vm86(unsigned long, unsigned long);
+asmlinkage int sys_vm86old(struct vm86_struct __user *);
+asmlinkage int sys_vm86(unsigned long, unsigned long);
 
 #else /* CONFIG_X86_32 */
 
 /* X86_64 only */
 /* kernel/process_64.c */
-long sys_arch_prctl(int, unsigned long);
+asmlinkage long sys_arch_prctl(int, unsigned long);
 
 /* kernel/sys_x86_64.c */
 asmlinkage long sys_mmap(unsigned long, unsigned long, unsigned long,
