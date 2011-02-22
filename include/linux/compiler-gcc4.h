@@ -57,7 +57,7 @@
 
 #if __GNUC_MINOR__ >= 5
 #define compiler_cond_syscall(x) \
-	long __attribute__((weak,alias("sys_ni_syscall"))) x(void);
+	long __attribute__((weak,alias("sys_ni_syscall"))) __visible x(void);
 #endif
 
 #if __GNUC_MINOR__ > 0
