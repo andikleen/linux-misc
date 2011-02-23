@@ -136,9 +136,6 @@ cifs_reconnect_tcon(struct cifsTconInfo *tcon, int smb_command)
 		}
 	}
 
-	if (ses->status == CifsExiting)
-		return -EIO;
-
 	/*
 	 * Give demultiplex thread up to 10 seconds to reconnect, should be
 	 * greater than cifs socket timeout which is 7 seconds
@@ -156,7 +153,7 @@ cifs_reconnect_tcon(struct cifsTconInfo *tcon, int smb_command)
 		 * retrying until process is killed or server comes
 		 * back on-line
 		 */
-		if (!tcon->retry || ses->status == CifsExiting) {
+		if (!tcon->retry) {
 			cFYI(1, "gave up waiting on reconnect in smb_init");
 			return -EHOSTDOWN;
 		}
@@ -331,37 +328,35 @@ smb_init_no_reconnect(int smb_command, int wct, struct cifsTconInfo *tcon,
 
 static int validate_t2(struct smb_t2_rsp *pSMB)
 {
-	int rc = -EINVAL;
-	int total_size;
-	char *pBCC;
+	unsigned int total_size;
 
-	/* check for plausible wct, bcc and t2 data and parm sizes */
+	/* check for plausible wct */
+	if (pSMB->hdr.WordCount < 10)
+		goto vt2_err;
+
 	/* check for parm and data offset going beyond end of smb */
-	if (pSMB->hdr.WordCount >= 10) {
-		if ((le16_to_cpu(pSMB->t2_rsp.ParameterOffset) <= 1024) &&
-		   (le16_to_cpu(pSMB->t2_rsp.DataOffset) <= 1024)) {
-			/* check that bcc is at least as big as parms + data */
-			/* check that bcc is less than negotiated smb buffer */
-			total_size = le16_to_cpu(pSMB->t2_rsp.ParameterCount);
-			if (total_size < 512) {
-				total_size +=
-					le16_to_cpu(pSMB->t2_rsp.DataCount);
-				/* BCC le converted in SendReceive */
-				pBCC = (pSMB->hdr.WordCount * 2) +
-					sizeof(struct smb_hdr) +
-					(char *)pSMB;
-				if ((total_size <= (*(u16 *)pBCC)) &&
-				   (total_size <
-					CIFSMaxBufSize+MAX_CIFS_HDR_SIZE)) {
-					return 0;
-				}
-			}
-		}
-	}
+	if (get_unaligned_le16(&pSMB->t2_rsp.ParameterOffset) > 1024 ||
+	    get_unaligned_le16(&pSMB->t2_rsp.DataOffset) > 1024)
+		goto vt2_err;
+
+	/* check that bcc is at least as big as parms + data */
+	/* check that bcc is less than negotiated smb buffer */
+	total_size = get_unaligned_le16(&pSMB->t2_rsp.ParameterCount);
+	if (total_size >= 512)
+		goto vt2_err;
+
+	total_size += get_unaligned_le16(&pSMB->t2_rsp.DataCount);
+	if (total_size > get_bcc(&pSMB->hdr) ||
+	    total_size >= CIFSMaxBufSize + MAX_CIFS_HDR_SIZE)
+		goto vt2_err;
+
+	return 0;
+vt2_err:
 	cifs_dump_mem("Invalid transact2 SMB: ", (char *)pSMB,
 		sizeof(struct smb_t2_rsp) + 16);
-	return rc;
+	return -EINVAL;
 }
+
 int
 CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 {
@@ -452,7 +447,6 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 		server->maxBuf = min((__u32)le16_to_cpu(rsp->MaxBufSize),
 				(__u32)CIFSMaxBufSize + MAX_CIFS_HDR_SIZE);
 		server->max_vcs = le16_to_cpu(rsp->MaxNumberVcs);
-		GETU32(server->sessid) = le32_to_cpu(rsp->SessionKey);
 		/* even though we do not use raw we might as well set this
 		accurately, in case we ever find a need for it */
 		if ((le16_to_cpu(rsp->RawMode) & RAW_ENABLE) == RAW_ENABLE) {
@@ -566,7 +560,6 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 			(__u32) CIFSMaxBufSize + MAX_CIFS_HDR_SIZE);
 	server->max_rw = le32_to_cpu(pSMBr->MaxRawSize);
 	cFYI(DBG2, "Max buf = %d", ses->server->maxBuf);
-	GETU32(ses->server->sessid) = le32_to_cpu(pSMBr->SessionKey);
 	server->capabilities = le32_to_cpu(pSMBr->Capabilities);
 	server->timeAdj = (int)(__s16)le16_to_cpu(pSMBr->ServerTimeZone);
 	server->timeAdj *= 60;
@@ -737,9 +730,9 @@ CIFSSMBEcho(struct TCP_Server_Info *server)
 
 	/* set up echo request */
 	smb->hdr.Tid = cpu_to_le16(0xffff);
-	smb->hdr.WordCount = cpu_to_le16(1);
-	smb->EchoCount = cpu_to_le16(1);
-	smb->ByteCount = cpu_to_le16(1);
+	smb->hdr.WordCount = 1;
+	put_unaligned_le16(1, &smb->EchoCount);
+	put_bcc_le(1, &smb->hdr);
 	smb->Data[0] = 'a';
 	smb->hdr.smb_buf_length += 3;
 
@@ -4918,7 +4911,6 @@ CIFSSMBSetFileSize(const int xid, struct cifsTconInfo *tcon, __u64 size,
 		   __u16 fid, __u32 pid_of_opener, bool SetAllocation)
 {
 	struct smb_com_transaction2_sfi_req *pSMB  = NULL;
-	char *data_offset;
 	struct file_end_of_file_info *parm_data;
 	int rc = 0;
 	__u16 params, param_offset, offset, byte_count, count;
@@ -4941,8 +4933,6 @@ CIFSSMBSetFileSize(const int xid, struct cifsTconInfo *tcon, __u64 size,
 	pSMB->Reserved2 = 0;
 	param_offset = offsetof(struct smb_com_transaction2_sfi_req, Fid) - 4;
 	offset = param_offset + params;
-
-	data_offset = (char *) (&pSMB->hdr.Protocol) + offset;
 
 	count = sizeof(struct file_end_of_file_info);
 	pSMB->MaxParameterCount = cpu_to_le16(2);
@@ -5611,7 +5601,7 @@ QAllEAsRetry:
 	}
 
 	/* make sure list_len doesn't go past end of SMB */
-	end_of_smb = (char *)pByteArea(&pSMBr->hdr) + BCC(&pSMBr->hdr);
+	end_of_smb = (char *)pByteArea(&pSMBr->hdr) + get_bcc(&pSMBr->hdr);
 	if ((char *)ea_response_data + list_len > end_of_smb) {
 		cFYI(1, "EA list appears to go beyond SMB");
 		rc = -EIO;

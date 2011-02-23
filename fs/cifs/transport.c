@@ -236,9 +236,9 @@ smb_sendv(struct TCP_Server_Info *server, struct kvec *iov, int n_vec)
 		server->tcpStatus = CifsNeedReconnect;
 	}
 
-	if (rc < 0) {
+	if (rc < 0 && rc != -EINTR)
 		cERROR(1, "Error %d sending data on socket to server", rc);
-	} else
+	else
 		rc = 0;
 
 	/* Don't want to modify the buffer as a
@@ -359,6 +359,10 @@ cifs_call_async(struct TCP_Server_Info *server, struct smb_hdr *in_buf,
 	if (rc)
 		return rc;
 
+	/* enable signing if server requires it */
+	if (server->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
+		in_buf->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
+
 	mutex_lock(&server->srv_mutex);
 	mid = AllocMidQEntry(in_buf, server);
 	if (mid == NULL) {
@@ -453,6 +457,9 @@ sync_mid_result(struct mid_q_entry *mid, struct TCP_Server_Info *server)
 	case MID_RETRY_NEEDED:
 		rc = -EAGAIN;
 		break;
+	case MID_RESPONSE_MALFORMED:
+		rc = -EIO;
+		break;
 	default:
 		cERROR(1, "%s: invalid mid state mid=%d state=%d", __func__,
 			mid->mid, mid->midState);
@@ -484,7 +491,7 @@ send_nt_cancel(struct TCP_Server_Info *server, struct smb_hdr *in_buf,
 	in_buf->smb_buf_length = sizeof(struct smb_hdr) - 4  + 2;
 	in_buf->Command = SMB_COM_NT_CANCEL;
 	in_buf->WordCount = 0;
-	BCC_LE(in_buf) = 0;
+	put_bcc_le(0, in_buf);
 
 	mutex_lock(&server->srv_mutex);
 	rc = cifs_sign_smb(in_buf, server, &mid->sequence_number);
@@ -570,17 +577,33 @@ SendReceive2(const unsigned int xid, struct cifsSesInfo *ses,
 #endif
 
 	mutex_unlock(&ses->server->srv_mutex);
-	cifs_small_buf_release(in_buf);
 
-	if (rc < 0)
+	if (rc < 0) {
+		cifs_small_buf_release(in_buf);
 		goto out;
+	}
 
-	if (long_op == CIFS_ASYNC_OP)
+	if (long_op == CIFS_ASYNC_OP) {
+		cifs_small_buf_release(in_buf);
 		goto out;
+	}
 
 	rc = wait_for_response(ses->server, midQ);
-	if (rc != 0)
-		goto out;
+	if (rc != 0) {
+		send_nt_cancel(ses->server, in_buf, midQ);
+		spin_lock(&GlobalMid_Lock);
+		if (midQ->midState == MID_REQUEST_SUBMITTED) {
+			midQ->callback = DeleteMidQEntry;
+			spin_unlock(&GlobalMid_Lock);
+			cifs_small_buf_release(in_buf);
+			atomic_dec(&ses->server->inFlight);
+			wake_up(&ses->server->request_q);
+			return rc;
+		}
+		spin_unlock(&GlobalMid_Lock);
+	}
+
+	cifs_small_buf_release(in_buf);
 
 	rc = sync_mid_result(midQ, ses->server);
 	if (rc != 0) {
@@ -632,8 +655,7 @@ SendReceive2(const unsigned int xid, struct cifsSesInfo *ses,
 		if (receive_len >= sizeof(struct smb_hdr) - 4
 		    /* do not count RFC1001 header */  +
 		    (2 * midQ->resp_buf->WordCount) + 2 /* bcc */ )
-			BCC(midQ->resp_buf) =
-				le16_to_cpu(BCC_LE(midQ->resp_buf));
+			put_bcc(get_bcc_le(midQ->resp_buf), midQ->resp_buf);
 		if ((flags & CIFS_NO_RESP) == 0)
 			midQ->resp_buf = NULL;  /* mark it so buf will
 						   not be freed by
@@ -725,8 +747,19 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 		goto out;
 
 	rc = wait_for_response(ses->server, midQ);
-	if (rc != 0)
-		goto out;
+	if (rc != 0) {
+		send_nt_cancel(ses->server, in_buf, midQ);
+		spin_lock(&GlobalMid_Lock);
+		if (midQ->midState == MID_REQUEST_SUBMITTED) {
+			/* no longer considered to be "in-flight" */
+			midQ->callback = DeleteMidQEntry;
+			spin_unlock(&GlobalMid_Lock);
+			atomic_dec(&ses->server->inFlight);
+			wake_up(&ses->server->request_q);
+			return rc;
+		}
+		spin_unlock(&GlobalMid_Lock);
+	}
 
 	rc = sync_mid_result(midQ, ses->server);
 	if (rc != 0) {
@@ -776,7 +809,7 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 		if (receive_len >= sizeof(struct smb_hdr) - 4
 		    /* do not count RFC1001 header */  +
 		    (2 * out_buf->WordCount) + 2 /* bcc */ )
-			BCC(out_buf) = le16_to_cpu(BCC_LE(out_buf));
+			put_bcc(get_bcc_le(midQ->resp_buf), midQ->resp_buf);
 	} else {
 		rc = -EIO;
 		cERROR(1, "Bad MID state?");
@@ -923,10 +956,21 @@ SendReceiveBlockingLock(const unsigned int xid, struct cifsTconInfo *tcon,
 			}
 		}
 
-		if (wait_for_response(ses->server, midQ) == 0) {
-			/* We got the response - restart system call. */
-			rstart = 1;
+		rc = wait_for_response(ses->server, midQ);
+		if (rc) {
+			send_nt_cancel(ses->server, in_buf, midQ);
+			spin_lock(&GlobalMid_Lock);
+			if (midQ->midState == MID_REQUEST_SUBMITTED) {
+				/* no longer considered to be "in-flight" */
+				midQ->callback = DeleteMidQEntry;
+				spin_unlock(&GlobalMid_Lock);
+				return rc;
+			}
+			spin_unlock(&GlobalMid_Lock);
 		}
+
+		/* We got the response - restart system call. */
+		rstart = 1;
 	}
 
 	rc = sync_mid_result(midQ, ses->server);
@@ -977,7 +1021,7 @@ SendReceiveBlockingLock(const unsigned int xid, struct cifsTconInfo *tcon,
 	if (receive_len >= sizeof(struct smb_hdr) - 4
 	    /* do not count RFC1001 header */  +
 	    (2 * out_buf->WordCount) + 2 /* bcc */ )
-		BCC(out_buf) = le16_to_cpu(BCC_LE(out_buf));
+		put_bcc(get_bcc_le(out_buf), out_buf);
 
 out:
 	delete_mid(midQ);
