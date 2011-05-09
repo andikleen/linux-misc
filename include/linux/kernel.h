@@ -687,7 +687,7 @@ static inline void ftrace_dump(enum ftrace_dump_mode oops_dump_mode) { }
  * "__build_bug_on_failed".  This error message can be harder to track down
  * though, hence the two different methods.
  */
-#ifndef __OPTIMIZE__
+#if !defined(__OPTIMIZE__) || defined(CONFIG_LTO)
 #define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))
 #else
 extern int __build_bug_on_failed;
