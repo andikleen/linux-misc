@@ -101,7 +101,7 @@ static void __init mpc837x_rdb_init_IRQ(void)
 	ipic_set_default_priority();
 }
 
-static const char *board[] __initdata = {
+static const char * const board[] __initconst = {
 	"fsl,mpc8377rdb",
 	"fsl,mpc8378rdb",
 	"fsl,mpc8379rdb",
