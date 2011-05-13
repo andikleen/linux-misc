@@ -39,8 +39,8 @@
 
 extern struct sys_timer msm_timer;
 
-static const resource_size_t qsd8x50_surf_smc91x_base __initdata = 0x70000300;
-static const unsigned        qsd8x50_surf_smc91x_gpio __initdata = 156;
+static const resource_size_t qsd8x50_surf_smc91x_base __initconst = 0x70000300;
+static const unsigned        qsd8x50_surf_smc91x_gpio __initconst = 156;
 
 /* Leave smc91x resources empty here, as we'll fill them in
  * at run-time: they vary from board to board, and the true
