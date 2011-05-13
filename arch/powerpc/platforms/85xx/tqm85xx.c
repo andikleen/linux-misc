@@ -187,7 +187,7 @@ static int __init declare_of_platform_devices(void)
 }
 machine_device_initcall(tqm85xx, declare_of_platform_devices);
 
-static const char *board[] __initdata = {
+static const char * const board[] __initconst = {
 	"tqc,tqm8540",
 	"tqc,tqm8541",
 	"tqc,tqm8548",

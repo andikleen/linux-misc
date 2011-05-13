@@ -148,7 +148,7 @@ enum {
 };
 
 /* Must match above enum */
-static const char *r128_family[] __devinitdata = {
+static char * const r128_family[] __devinitconst = {
 	"AGP",
 	"PCI",
 	"PRO AGP",

@@ -1193,7 +1193,7 @@ struct ab_family_id {
 	char	*name;
 };
 
-static const struct ab_family_id ids[] __initdata = {
+static const struct ab_family_id ids[] __initconst = {
 	/* AB3550 */
 	{
 		.id = AB3550_P1A,

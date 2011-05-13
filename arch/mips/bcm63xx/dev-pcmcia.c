@@ -79,7 +79,7 @@ static int __init config_pcmcia_cs(unsigned int cs,
 	return ret;
 }
 
-static const __initdata struct {
+static const __initconst struct {
 	unsigned int	cs;
 	unsigned int	base;
 	unsigned int	size;

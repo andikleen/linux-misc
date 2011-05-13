@@ -355,7 +355,7 @@ static const struct platform_suspend_ops omap_pm_ops = {
 	.valid		= suspend_valid_only_mem,
 };
 #else
-static const struct platform_suspend_ops __initdata omap_pm_ops;
+static const struct platform_suspend_ops __initconst omap_pm_ops;
 #endif /* CONFIG_SUSPEND */
 
 /* XXX This function should be shareable between OMAP2xxx and OMAP3 */
