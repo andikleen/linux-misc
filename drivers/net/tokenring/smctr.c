@@ -59,7 +59,7 @@
 
 #include "smctr.h"               /* Our Stuff */
 
-static const char version[] __initdata =
+static const char version[] __initconst =
 	KERN_INFO "smctr.c: v1.4 7/12/00 by jschlst@samba.org\n";
 static const char cardname[] = "smctr";
 
