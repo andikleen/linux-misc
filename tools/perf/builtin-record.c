@@ -63,6 +63,7 @@ static bool			inherit_stat			=  false;
 static bool			no_samples			=  false;
 static bool			sample_address			=  false;
 static bool			sample_time			=  false;
+static bool			latency_data			=  false;
 static bool			no_buildid			=  false;
 static bool			no_buildid_cache		=  false;
 static struct perf_evlist	*evsel_list;
@@ -197,6 +198,11 @@ static void config_attr(struct perf_evsel *evsel, struct perf_evlist *evlist)
 	if (sample_address) {
 		attr->sample_type	|= PERF_SAMPLE_ADDR;
 		attr->mmap_data = track;
+	}
+
+	if (latency_data) {
+		attr->sample_type	|= PERF_SAMPLE_LATENCY;
+		attr->sample_type	|= PERF_SAMPLE_EXTRA;
 	}
 
 	if (call_graph)
@@ -780,6 +786,8 @@ const struct option record_options[] = {
 	OPT_BOOLEAN('T', "timestamp", &sample_time, "Sample timestamps"),
 	OPT_BOOLEAN('n', "no-samples", &no_samples,
 		    "don't sample"),
+	OPT_BOOLEAN('l', "latency", &latency_data,
+		    "Latency data"),
 	OPT_BOOLEAN('N', "no-buildid-cache", &no_buildid_cache,
 		    "do not update the buildid cache"),
 	OPT_BOOLEAN('B', "no-buildid", &no_buildid,

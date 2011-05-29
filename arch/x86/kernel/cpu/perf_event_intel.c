@@ -1,6 +1,6 @@
 #ifdef CONFIG_CPU_SUP_INTEL
 
-#define MAX_EXTRA_REGS 2
+#define MAX_EXTRA_REGS 3
 
 /*
  * Per register state.
@@ -89,6 +89,7 @@ static struct event_constraint intel_nehalem_event_constraints[] __read_mostly =
 static struct extra_reg intel_nehalem_extra_regs[] __read_mostly =
 {
 	INTEL_EVENT_EXTRA_REG(0xb7, MSR_OFFCORE_RSP_0, 0xffff),
+	INTEL_EVENT_EXTRA_REG2(0x100b, MSR_PEBS_LD_LAT_THRESHOLD, 0xffff),
 	EVENT_EXTRA_END
 };
 
@@ -127,6 +128,7 @@ static struct extra_reg intel_westmere_extra_regs[] __read_mostly =
 {
 	INTEL_EVENT_EXTRA_REG(0xb7, MSR_OFFCORE_RSP_0, 0xffff),
 	INTEL_EVENT_EXTRA_REG(0xbb, MSR_OFFCORE_RSP_1, 0xffff),
+	INTEL_EVENT_EXTRA_REG2(0x100b, MSR_PEBS_LD_LAT_THRESHOLD, 0xffff),
 	EVENT_EXTRA_END
 };
 

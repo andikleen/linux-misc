@@ -870,6 +870,12 @@ static void perf_event__header_size(struct perf_event *event)
 	if (sample_type & PERF_SAMPLE_PERIOD)
 		size += sizeof(data->period);
 
+	if (sample_type & PERF_SAMPLE_LATENCY)
+		size += sizeof(data->latency);
+
+	if (sample_type & PERF_SAMPLE_EXTRA)
+		size += sizeof(data->extra);
+
 	if (sample_type & PERF_SAMPLE_READ)
 		size += event->read_size;
 
@@ -4306,6 +4312,12 @@ void perf_output_sample(struct perf_output_handle *handle,
 
 	if (sample_type & PERF_SAMPLE_PERIOD)
 		perf_output_put(handle, data->period);
+
+	if (sample_type & PERF_SAMPLE_LATENCY)
+		perf_output_put(handle, data->latency);
+
+	if (sample_type & PERF_SAMPLE_EXTRA)
+		perf_output_put(handle, data->extra);
 
 	if (sample_type & PERF_SAMPLE_READ)
 		perf_output_read(handle, event);

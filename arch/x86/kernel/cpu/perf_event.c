@@ -207,6 +207,9 @@ struct extra_reg {
 #define INTEL_EVENT_EXTRA_REG(event, msr, vm)	\
 	EVENT_EXTRA_REG(event, msr, ARCH_PERFMON_EVENTSEL_EVENT, vm)
 #define EVENT_EXTRA_END EVENT_EXTRA_REG(0, 0, 0, 0)
+#define INTEL_EVENT_EXTRA_REG2(event, msr, vm)    \
+	EVENT_EXTRA_REG(event, msr, ARCH_PERFMON_EVENTSEL_EVENT | \
+			ARCH_PERFMON_EVENTSEL_UMASK, vm)
 
 union perf_capabilities {
 	struct {
@@ -406,6 +409,11 @@ static int x86_pmu_extra_regs(u64 config, struct perf_event *event)
 			continue;
 		if (event->attr.config1 & ~er->valid_mask)
 			return -EINVAL;
+
+		/* The minimum value that may be programmed into MSR_PEBS_LD_LAT is 3 */
+		if (er->msr == MSR_PEBS_LD_LAT_THRESHOLD && event->attr.config1 < 3)
+			return -EINVAL;
+
 		event->hw.extra_reg = er->msr;
 		event->hw.extra_config = event->attr.config1;
 		break;

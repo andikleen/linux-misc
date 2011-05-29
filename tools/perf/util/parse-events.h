@@ -22,7 +22,7 @@ extern bool have_tracepoints(struct list_head *evlist);
 
 const char *event_type(int type);
 const char *event_name(struct perf_evsel *event);
-extern const char *__event_name(int type, u64 config);
+extern const char *__event_name(int type, u64 config, u64 extra);
 
 extern int parse_events(const struct option *opt, const char *str, int unset);
 extern int parse_filter(const struct option *opt, const char *str, int unset);

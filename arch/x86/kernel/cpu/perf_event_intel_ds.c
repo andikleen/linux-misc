@@ -1,5 +1,26 @@
 #ifdef CONFIG_CPU_SUP_INTEL
 
+/* Indexed by Intel load latency data source encoding value */
+
+static u64 intel_load_latency_data[] = {
+	LD_LAT_UNKNOWN | LD_LAT_TOGGLE,			/* 0x00: Unknown L3 */
+	LD_LAT_L1 | LD_LAT_LOCAL,			/* 0x01: L1-local */
+	LD_LAT_L2 | LD_LAT_SNOOP,			/* 0x02: L2-snoop */
+	LD_LAT_L2 | LD_LAT_LOCAL,			/* 0x03: L2-local */
+	LD_LAT_L3 | LD_LAT_SNOOP | LD_LAT_INVALID,	/* 0x04: L3-snoop, no coherency actions */
+	LD_LAT_L3 | LD_LAT_SNOOP | LD_LAT_SHARED,	/* 0x05: L3-snoop, found no M */
+	LD_LAT_L3 | LD_LAT_SNOOP | LD_LAT_MODIFIED,	/* 0x06: L3-snoop, found M */
+	LD_LAT_RESERVED,				/* 0x07: reserved */
+	LD_LAT_RAM | LD_LAT_SNOOP | LD_LAT_SHARED,	/* 0x08: L3-miss, snoop, shared */
+	LD_LAT_RESERVED,				/* 0x09: reserved */
+	LD_LAT_RAM | LD_LAT_LOCAL | LD_LAT_SHARED,	/* 0x0A: L3-miss, local, shared */
+	LD_LAT_RAM | LD_LAT_REMOTE | LD_LAT_SHARED,	/* 0x0B: L3-miss, remote, shared */
+	LD_LAT_RAM | LD_LAT_LOCAL | LD_LAT_EXCLUSIVE,	/* 0x0C: L3-miss, local, exclusive */
+	LD_LAT_RAM | LD_LAT_REMOTE | LD_LAT_EXCLUSIVE,	/* 0x0D: L3-miss, remote, exclusive */
+	LD_LAT_IO | LD_LAT_TOGGLE,			/* 0x0E: IO */
+	LD_LAT_UNCACHED | LD_LAT_TOGGLE,		/* 0x0F: Uncached */
+};
+
 /* The maximal number of PEBS events: */
 #define MAX_PEBS_EVENTS		4
 
@@ -454,6 +475,8 @@ static void intel_pmu_pebs_enable(struct perf_event *event)
 	hwc->config &= ~ARCH_PERFMON_EVENTSEL_INT;
 
 	cpuc->pebs_enabled |= 1ULL << hwc->idx;
+	if (hwc->extra_reg == MSR_PEBS_LD_LAT_THRESHOLD)
+		cpuc->pebs_enabled |= 1ULL << (hwc->idx + 32);
 	WARN_ON_ONCE(cpuc->enabled);
 
 	if (x86_pmu.intel_cap.pebs_trap && event->attr.precise_ip > 1)
@@ -466,6 +489,8 @@ static void intel_pmu_pebs_disable(struct perf_event *event)
 	struct hw_perf_event *hwc = &event->hw;
 
 	cpuc->pebs_enabled &= ~(1ULL << hwc->idx);
+	if (hwc->extra_reg == MSR_PEBS_LD_LAT_THRESHOLD)
+		cpuc->pebs_enabled &= ~(1ULL << (hwc->idx + 32));
 	if (cpuc->enabled)
 		wrmsrl(MSR_IA32_PEBS_ENABLE, cpuc->pebs_enabled);
 
@@ -582,19 +607,32 @@ static void __intel_pmu_pebs_event(struct perf_event *event,
 				   struct pt_regs *iregs, void *__pebs)
 {
 	/*
-	 * We cast to pebs_record_core since that is a subset of
-	 * both formats and we don't use the other fields in this
-	 * routine.
+	 * We cast to pebs_record_nhm to get the load latency data
+	 * if extra_reg MSR_PEBS_LD_LAT_THRESHOLD used
 	 */
-	struct pebs_record_core *pebs = __pebs;
+	struct pebs_record_nhm *pebs = __pebs;
 	struct perf_sample_data data;
 	struct pt_regs regs;
+	u64 sample_type;
 
 	if (!intel_pmu_save_and_restart(event))
 		return;
 
 	perf_sample_data_init(&data, 0);
 	data.period = event->hw.last_period;
+
+	if (event->hw.extra_reg == MSR_PEBS_LD_LAT_THRESHOLD) {
+		sample_type = event->attr.sample_type;
+
+		if (sample_type & PERF_SAMPLE_ADDR)
+			data.addr = pebs->dla;
+
+		if (sample_type & PERF_SAMPLE_LATENCY)
+			data.latency = pebs->lat;
+
+		if (sample_type & PERF_SAMPLE_EXTRA)
+			data.extra = intel_load_latency_data[pebs->dse];
+	}
 
 	/*
 	 * We use the interrupt regs as a base because the PEBS record

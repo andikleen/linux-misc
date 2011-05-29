@@ -76,6 +76,8 @@ struct perf_sample {
 	u64 id;
 	u64 stream_id;
 	u64 period;
+	u64 latency;
+	u64 extra;
 	u32 cpu;
 	u32 raw_size;
 	void *raw_data;

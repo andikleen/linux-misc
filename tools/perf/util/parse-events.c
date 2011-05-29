@@ -297,15 +297,18 @@ const char *event_name(struct perf_evsel *evsel)
 	if (evsel->name)
 		return evsel->name;
 
-	return __event_name(type, config);
+	return __event_name(type, config, evsel->attr.config1);
 }
 
-const char *__event_name(int type, u64 config)
+const char *__event_name(int type, u64 config, u64 extra)
 {
 	static char buf[32];
+	int n;
 
 	if (type == PERF_TYPE_RAW) {
-		sprintf(buf, "raw 0x%" PRIx64, config);
+		n = sprintf(buf, "raw 0x%" PRIx64, config);
+		if (extra)
+			sprintf(buf + n, ":%#" PRIx64, extra);
 		return buf;
 	}
 
@@ -694,9 +697,20 @@ parse_raw_event(const char **strp, struct perf_event_attr *attr)
 		return EVT_FAILED;
 	n = hex2u64(str + 1, &config);
 	if (n > 0) {
-		*strp = str + n + 1;
+		str += n + 1;
+		*strp = str;
 		attr->type = PERF_TYPE_RAW;
 		attr->config = config;
+
+		if (*str++ == ':') {
+			n = hex2u64(str + 1, &config);
+			if (n > 0) {
+				attr->config1 = config;
+				str += n + 1;
+				*strp = str;
+			}
+		}
+
 		return EVT_HANDLED;
 	}
 	return EVT_FAILED;
@@ -1078,7 +1092,7 @@ void print_events(const char *event_glob)
 
 	printf("\n");
 	printf("  %-50s [%s]\n",
-		"rNNN (see 'perf list --help' on how to encode it)",
+		"rNNN[:EEE] (see 'perf list --help' on how to encode it)",
 	       event_type_descriptors[PERF_TYPE_RAW]);
 	printf("\n");
 

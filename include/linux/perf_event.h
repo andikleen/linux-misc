@@ -127,8 +127,10 @@ enum perf_event_sample_format {
 	PERF_SAMPLE_PERIOD			= 1U << 8,
 	PERF_SAMPLE_STREAM_ID			= 1U << 9,
 	PERF_SAMPLE_RAW				= 1U << 10,
+	PERF_SAMPLE_LATENCY			= 1U << 11,
+	PERF_SAMPLE_EXTRA			= 1U << 12,
 
-	PERF_SAMPLE_MAX = 1U << 11,		/* non-ABI */
+	PERF_SAMPLE_MAX = 1U << 13,		/* non-ABI */
 };
 
 /*
@@ -432,6 +434,8 @@ enum perf_event_type {
 	 *	{ u64			stream_id;} && PERF_SAMPLE_STREAM_ID
 	 *	{ u32			cpu, res; } && PERF_SAMPLE_CPU
 	 *	{ u64			period;   } && PERF_SAMPLE_PERIOD
+	 *	{ u64			latency;  } && PERF_SAMPLE_LATENCY
+	 *	{ u64			extra;    } && PERF_SAMPLE_EXTRA
 	 *
 	 *	{ struct read_format	values;	  } && PERF_SAMPLE_READ
 	 *
@@ -473,6 +477,35 @@ enum perf_callchain_context {
 #define PERF_FLAG_FD_NO_GROUP		(1U << 0)
 #define PERF_FLAG_FD_OUTPUT		(1U << 1)
 #define PERF_FLAG_PID_CGROUP		(1U << 2) /* pid=cgroup id, per-cpu mode only */
+
+/*
+ * Load latency data source encoding
+ */
+
+/* Bits(0-1) {L1, L2, L3, RAM} or {unknown, IO, uncached, reserved} */
+#define LD_LAT_L1			0x00
+#define LD_LAT_L2			0x01
+#define LD_LAT_L3			0x02
+#define LD_LAT_RAM			0x03
+#define LD_LAT_UNKNOWN			0x00
+#define LD_LAT_IO			0x01
+#define LD_LAT_UNCACHED			0x02
+#define LD_LAT_RESERVED			0x03
+
+/* Bits(2-3) {toggle, snoop, local, remote} */
+#define LD_LAT_TOGGLE			(0x00 << 2)
+#define LD_LAT_SNOOP			(0x01 << 2)
+#define LD_LAT_LOCAL			(0x02 << 2)
+#define LD_LAT_REMOTE			(0x03 << 2)
+
+/* Bits(4-5) {modified, exclusive, shared, invalid} */
+#define LD_LAT_MODIFIED			(0x00 << 4)
+#define LD_LAT_EXCLUSIVE		(0x01 << 4)
+#define LD_LAT_SHARED			(0x02 << 4)
+#define LD_LAT_INVALID			(0x03 << 4)
+
+#define EXTRA_SRC_RESERVED		0x03
+
 
 #ifdef __KERNEL__
 /*
@@ -999,6 +1032,8 @@ struct perf_sample_data {
 		u32	reserved;
 	}				cpu_entry;
 	u64				period;
+	u64				latency;
+	u64				extra;
 	struct perf_callchain_entry	*callchain;
 	struct perf_raw_record		*raw;
 };
