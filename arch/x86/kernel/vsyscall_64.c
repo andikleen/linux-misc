@@ -210,7 +210,14 @@ bool emulate_vsyscall(struct pt_regs *regs, unsigned long address)
 		goto sigsegv;
 	}
 
+<<<<<<< HEAD
 	regs->ax = ret;
+=======
+long __vsyscall(3) venosys_1(void)
+{
+	return -ENOSYS;
+}
+>>>>>>> add visible to vsyscall and make not static
 
 	/* Emulate a ret instruction. */
 	regs->ip = caller;
