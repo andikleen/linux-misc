@@ -45,6 +45,7 @@
 #define __initdata	__section(.init.data)
 #define __initconst	__section(.init.rodata)
 #define __exitdata	__section(.exit.data)
+#define __exitconstdata __section(.exit.rodata)
 #define __exit_call	__used __section(.exitcall.exit)
 
 /*
