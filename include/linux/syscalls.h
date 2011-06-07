@@ -827,6 +827,7 @@ asmlinkage long sys_fanotify_mark(int fanotify_fd, unsigned int flags,
 				  const char  __user *pathname);
 asmlinkage long sys_syncfs(int fd);
 
+asmlinkage
 int kernel_execve(const char *filename, const char *const argv[], const char *const envp[]);
 
 

@@ -358,6 +358,7 @@ out:
 extern int __execve(const char *filename,
 		    const char *const argv[],
 		    const char *const envp[], struct task_struct *task);
+asmlinkage
 int kernel_execve(const char *filename,
 		  const char *const argv[],
 		  const char *const envp[])
