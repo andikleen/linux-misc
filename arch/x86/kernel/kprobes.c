@@ -664,9 +664,7 @@ static int __kprobes kprobe_handler(struct pt_regs *regs)
  * When a retprobed function returns, this code saves registers and
  * calls trampoline_handler() runs, which calls the kretprobe's handler.
  */
-static void __used __kprobes kretprobe_trampoline_holder(void)
-{
-	asm volatile (
+asm(
 			".global kretprobe_trampoline\n"
 			"kretprobe_trampoline: \n"
 #ifdef CONFIG_X86_64
@@ -694,7 +692,6 @@ static void __used __kprobes kretprobe_trampoline_holder(void)
 			"	popf\n"
 #endif
 			"	ret\n");
-}
 
 /*
  * Called from kretprobe_trampoline
@@ -1126,9 +1123,7 @@ static void __kprobes synthesize_set_arg1(kprobe_opcode_t *addr,
 	*(unsigned long *)addr = val;
 }
 
-static void __used __kprobes kprobes_optinsn_template_holder(void)
-{
-	asm volatile (
+asm (
 			".global optprobe_template_entry\n"
 			"optprobe_template_entry: \n"
 #ifdef CONFIG_X86_64
@@ -1167,7 +1162,6 @@ static void __used __kprobes kprobes_optinsn_template_holder(void)
 #endif
 			".global optprobe_template_end\n"
 			"optprobe_template_end: \n");
-}
 
 #define TMPL_MOVE_IDX \
 	((long)&optprobe_template_val - (long)&optprobe_template_entry)
