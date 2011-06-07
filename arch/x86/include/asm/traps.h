@@ -7,7 +7,7 @@
 #include <asm/siginfo.h>			/* TRAP_TRACE, ... */
 
 #ifdef CONFIG_X86_32
-#define dotraplinkage
+#define dotraplinkage asmregparm
 #else
 #define dotraplinkage asmlinkage
 #endif
