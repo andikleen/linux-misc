@@ -6,6 +6,8 @@
 #include <asm/asm-offsets.h>
 #include <asm/syscall.h>
 
+#undef __SYSCALL
+
 #define __NO_STUBS
 
 #define __SYSCALL(nr, sym) extern asmlinkage void sym(void) ;
