@@ -920,8 +920,8 @@ endif
 ifdef CONFIG_BUILD_DOCSRC
 	$(Q)$(MAKE) $(build)=Documentation
 endif
-	$(call vmlinux-modpost)
-	$(call if_changed_rule,vmlinux__)
+	+$(call vmlinux-modpost)
+	+$(call if_changed_rule,vmlinux__)
 	$(Q)rm -f .old_version
 
 # build vmlinux.o first to catch section mismatch errors early
