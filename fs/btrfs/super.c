@@ -267,6 +267,9 @@ int btrfs_parse_options(struct btrfs_root *root, char *options)
 			} else if (strcmp(args[0].from, "lzo") == 0) {
 				compress_type = "lzo";
 				info->compress_type = BTRFS_COMPRESS_LZO;
+			} else if (strcmp(args[0].from, "snappy") == 0) {
+				compress_type = "snappy";
+				info->compress_type = BTRFS_COMPRESS_SNAPPY;
 			} else {
 				ret = -EINVAL;
 				goto out;
@@ -696,8 +699,12 @@ static int btrfs_show_options(struct seq_file *seq, struct vfsmount *vfs)
 	if (btrfs_test_opt(root, COMPRESS)) {
 		if (info->compress_type == BTRFS_COMPRESS_ZLIB)
 			compress_type = "zlib";
-		else
+		else if (info->compress_type == BTRFS_COMPRESS_SNAPPY)
+			compress_type = "snappy";
+		else if (info->compress_type == BTRFS_COMPRESS_LZO)
 			compress_type = "lzo";
+		else
+			compress_type = "?";
 		if (btrfs_test_opt(root, FORCE_COMPRESS))
 			seq_printf(seq, ",compress-force=%s", compress_type);
 		else

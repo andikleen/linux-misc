@@ -1139,6 +1139,10 @@ int btrfs_defrag_file(struct inode *inode, struct file *file,
 		features |= BTRFS_FEATURE_INCOMPAT_COMPRESS_LZO;
 		btrfs_set_super_incompat_flags(disk_super, features);
 	}
+	if (range->compress_type == BTRFS_COMPRESS_SNAPPY) {
+		features |= BTRFS_FEATURE_INCOMPAT_COMPRESS_SNAPPY;
+		btrfs_set_super_incompat_flags(disk_super, features);
+	}
 
 	if (!file)
 		kfree(ra);

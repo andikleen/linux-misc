@@ -1779,6 +1779,8 @@ struct btrfs_root *open_ctree(struct super_block *sb,
 	features |= BTRFS_FEATURE_INCOMPAT_MIXED_BACKREF;
 	if (tree_root->fs_info->compress_type & BTRFS_COMPRESS_LZO)
 		features |= BTRFS_FEATURE_INCOMPAT_COMPRESS_LZO;
+	if (tree_root->fs_info->compress_type & BTRFS_COMPRESS_LZO)
+		features |= BTRFS_FEATURE_INCOMPAT_COMPRESS_LZO;
 	btrfs_set_super_incompat_flags(disk_super, features);
 
 	features = btrfs_super_compat_ro_flags(disk_super) &
