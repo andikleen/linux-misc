@@ -121,6 +121,10 @@ obj-$(CONFIG_DQL) += dynamic_queue_limits.o
 obj-$(CONFIG_MPILIB) += mpi/
 obj-$(CONFIG_DIGSIG) += digsig.o
 
+CFLAGS_snappy.o += $(call cc-disable-warning, declaration-after-statement) \
+		   -DNDEBUG=1
+obj-$(CONFIG_SNAPPY) += snappy.o
+
 hostprogs-y	:= gen_crc32table
 clean-files	:= crc32table.h
 
