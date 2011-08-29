@@ -1107,8 +1107,6 @@ static inline int compress(struct snappy_env *env, struct source *reader,
 	append(writer, ulength, p - ulength);
 	written += (p - ulength);
 
-	char *scratch = env->scratch;
-
 	while (N > 0) {
 		/* Get next block to compress (without copying if possible) */
 		size_t fragment_size;
@@ -1125,8 +1123,10 @@ static inline int compress(struct snappy_env *env, struct source *reader,
 			/* Buffer returned by reader is large enough */
 			pending_advance = num_to_read;
 			fragment_size = num_to_read;
-		} else {
-			memcpy(scratch, fragment, bytes_read);
+		}
+#ifdef SCATHER_GATHER
+		else {
+			memcpy(env->scratch, fragment, bytes_read);
 			skip(reader, bytes_read);
 
 			while (bytes_read < num_to_read) {
@@ -1134,15 +1134,17 @@ static inline int compress(struct snappy_env *env, struct source *reader,
 				size_t n =
 				    min_t(size_t, fragment_size,
 					  num_to_read - bytes_read);
-				memcpy(scratch + bytes_read, fragment, n);
+				memcpy(env->scratch + bytes_read, fragment, n);
 				bytes_read += n;
 				skip(reader, n);
 			}
 			DCHECK_EQ(bytes_read, num_to_read);
-			fragment = scratch;
+			fragment = env->scratch;
 			fragment_size = num_to_read;
 		}
-		DCHECK_EQ(fragment_size, num_to_read);
+#endif
+		if (fragment_size < num_to_read)
+			return -EIO;
 
 		/* Get encoding table for compression */
 		int table_size;
@@ -1154,6 +1156,7 @@ static inline int compress(struct snappy_env *env, struct source *reader,
 
 		char *dest;
 		dest = sink_peek(writer, max_output);
+#ifdef SCATHER_GATHER
 		if (!dest) {
 			/*
 			 * Need a scratch buffer for the output,
@@ -1162,6 +1165,7 @@ static inline int compress(struct snappy_env *env, struct source *reader,
 			 */
 			dest = env->scratch_output;
 		}
+#endif
 		char *end = compress_fragment(fragment, fragment_size,
 					      dest, table, table_size);
 		append(writer, dest, end - dest);
@@ -1248,14 +1252,19 @@ EXPORT_SYMBOL(snappy_uncompress);
 int snappy_init_env(struct snappy_env *env)
 {
 	env->hash_table = vmalloc(sizeof(u16) * kmax_hash_table_size);
+	if (!env->hash_table)
+		goto error;
+#ifdef SCATHER_GATHER
 	env->scratch = vmalloc(kblock_size);
 	env->scratch_output =
 		vmalloc(snappy_max_compressed_length(kblock_size));
-	if (!env->hash_table || !env->scratch || !env->scratch_output) {
-		snappy_free_env(env);
-		return -ENOMEM;
-	}
+	if (!env->scratch || !env->scratch_output)
+		goto error;
+#endif
 	return 0;
+error:
+	snappy_free_env(env);
+	return -ENOMEM;
 }
 EXPORT_SYMBOL(snappy_init_env);
 
@@ -1268,8 +1277,10 @@ EXPORT_SYMBOL(snappy_init_env);
 void snappy_free_env(struct snappy_env *env)
 {
 	vfree(env->hash_table);
+#ifdef SCATHER_GATHER
 	vfree(env->scratch);
 	vfree(env->scratch_output);
+#endif
 	memset(env, 0, sizeof(struct snappy_env));
 }
 EXPORT_SYMBOL(snappy_free_env);
