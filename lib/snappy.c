@@ -963,7 +963,7 @@ static void decompress_all_tags(struct snappy_decompressor *d,
 		const unsigned char c = *(const unsigned char *)(ip++);
 
 		if ((c & 0x3) == LITERAL) {
-			u32 literal_length = length >> 2;
+			u32 literal_length = c >> 2;
 			if (unlikely(literal_length >= 60)) {
 				/* Long literal */
 				const u32 literal_ll = literal_length - 59;
