@@ -961,14 +961,18 @@ static void decompress_all_tags(struct snappy_decompressor *d,
 		}
 
 		const unsigned char c = *(const unsigned char *)(ip++);
-		const u32 entry = char_table[c];
-		const u32 trailer =
-		    get_unaligned_le32(ip) & wordmask[entry >> 11];
-		ip += entry >> 11;
-		const u32 length = entry & 0xff;
 
 		if ((c & 0x3) == LITERAL) {
-			u32 literal_length = length + trailer;
+			u32 literal_length = length >> 2;
+			if (unlikely(literal_length >= 60)) {
+				/* Long literal */
+				const u32 literal_ll = literal_length - 59;
+				literal_length = get_unaligned_le32(ip) &
+					wordmask[literal_ll];
+				ip += literal_ll;
+			}
+			++literal_length;
+
 			u32 avail = d->ip_limit - ip;
 			while (avail < literal_length) {
 				if (!writer_append(writer, ip, avail, false))
@@ -989,6 +993,12 @@ static void decompress_all_tags(struct snappy_decompressor *d,
 				return;
 			ip += literal_length;
 		} else {
+			const u32 entry = char_table[c];
+			const u32 trailer = get_unaligned_le32(ip) &
+				wordmask[entry >> 11];
+			const u32 length = entry & 0xff;
+			ip += entry >> 11;
+
 			/*
 			 * copy_offset/256 is encoded in bits 8..10.
 			 * By just fetching those bits, we get
