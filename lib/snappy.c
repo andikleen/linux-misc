@@ -3,6 +3,7 @@
  * This is a very fast compressor with comparable compression to lzo.
  * Works best on 64bit little-endian, but should be good on others too.
  * Ported by Andi Kleen.
+ * Based on snappy 1.0.3 plus some selected changes from SVN.
  */
 
 /*
@@ -970,9 +971,7 @@ static void decompress_all_tags(struct snappy_decompressor *d,
 			u32 literal_length = length + trailer;
 			u32 avail = d->ip_limit - ip;
 			while (avail < literal_length) {
-				bool allow_fast_path = (avail >= 16);
-				if (!writer_append
-				    (writer, ip, avail, allow_fast_path))
+				if (!writer_append(writer, ip, avail, false))
 					return;
 				literal_length -= avail;
 				skip(d->reader, d->peeked);
