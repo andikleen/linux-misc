@@ -823,6 +823,15 @@ config CRYPTO_LZO
 	help
 	  This is the LZO algorithm.
 
+config CRYPTO_SNAPPY
+	tristate "Snappy compression algorithm"
+	select CRYPTO_ALGAPI
+	select SNAPPY
+	help
+	  snappy is a faster alternative to the lzo compression algorithm
+	  with comparable compression. It is very fast on 64bit systems, but also
+	  good on 32bit systems. It especially excels at already compressed data.
+
 comment "Random Number Generation"
 
 config CRYPTO_ANSI_CPRNG
