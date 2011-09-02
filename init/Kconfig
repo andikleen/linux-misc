@@ -929,6 +929,10 @@ config LTO
 	  When the toolchain support is not available this will
 	  be automatically disabled.
 
+config LTO_DEBUG
+	bool "Enable LTO compile time debugging"
+	depends on LTO
+
 config SYSCTL
 	bool
 

@@ -25,6 +25,10 @@ ifneq ($(call cc-option,${LTO_CFLAGS},n),n)
 	# touched outside the compiler's view.
 	LTO_FINAL_CFLAGS += ${LTO_CFLAGS} -fwhole-program
 
+ifdef CONFIG_LTO_DEBUG
+	LTO_FINAL_CFLAGS += -fdump-ipa-cgraph -Wl,-plugin-save-temps -save-temps   -dH
+endif
+
 	# need to explicitely enable the optimizer again on the link
 	# stage
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
