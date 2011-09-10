@@ -261,6 +261,55 @@ out:
 	return ret;
 }
 
+#if 0
+/* SG */
+static int snappy_decompress_biovec(struct list_head *ws,
+				 struct page **pages_in,
+				 u64 disk_start,
+				 struct bio_vec *bvec,
+				 int vcnt,
+				 size_t srclen)
+{
+	struct workspace *workspace = list_entry(ws, struct workspace, list);
+	char *data_in;
+	unsigned long tot_len;
+	int total_pages_in = (srclen + PAGE_CACHE_SIZE - 1) / PAGE_CACHE_SIZE;
+	struct iovec in_iov[total_pages_in];
+	struct iovec out_iov[vcnt];
+	int i;
+	int left;
+	int err;
+
+	/* Map input */
+
+	/* Assume we have enough kmap space for all pages XXX */
+	left = total_pages_in;
+	for (i = 0; i < total_pages_in; i++) {
+		in_iov[i].iov_base = kmap(pages_in[i]);
+		in_iov[i].iov_len = min_t(unsigned, PAGE_CACHE_SIZE, left);
+		left -= PAGE_CACHE_SIZE;
+	}
+
+	/* Map output */
+	for (i = 0; i < vcnt; i++) {
+		out_iov[i].iov_base = kmap(bvec[i].bv_page);
+		out_iov[i].iov_len = PAGE_CACHE_SIZE;
+	}
+
+	err = snappy_uncompress_iov(workspace->env,
+				    in_iov, total_pages_in,
+				    srclen,
+				    out_iov, vcnt);
+
+	for (i = 0; i < total_pages_in)
+		kunmap(in_iov[i].iov_base);
+	for (i = 0; i < vcnt; i++)
+		kunmap(bvec[i].bv_page);
+
+	return err;
+}
+#endif
+
 static int snappy_decompress_biovec(struct list_head *ws,
 				 struct page **pages_in,
 				 u64 disk_start,
