@@ -2309,14 +2309,14 @@ static struct platform_driver w83627ehf_driver = {
 static int __init w83627ehf_find(int sioaddr, unsigned short *addr,
 				 struct w83627ehf_sio_data *sio_data)
 {
-	static const char __initdata sio_name_W83627EHF[] = "W83627EHF";
-	static const char __initdata sio_name_W83627EHG[] = "W83627EHG";
-	static const char __initdata sio_name_W83627DHG[] = "W83627DHG";
-	static const char __initdata sio_name_W83627DHG_P[] = "W83627DHG-P";
-	static const char __initdata sio_name_W83667HG[] = "W83667HG";
-	static const char __initdata sio_name_W83667HG_B[] = "W83667HG-B";
-	static const char __initdata sio_name_NCT6775[] = "NCT6775F";
-	static const char __initdata sio_name_NCT6776[] = "NCT6776F";
+	static const char __initconst sio_name_W83627EHF[] = "W83627EHF";
+	static const char __initconst sio_name_W83627EHG[] = "W83627EHG";
+	static const char __initconst sio_name_W83627DHG[] = "W83627DHG";
+	static const char __initconst sio_name_W83627DHG_P[] = "W83627DHG-P";
+	static const char __initconst sio_name_W83667HG[] = "W83667HG";
+	static const char __initconst sio_name_W83667HG_B[] = "W83667HG-B";
+	static const char __initconst sio_name_NCT6775[] = "NCT6775F";
+	static const char __initconst sio_name_NCT6776[] = "NCT6776F";
 
 	u16 val;
 	const char *sio_name;
