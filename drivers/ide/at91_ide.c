@@ -208,7 +208,7 @@ static const struct ide_port_ops at91_ide_port_ops = {
 	.set_pio_mode	= at91_ide_set_pio_mode,
 };
 
-static const struct ide_port_info at91_ide_port_info __initdata = {
+static const struct ide_port_info at91_ide_port_info __initconst = {
 	.port_ops	= &at91_ide_port_ops,
 	.tp_ops		= &at91_ide_tp_ops,
 	.host_flags 	= IDE_HFLAG_MMIO | IDE_HFLAG_NO_DMA | IDE_HFLAG_SINGLE |
