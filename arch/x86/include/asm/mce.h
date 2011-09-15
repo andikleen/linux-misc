@@ -214,7 +214,6 @@ extern void register_mce_write_callback(ssize_t (*)(struct file *filp,
 
 /* Call the installed machine check handler for this CPU setup. */
 extern void (*machine_check_vector)(struct pt_regs *, long error_code);
-void do_machine_check(struct pt_regs *, long);
 
 /*
  * Threshold handler
