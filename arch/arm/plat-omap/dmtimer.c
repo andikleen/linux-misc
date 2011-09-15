@@ -78,7 +78,7 @@ static struct omap_dm_timer omap2_dm_timers[] = {
 	{ .phys_base = 0x4808a000, .irq = INT_24XX_GPTIMER12 },
 };
 
-static const char *omap2_dm_source_names[] __initdata = {
+static const char * const omap2_dm_source_names[] __initconst = {
 	"sys_ck",
 	"func_32k_ck",
 	"alt_ck",
@@ -111,7 +111,7 @@ static struct omap_dm_timer omap3_dm_timers[] = {
 	{ .phys_base = 0x48304000, .irq = INT_34XX_GPT12_IRQ },
 };
 
-static const char *omap3_dm_source_names[] __initdata = {
+static const char * const omap3_dm_source_names[] __initconst = {
 	"sys_ck",
 	"omap_32k_fck",
 	NULL
@@ -142,7 +142,7 @@ static struct omap_dm_timer omap4_dm_timers[] = {
 	{ .phys_base = 0x48088000, .irq = OMAP44XX_IRQ_GPT11 },
 	{ .phys_base = 0x4a320000, .irq = OMAP44XX_IRQ_GPT12 },
 };
-static const char *omap4_dm_source_names[] __initdata = {
+static const char * const omap4_dm_source_names[] __initconst = {
 	"sys_clkin_ck",
 	"sys_32k_ck",
 	NULL
