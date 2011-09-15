@@ -2418,7 +2418,7 @@ EXPORT_SYMBOL(orinoco_down);
 /* Module initialization                                            */
 /********************************************************************/
 
-/* Can't be declared "const" or the whole __initconst section will
+/* Can't be declared "const" or the whole __initdata section will
  * become const */
 static char version[] __initdata = DRIVER_NAME " " DRIVER_VERSION
 	" (David Gibson <hermes@gibson.dropbear.id.au>, "
