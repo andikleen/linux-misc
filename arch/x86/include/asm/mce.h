@@ -209,7 +209,6 @@ extern struct file_operations mce_chrdev_ops;
 
 /* Call the installed machine check handler for this CPU setup. */
 extern void (*machine_check_vector)(struct pt_regs *, long error_code);
-void do_machine_check(struct pt_regs *, long);
 
 /*
  * Threshold handler
