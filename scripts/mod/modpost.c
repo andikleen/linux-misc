@@ -588,6 +588,15 @@ static void handle_modversions(struct module *mod, struct elf_info *info,
 {
 	unsigned int crc;
 	enum export export;
+	char newname[strlen(symname) + 1];
+	char *p;
+
+	/* Remove .number postfixes */
+	if (symname[0] && (p = strchr(symname + 1, '.')) != NULL) {
+		strcpy(newname, symname);
+		newname[p - symname] = 0;
+		symname = newname;
+	}
 
 	if ((!is_vmlinux(mod->name) || mod->is_dot_o) &&
 	    strncmp(symname, "__ksymtab", 9) == 0)
