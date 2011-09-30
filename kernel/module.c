@@ -310,6 +310,7 @@ EXPORT_SYMBOL_GPL(each_symbol_section);
 struct find_symbol_arg {
 	/* Input */
 	const char *name;
+	int len;
 	bool gplok;
 	bool warn;
 
@@ -358,12 +359,21 @@ static bool check_symbol(const struct symsearch *syms,
 	return true;
 }
 
+static int matching_len(const char *name)
+{
+	int l;
+
+	if (name[0] == 0)
+		return 0;
+	l = strcspn(name + 1, ".");
+	return name[l] ? l + 1 : l;
+}
+
 static int cmp_name(const void *va, const void *vb)
 {
-	const char *a;
-	const struct kernel_symbol *b;
-	a = va; b = vb;
-	return strcmp(a, b->name);
+	const struct find_symbol_arg *fsa = va;
+	const struct kernel_symbol *b = vb;
+	return strncmp(fsa->name, b->name, fsa->len);
 }
 
 static bool find_symbol_in_section(const struct symsearch *syms,
@@ -373,7 +383,7 @@ static bool find_symbol_in_section(const struct symsearch *syms,
 	struct find_symbol_arg *fsa = data;
 	struct kernel_symbol *sym;
 
-	sym = bsearch(fsa->name, syms->start, syms->stop - syms->start,
+	sym = bsearch(fsa, syms->start, syms->stop - syms->start,
 			sizeof(struct kernel_symbol), cmp_name);
 
 	if (sym != NULL && check_symbol(syms, owner, sym - syms->start, data))
@@ -395,6 +405,7 @@ const struct kernel_symbol *find_symbol(const char *name,
 	fsa.name = name;
 	fsa.gplok = gplok;
 	fsa.warn = warn;
+	fsa.len = matching_len(name);
 
 	if (each_symbol_section(find_symbol_in_section, &fsa)) {
 		if (owner)
