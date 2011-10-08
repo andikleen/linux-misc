@@ -29,7 +29,7 @@
  * and vice versa.
  */
 
-static unsigned long vsmp_save_fl(void)
+asmregparm unsigned long vsmp_save_fl(void)
 {
 	unsigned long flags = native_save_fl();
 
@@ -39,7 +39,7 @@ static unsigned long vsmp_save_fl(void)
 }
 PV_CALLEE_SAVE_REGS_THUNK(vsmp_save_fl);
 
-static void vsmp_restore_fl(unsigned long flags)
+asmregparm void vsmp_restore_fl(unsigned long flags)
 {
 	if (flags & X86_EFLAGS_IF)
 		flags &= ~X86_EFLAGS_AC;
@@ -49,7 +49,7 @@ static void vsmp_restore_fl(unsigned long flags)
 }
 PV_CALLEE_SAVE_REGS_THUNK(vsmp_restore_fl);
 
-static void vsmp_irq_disable(void)
+asmregparm void vsmp_irq_disable(void)
 {
 	unsigned long flags = native_save_fl();
 
@@ -57,7 +57,7 @@ static void vsmp_irq_disable(void)
 }
 PV_CALLEE_SAVE_REGS_THUNK(vsmp_irq_disable);
 
-static void vsmp_irq_enable(void)
+asmregparm void vsmp_irq_enable(void)
 {
 	unsigned long flags = native_save_fl();
 

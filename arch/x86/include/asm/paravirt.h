@@ -839,10 +839,10 @@ static __always_inline void arch_spin_unlock(struct arch_spinlock *lock)
  * functions.
  */
 #define PV_CALLEE_SAVE_REGS_THUNK(func)					\
-	extern asmregparm typeof(func) __raw_callee_save_##func;			\
-	static void *__##func##__ __used = func;			\
+	extern asmregparm typeof(func) __raw_callee_save_##func;	\
 									\
 	asm(".pushsection .text;"					\
+	    ".globl __raw_callee_save_" #func " ; "			\
 	    "__raw_callee_save_" #func ": "				\
 	    PV_SAVE_ALL_CALLER_REGS					\
 	    "call " #func ";"						\
