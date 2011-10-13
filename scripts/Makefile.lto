@@ -16,14 +16,14 @@ ifdef CONFIG_LTO
 # XXX check linker version
 ifeq ($(call cc-ifversion, -ge, 0407,y),y)
 ifneq ($(call cc-option,${LTO_CFLAGS},n),n)
-	LTO_CFLAGS := -fuse-linker-plugin -flto=8 -fno-toplevel-reorder
+	LTO_CFLAGS := -fuse-linker-plugin -flto=16 -fno-toplevel-reorder #-fno-fat-lto-objects
 	DISABLE_LTO := -fno-lto
 
-	LTO_FINAL_CFLAGS += ${LTO_CFLAGS} -fwhole-program -flto-partition=none
+	LTO_FINAL_CFLAGS += ${LTO_CFLAGS} -fwhole-program # -flto-partition=none
 
 ifdef CONFIG_LTO_DEBUG
-	LTO_FINAL_CFLAGS += -fdump-ipa-cgraph -dH # -Wl,-plugin-save-temps -save-temps   -dH
-	LTO_CFLAGS += -dH
+	LTO_FINAL_CFLAGS += -dH #-fdump-ipa-cgraph -fdump-ipa-inline-details -Wl,-plugin-save-temps -save-temps   -dH
+	LTO_CFLAGS += 
 endif
 
 	# need to explicitely enable the optimizer again on the link
