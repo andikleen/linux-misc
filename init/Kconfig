@@ -992,6 +992,10 @@ config LTO_DEBUG
 	bool "Enable LTO compile time debugging"
 	depends on LTO
 
+config LTO_FAST_BUT_BROKEN
+	bool "Disable partition=none workaround"
+	depends on LTO
+
 config SYSCTL
 	bool
 
