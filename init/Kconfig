@@ -995,6 +995,16 @@ config LTO_DEBUG
 config LTO_FAST_BUT_BROKEN
 	bool "Disable partition=none workaround"
 	depends on LTO
+	help
+	  This will not actually produce a working kernel, but is useful
+	  to check the build.
+
+config LTO_SLIM
+	bool "Use slim lto"
+	depend on LTO
+	help
+          Requires recent Linux binutils and an AR=... wrapper that sets
+	  the linker plugin.
 
 config SYSCTL
 	bool
