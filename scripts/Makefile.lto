@@ -20,7 +20,7 @@ ifneq ($(call cc-option,${LTO_CFLAGS},n),n)
 	DISABLE_LTO := -fno-lto
 
 	LTO_FINAL_CFLAGS += ${LTO_CFLAGS} -fwhole-program 
-ifndef CONFIG_LTO_FASTER_BUT_BROKEN
+ifndef CONFIG_LTO_FAST_BUT_BROKEN
 	LTO_FINAL_CFLAGS += -flto-partition=none
 endif
 
