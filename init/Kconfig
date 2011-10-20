@@ -1001,7 +1001,7 @@ config LTO_FAST_BUT_BROKEN
 
 config LTO_SLIM
 	bool "Use slim lto"
-	depend on LTO
+	depends on LTO
 	help
           Requires recent Linux binutils and an AR=... wrapper that sets
 	  the linker plugin.
