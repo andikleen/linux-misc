@@ -769,13 +769,7 @@ export KBUILD_VMLINUX_OBJS := $(vmlinux-all)
 
 # Rule to link vmlinux - also used during CONFIG_KALLSYMS
 # May be overridden by arch/$(ARCH)/Makefile
-quiet_cmd_vmlinux__ ?= LD  $@
-      cmd_vmlinux__ ?= $(LD) $(LDFLAGS) $(LDFLAGS_vmlinux) -o $@ \
-      -T $(vmlinux-lds) $(vmlinux-init)                          \
-      --start-group $(vmlinux-main) --end-group                  \
-      $(filter-out $(vmlinux-lds) $(vmlinux-init) $(vmlinux-main) vmlinux.o FORCE ,$^)
-
-quiet_cmd_vmlinux_final__ ?= LDFINAL  $@
+quiet_cmd_vmlinux__ ?= LDFINAL  $@
       cmd_vmlinux__ ?= $(LDFINAL) $(LDFLAGS) $(LDFLAGS_vmlinux) -o $@ \
       -T $(vmlinux-lds) $(vmlinux-init)                          \
       --start-group $(vmlinux-main) --end-group                  \
@@ -797,16 +791,6 @@ quiet_cmd_vmlinux_version = GEN     .version
 quiet_cmd_sysmap = SYSMAP
       cmd_sysmap = $(CONFIG_SHELL) $(srctree)/scripts/mksysmap
 
-ifdef CONFIG_KALLSYMS
-define finalize_kernel
-	+$(call cmd,vmlinux__)
-endef
-else
-define finalize_kernel
-	+$(call cmd,vmlinux_final__)
-endef
-endif
-
 # Link of vmlinux
 # If CONFIG_KALLSYMS is set .version is already updated
 # Generate System.map and verify that the content is consistent
@@ -815,7 +799,8 @@ endif
 define rule_vmlinux__
 	:
 	+$(if $(CONFIG_KALLSYMS),,+$(call cmd,vmlinux_version))
-	$(call finalize_kernel)
+
+	+$(call cmd,vmlinux__)
 	$(Q)echo 'cmd_$@ := $(cmd_vmlinux__)' > $(@D)/.$(@F).cmd
 
 	$(Q)$(if $($(quiet)cmd_sysmap),                                      \
@@ -875,7 +860,7 @@ cmd_ksym_ld = $(cmd_vmlinux__)
 define rule_ksym_ld
 	: 
 	+$(call cmd,vmlinux_version)
-	$(call cmd,vmlinux_final__)
+	$(call cmd,vmlinux__)
 	$(Q)echo 'cmd_$@ := $(cmd_vmlinux__)' > $(@D)/.$(@F).cmd
 endef
 
