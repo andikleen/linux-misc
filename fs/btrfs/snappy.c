@@ -392,11 +392,15 @@ static int btrfs_snappy_decompress(struct list_head *ws, unsigned char *data_in,
 	struct workspace *workspace = list_entry(ws, struct workspace, list);
 	size_t in_len;
 	size_t out_len;
+	size_t tot_len;
 	int ret = 0;
 	char *kaddr;
 	unsigned long bytes;
 
 	BUG_ON(srclen < SNAPPY_LEN);
+
+	tot_len = read_compress_length(data_in);
+	data_in += SNAPPY_LEN;
 
 	in_len = read_compress_length(data_in);
 	data_in += SNAPPY_LEN;
