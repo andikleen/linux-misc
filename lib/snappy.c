@@ -41,6 +41,7 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/snappy.h>
+#include <linux/vmalloc.h>
 #include <asm/unaligned.h>
 
 #define CRASH_UNLESS(x) BUG_ON(!(x))
@@ -102,11 +103,6 @@ static inline int find_lsb_set_non_zero(u32 n)
 
 static inline int find_lsb_set_non_zero64(u64 n)
 {
-	if (sizeof(long) == 4) {
-		if (n & 0xffffffff)
-			return __builtin_ctz(n & 0xffffffff);
-		return 32 + __builtin_ctz(n >> 32);
-	}
 	return __builtin_ctzll(n);
 }
 
@@ -198,6 +194,7 @@ static inline char *varint_encode32(char *sptr, u32 v)
 	return (char *)(ptr);
 }
 
+
 struct source {
 	const char *ptr;
 	size_t left;
@@ -235,6 +232,7 @@ static inline void *sink_peek(struct sink *s, size_t n)
 {
 	return s->dest;
 }
+
 
 struct writer {
 	char *base;
@@ -354,23 +352,30 @@ static inline bool writer_append_from_self(struct writer *w, u32 offset,
 	return true;
 }
 
-static inline bool writer_append(struct writer *w, const char *ip, u32 len,
-				 bool allow_fast_path)
+static inline bool writer_append(struct writer *w, const char *ip, u32 len)
 {
 	char *op = w->op;
 	const int space_left = w->op_limit - op;
-	if (allow_fast_path && len <= 16 && space_left >= 16) {
-		/* Fast path, used for the majority (about 90%) of dynamic
-		 * invocations. */
-		UNALIGNED_STORE64(op, UNALIGNED_LOAD64(ip));
-		UNALIGNED_STORE64(op + 8, UNALIGNED_LOAD64(ip + 8));
-	} else {
-		if (space_left < len)
-			return false;
-		memcpy(op, ip, len);
-	}
+	if (space_left < len)
+		return false;
+	memcpy(op, ip, len);
 	w->op = op + len;
 	return true;
+}
+
+static inline bool writer_try_fast_append(struct writer *w, const char *ip,
+					  u32 available, u32 len)
+{
+	char *op = w->op;
+	const int space_left = w->op_limit - op;
+	if (len <= 16 && available >= 16 && space_left >= 16) {
+		/* Fast path, used for the majority (~95%) of invocations */
+		UNALIGNED_STORE64(op, UNALIGNED_LOAD64(ip));
+		UNALIGNED_STORE64(op + 8, UNALIGNED_LOAD64(ip + 8));
+		w->op = op + len;
+		return true;
+	}
+	return false;
 }
 
 /*
@@ -542,6 +547,10 @@ EXPORT_SYMBOL(snappy_uncompressed_length);
 #define kblock_log 15
 #define kblock_size (1 << kblock_log)
 
+/*
+ * This value could be halfed or quartered to save memory
+ * at the cost of slightly worse compression.
+ */
 #define kmax_hash_table_bits 14
 #define kmax_hash_table_size (1 << kmax_hash_table_bits)
 
@@ -583,7 +592,7 @@ static u16 *get_hash_table(struct snappy_env *env, size_t input_size,
  * Separate implementation for x86_64, for speed.  Uses the fact that
  * x86_64 is little endian.
  */
-#if defined(__LITTLE_ENDIAN__)
+#if defined(__LITTLE_ENDIAN__) && BITS_PER_LONG == 64
 static inline int find_match_length(const char *s1,
 				    const char *s2, const char *s2_limit)
 {
@@ -957,6 +966,21 @@ static void decompress_all_tags(struct snappy_decompressor *d,
 {
 	const char *ip = d->ip;
 
+	/*
+	 * We could have put this refill fragment only at the beginning of the loop.
+	 * However, duplicating it at the end of each branch gives the compiler more
+	 * scope to optimize the <ip_limit_ - ip> expression based on the local
+	 * context, which overall increases speed.
+	 */
+#define MAYBE_REFILL() \
+        if (d->ip_limit - ip < 5) {		\
+		d->ip = ip;			\
+		if (!refill_tag(d)) return;	\
+		ip = d->ip;			\
+        }
+
+
+	MAYBE_REFILL();
 	for (;;) {
 		if (d->ip_limit - ip < 5) {
 			d->ip = ip;
@@ -968,19 +992,25 @@ static void decompress_all_tags(struct snappy_decompressor *d,
 		const unsigned char c = *(const unsigned char *)(ip++);
 
 		if ((c & 0x3) == LITERAL) {
-			u32 literal_length = c >> 2;
-			if (unlikely(literal_length >= 60)) {
+			u32 literal_length = (c >> 2) + 1;
+			if (writer_try_fast_append(writer, ip, d->ip_limit - ip,
+						   literal_length)) {
+				DCHECK_LT(literal_length, 61);
+				ip += literal_length;
+				MAYBE_REFILL();
+				continue;
+			}
+			if (unlikely(literal_length >= 61)) {
 				/* Long literal */
-				const u32 literal_ll = literal_length - 59;
-				literal_length = get_unaligned_le32(ip) &
-					wordmask[literal_ll];
+				const u32 literal_ll = literal_length - 60;
+				literal_length = (get_unaligned_le32(ip) &
+						  wordmask[literal_ll]) + 1;
 				ip += literal_ll;
 			}
-			++literal_length;
 
 			u32 avail = d->ip_limit - ip;
 			while (avail < literal_length) {
-				if (!writer_append(writer, ip, avail, false))
+				if (!writer_append(writer, ip, avail))
 					return;
 				literal_length -= avail;
 				skip(d->reader, d->peeked);
@@ -992,11 +1022,10 @@ static void decompress_all_tags(struct snappy_decompressor *d,
 					return;	/* Premature end of input */
 				d->ip_limit = ip + avail;
 			}
-			bool allow_fast_path = (avail >= 16);
-			if (!writer_append(writer, ip, literal_length,
-					   allow_fast_path))
+			if (!writer_append(writer, ip, literal_length))
 				return;
 			ip += literal_length;
+			MAYBE_REFILL();
 		} else {
 			const u32 entry = char_table[c];
 			const u32 trailer = get_unaligned_le32(ip) &
@@ -1015,9 +1044,12 @@ static void decompress_all_tags(struct snappy_decompressor *d,
 						     copy_offset + trailer,
 						     length))
 				return;
+			MAYBE_REFILL();
 		}
 	}
 }
+
+#undef MAYBE_REFILL
 
 static bool refill_tag(struct snappy_decompressor *d)
 {
@@ -1138,7 +1170,6 @@ static inline int compress(struct snappy_env *env, struct source *reader,
 			pending_advance = num_to_read;
 			fragment_size = num_to_read;
 		}
-#ifdef SCATHER_GATHER
 		else {
 			memcpy(env->scratch, fragment, bytes_read);
 			skip(reader, bytes_read);
@@ -1156,7 +1187,6 @@ static inline int compress(struct snappy_env *env, struct source *reader,
 			fragment = env->scratch;
 			fragment_size = num_to_read;
 		}
-#endif
 		if (fragment_size < num_to_read)
 			return -EIO;
 
@@ -1170,7 +1200,6 @@ static inline int compress(struct snappy_env *env, struct source *reader,
 
 		char *dest;
 		dest = sink_peek(writer, max_output);
-#ifdef SCATHER_GATHER
 		if (!dest) {
 			/*
 			 * Need a scratch buffer for the output,
@@ -1179,7 +1208,6 @@ static inline int compress(struct snappy_env *env, struct source *reader,
 			 */
 			dest = env->scratch_output;
 		}
-#endif
 		char *end = compress_fragment(fragment, fragment_size,
 					      dest, table, table_size);
 		append(writer, dest, end - dest);
@@ -1256,10 +1284,13 @@ bool snappy_uncompress(const char *compressed, size_t n, char *uncompressed)
 }
 EXPORT_SYMBOL(snappy_uncompress);
 
+
 /**
  * snappy_init_env - Allocate snappy compression environment
  * @env: Environment to preallocate
  *
+ * Passing multiple entries in an iovec is not allowed
+ * on the environment allocated here.
  * Returns 0 on success, otherwise negative errno.
  * Must run in process context.
  */
@@ -1267,18 +1298,8 @@ int snappy_init_env(struct snappy_env *env)
 {
 	env->hash_table = vmalloc(sizeof(u16) * kmax_hash_table_size);
 	if (!env->hash_table)
-		goto error;
-#ifdef SCATHER_GATHER
-	env->scratch = vmalloc(kblock_size);
-	env->scratch_output =
-		vmalloc(snappy_max_compressed_length(kblock_size));
-	if (!env->scratch || !env->scratch_output)
-		goto error;
-#endif
+		return -ENOMEM;
 	return 0;
-error:
-	snappy_free_env(env);
-	return -ENOMEM;
 }
 EXPORT_SYMBOL(snappy_init_env);
 
@@ -1291,10 +1312,6 @@ EXPORT_SYMBOL(snappy_init_env);
 void snappy_free_env(struct snappy_env *env)
 {
 	vfree(env->hash_table);
-#ifdef SCATHER_GATHER
-	vfree(env->scratch);
-	vfree(env->scratch_output);
-#endif
 	memset(env, 0, sizeof(struct snappy_env));
 }
 EXPORT_SYMBOL(snappy_free_env);
