@@ -1315,3 +1315,5 @@ void snappy_free_env(struct snappy_env *env)
 	memset(env, 0, sizeof(struct snappy_env));
 }
 EXPORT_SYMBOL(snappy_free_env);
+
+MODULE_LICENSE("BSD");
