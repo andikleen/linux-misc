@@ -16,7 +16,7 @@ ifdef CONFIG_LTO
 # XXX check linker version
 ifeq ($(call cc-ifversion, -ge, 0407,y),y)
 ifneq ($(call cc-option,${LTO_CFLAGS},n),n)
-	LTO_CFLAGS := -fuse-linker-plugin -flto=16 # -fno-toplevel-reorder 
+	LTO_CFLAGS := -fuse-linker-plugin -flto=16 -fno-toplevel-reorder 
 ifdef CONFIG_LTO_SLIM
 	# requires plugin ar passed and very recent HJ binutils
 	LTO_CFLAGS += -fno-fat-lto-objects
