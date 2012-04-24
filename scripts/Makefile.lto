@@ -24,9 +24,6 @@ endif
 	DISABLE_LTO := -fno-lto
 
 	LTO_FINAL_CFLAGS += ${LTO_CFLAGS} -fwhole-program 
-ifndef CONFIG_LTO_FAST_BUT_BROKEN
-	LTO_FINAL_CFLAGS += -flto-partition=none
-endif
 
 ifdef CONFIG_LTO_DEBUG
 	LTO_FINAL_CFLAGS += -dH #-fdump-ipa-cgraph -fdump-ipa-inline-details -Wl,-plugin-save-temps -save-temps   -dH
