@@ -992,13 +992,6 @@ config LTO_DEBUG
 	bool "Enable LTO compile time debugging"
 	depends on LTO
 
-config LTO_FAST_BUT_BROKEN
-	bool "Disable partition=none workaround"
-	depends on LTO
-	help
-	  This will not actually produce a working kernel, but is useful
-	  to check the build.
-
 config LTO_SLIM
 	bool "Use slim lto"
 	depends on LTO
