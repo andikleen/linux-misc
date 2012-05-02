@@ -975,6 +975,8 @@ config LTO_MENU
 	  When the toolchain support is not available this will
 	  be automatically disabled.
 
+          For more information see Documentation/lto-build
+
 config LTO_DISABLE
          bool "Disable LTO again"
          depends on LTO_MENU
