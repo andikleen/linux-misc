@@ -1,0 +1,94 @@
+Link time optimization (LTO) for the Linux kernel
+
+This is an experimential feature.
+
+Link Time Optimization allows the compiler to optimize the complete program
+instead of just each file.  Link Time Optimization is a new feature in gcc 4.6,
+but only really works with gcc 4.7 (but still various issues)
+
+The compiler can inline between files and do some other global optimizations.
+It will also drop unused functions which can make the kernel image smaller
+in some circumstances.  Build time and memory consumption of the build will increase.
+
+Normal "reaosnable" builds work with less than 4GB of RAM, but very large
+configurations like allyesconfig need slightly more.
+
+Issues:
+- 32bit builds currently crash gcc 4.7 (WIP)
+- allnoconfig also crashes
+- 64bit works, but only limited configs tested in a limited way.
+- Various workarounds in kernel for toolchain problems. Some 
+of them are obsolete.
+- A few kernel features are currently incompatible, in particular
+function tracing, because they require special compiler flags for
+specific files, which is not supported in LTO right now.
+- Some of the kernel changes for correct section attributes
+break obscure ports with broken tool chains (pa-risc) (WIP)
+
+Configuration:
+- Enable CONFIG_LTO_MENU and then disable CONFIG_LTO_DISABLE.
+This is mainly to not have allyesconfig default to LTO.
+- FUNCTION_TRACER, STACK_TRACER, FUNCTION_GRAPH_TRACER have to disabled
+because they are currently incompatible with LTO.
+
+Requirements:
+- Enough memory: 4GB for a standard build, ~6GB for allyesconfig
+If you are tight on memory and use tmpfs as /tmp define TMPDIR and 
+point it to a directory on disk. And dial down the -jN number
+during the kernel build.
+
+- HJ Lu's Linux binutils from
+http://www.kernel.org/pub/linux/devel/binutils/
+Sorry standard binutils releases don't work
+The kernel build has to use this linker, so if it is installed 
+in a non standard location use LD=... on the make line.
+
+- gcc 4.7 built with plugin ld (--with-plugin-ld) also pointing to the 
+linker from HJ's binutils and LTO 
+
+Example build procedure for the tool chain and kernel. This does not 
+overwrite the standard compiler toolchain on the system. If you already
+have a suitable gcc 4.7+ compiler and linker the toolchain build can
+be skipped.
+
+Get HJ Lu Linux binutils from http://www.kernel.org/pub/linux/devel/binutils/
+The standard binutils do not work at this point!
+
+Unpack binutils
+
+cd binutils-VERSION  (or plain binutils in some 
+./configure --prefix=/opt/binutils-hjlu --enable-plugins
+nice -n20 make -j$(getconf _NPROCESSORS_ONLN)
+sudo make install
+sudo ln -sf /opt/binutils-hjlu/bin/ld /usr/local/bin/ld-plugin
+
+Unpack gcc-4.7
+
+mkdir obj
+cd obj
+../gcc-4.7*/configure --prefix=/opt/gcc-4.7 --enable-lto \
+--with-plugin-ld=/usr/local/bin/ld-plugin  \
+--disable-nls --enable-languages=c,c++ \
+--enable-checking=release --disable-libstdcxx-pch  \
+--disable-fixincl
+nice -n20 make -j$(getconf _NPROCESSORS_ONLN) 
+sudo make install
+sudo ln -sf /opt/gcc-4.7/bin/gcc /usr/local/bin/gcc47
+sudo ln -sf /opt/gcc-4.7/bin/gcc-ar /usr/local/bin/gcc-ar47
+
+# get lto tree in linux-lto
+
+mkdir obj
+cd obj
+# copy a suitable kernel config file into .config
+make -C ../linux-lto O=$(pwd)  oldconfig
+# make sure FUNCTION_TRACER, FUNCTION_GRAPH_TRACER, STACK_TRACER are disabled
+# enable CONFIG_LTO_MENU and disable CONFIG_LTO_DISABLE
+# CONFIG_LTO_SLIM is recommended
+export TMPDIR=$(pwd) 
+# this lowers memory usage with /tmp=tmpfs
+nice -n20 make CC=gcc47 LD=ld-plugin AR=gcc-ar47 \
+-j $(getconf _NPROCESSORS_ONLN)
+
+Andi Kleen
+- 
