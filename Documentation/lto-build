@@ -10,7 +10,7 @@ The compiler can inline between files and do some other global optimizations.
 It will also drop unused functions which can make the kernel image smaller
 in some circumstances.  Build time and memory consumption of the build will increase.
 
-Normal "reaosnable" builds work with less than 4GB of RAM, but very large
+Normal "reasonable" builds work with less than 4GB of RAM, but very large
 configurations like allyesconfig need slightly more.
 
 Issues:
@@ -69,7 +69,7 @@ cd obj
 ../gcc-4.7*/configure --prefix=/opt/gcc-4.7 --enable-lto \
 --with-plugin-ld=/usr/local/bin/ld-plugin  \
 --disable-nls --enable-languages=c,c++ \
---enable-checking=release --disable-libstdcxx-pch  \
+--disable-libstdcxx-pch  \
 --disable-fixincl
 nice -n20 make -j$(getconf _NPROCESSORS_ONLN) 
 sudo make install
@@ -82,13 +82,12 @@ mkdir obj
 cd obj
 # copy a suitable kernel config file into .config
 make -C ../linux-lto O=$(pwd)  oldconfig
-# make sure FUNCTION_TRACER, FUNCTION_GRAPH_TRACER, STACK_TRACER are disabled
-# enable CONFIG_LTO_MENU and disable CONFIG_LTO_DISABLE
-# CONFIG_LTO_SLIM is recommended
+./source/scripts/config --disable function_tracer --disable function_graph_tracer \
+			 --disable stack_tracer --enable lto_menu \
+                         --disable lto_disable --enable lto_slim --disable lto_debug \
 export TMPDIR=$(pwd) 
 # this lowers memory usage with /tmp=tmpfs
 nice -n20 make CC=gcc47 LD=ld-plugin AR=gcc-ar47 \
 -j $(getconf _NPROCESSORS_ONLN)
 
 Andi Kleen
-- 
