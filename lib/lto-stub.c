@@ -1,6 +1,7 @@
 #include <linux/log2.h>
 #include <linux/delay.h>
 #include <linux/kernel.h>
+#include <linux/bug.h>
 
 /* 
  * When doing link-time-optimization the linker resolves some symbols
