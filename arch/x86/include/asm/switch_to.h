@@ -2,7 +2,7 @@
 #define _ASM_X86_SWITCH_TO_H
 
 struct task_struct; /* one of the stranger aspects of C forward declarations */
-asmlinkage struct task_struct *__switch_to(struct task_struct *prev,
+asmregparm struct task_struct *__switch_to(struct task_struct *prev,
 	 				   struct task_struct *next);
 struct tss_struct;
 void __switch_to_xtra(struct task_struct *prev_p, struct task_struct *next_p,
