@@ -14,8 +14,6 @@ Normal "reasonable" builds work with less than 4GB of RAM, but very large
 configurations like allyesconfig need slightly more.
 
 Issues:
-- 32bit builds currently crash gcc 4.7 (WIP)
-- allnoconfig also crashes
 - 64bit works, but only limited configs tested in a limited way.
 - Various workarounds in kernel for toolchain problems. Some 
 of them are obsolete.

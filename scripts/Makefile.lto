@@ -17,14 +17,17 @@ ifdef CONFIG_LTO
 ifeq ($(call cc-ifversion, -ge, 0407,y),y)
 ifneq ($(call cc-option,${LTO_CFLAGS},n),n)
 # should use -flto=jobserver, but we need a fix for http://gcc.gnu.org/PR50639
-	LTO_CFLAGS := -fuse-linker-plugin -flto=`getconf _NPROCESSORS_ONLN` # -fno-toplevel-reorder 
+	LTO_CFLAGS := -fuse-linker-plugin -flto=`getconf _NPROCESSORS_ONLN` # -fno-toplevel-reorder
 ifdef CONFIG_LTO_SLIM
 	# requires plugin ar passed and very recent HJ binutils
 	LTO_CFLAGS += -fno-fat-lto-objects
 endif
 	DISABLE_LTO := -fno-lto
 
-	LTO_FINAL_CFLAGS += ${LTO_CFLAGS} -fwhole-program 
+	LTO_FINAL_CFLAGS += ${LTO_CFLAGS} -fwhole-program  
+
+	# workaround for http://gcc.gnu.org/PR50602
+	LTO_FINAL_CFLAGS += $(filter -freg-struct-return,${KBUILD_CFLAGS})
 
 ifdef CONFIG_LTO_DEBUG
 	LTO_FINAL_CFLAGS += -dH -fdump-ipa-cgraph -fdump-ipa-inline-details # -Wl,-plugin-save-temps -save-temps
