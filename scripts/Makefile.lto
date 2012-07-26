@@ -37,7 +37,7 @@ endif
 
 	LTO_FINAL_CFLAGS += $(filter -g%,${KBUILD_CFLAGS})
 	LTO_FINAL_CFLAGS += $(filter -O%,${KBUILD_CFLAGS})
-	LTO_FINAL_CFLAGS += $(filter -f%,${KBUILD_CFLAGS})
+	#LTO_FINAL_CFLAGS += $(filter -f%,${KBUILD_CFLAGS})
 	LTO_FINAL_CFLAGS += $(filter -m%,${KBUILD_CFLAGS})
 	LTO_FINAL_CFLAGS += $(filter -W%,${KBUILD_CFLAGS})
 
