@@ -588,15 +588,6 @@ static void handle_modversions(struct module *mod, struct elf_info *info,
 {
 	unsigned int crc;
 	enum export export;
-	char newname[strlen(symname) + 1];
-	char *p;
-
-	/* Remove .number postfixes */
-	if (symname[0] && (p = strchr(symname + 1, '.')) != NULL) {
-		strcpy(newname, symname);
-		newname[p - symname] = 0;
-		symname = newname;
-	}
 
 	if ((!is_vmlinux(mod->name) || mod->is_dot_o) &&
 	    strncmp(symname, "__ksymtab", 9) == 0)
@@ -1693,6 +1684,19 @@ static void check_sec_ref(struct module *mod, const char *modname,
 	}
 }
 
+static char *remove_dot(char *s)
+{
+	char *end;
+	int n = strcspn(s, ".");
+
+	if (n > 0 && s[n] != 0) {
+		strtoul(s + n + 1, &end, 10);
+		if  (end > s + n + 1 && (*end == '.' || *end == 0))
+			s[n] = 0;
+	}
+	return s;
+}
+
 static void read_symbols(char *modname)
 {
 	const char *symname;
@@ -1731,7 +1735,7 @@ static void read_symbols(char *modname)
 	}
 
 	for (sym = info.symtab_start; sym < info.symtab_stop; sym++) {
-		symname = info.strtab + sym->st_name;
+		symname = remove_dot(info.strtab + sym->st_name);
 
 		handle_modversions(mod, &info, sym, symname);
 		handle_moddevtable(mod, &info, sym, symname);
