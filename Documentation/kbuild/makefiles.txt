@@ -595,6 +595,16 @@ more details, with real examples.
 		#Makefile
 		LDFLAGS_vmlinux += $(call ld-option, -X)
 
+    ld-version
+	ld-version returns the full version number of $(LD), for three
+	number binutils versions, like the Linux binutils
+
+    ld-ifversion
+	Check the version number of the $(LD) linker in an if.
+
+	Example:
+		#Makefile.lto
+		ifeq ($(call ld-ifversion,-ge,22710001,y),y)
 
 === 4 Host Program support
 
