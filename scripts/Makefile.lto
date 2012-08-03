@@ -35,9 +35,15 @@ ifdef CONFIG_LTO_DEBUG
 	LTO_CFLAGS += 
 endif
 
+	# In principle gcc should pass through options in the object files,
+	# but it doesn't always work. So do it here manually
 	LTO_FINAL_CFLAGS += $(filter -g%,${KBUILD_CFLAGS})
 	LTO_FINAL_CFLAGS += $(filter -O%,${KBUILD_CFLAGS})
+	# we cannot pass through all -f* flags right now. Some combination causes
+	# a crash at boot (TBD)
+	# But we need to pass through the frame pointer setting at least
 	#LTO_FINAL_CFLAGS += $(filter -f%,${KBUILD_CFLAGS})
+	LTO_FINAL_CFLAGS += $(filter -fno-omit-frame-pointer, ${KBUILD_CFLAGS})
 	LTO_FINAL_CFLAGS += $(filter -m%,${KBUILD_CFLAGS})
 	LTO_FINAL_CFLAGS += $(filter -W%,${KBUILD_CFLAGS})
 
