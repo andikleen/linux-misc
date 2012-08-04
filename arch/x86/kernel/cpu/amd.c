@@ -83,7 +83,7 @@ static void __cpuinit init_amd_k6(struct cpuinfo_x86 *c)
 		 */
 
 		n = K6_BUG_LOOP;
-		f_vide = vide;
+		asm("" : "=r" (f_vide) : "0" (vide));
 		rdtscl(d);
 		while (n--)
 			f_vide();
