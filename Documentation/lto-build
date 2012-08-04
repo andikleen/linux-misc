@@ -1,33 +1,39 @@
 Link time optimization (LTO) for the Linux kernel
 
-This is an experimential feature.
+This is an experimental feature which still has various problems.
 
 Link Time Optimization allows the compiler to optimize the complete program
 instead of just each file.  Link Time Optimization is a new feature in gcc 4.6,
-but only really works with gcc 4.7 (but still various issues)
+but only really works with gcc 4.7.
 
-The compiler can inline between files and do some other global optimizations.
-It will also drop unused functions which can make the kernel image smaller
-in some circumstances.  Build time and memory consumption of the build will increase.
+The compiler can inline functions between files and do some other global
+optimizations.  It will also drop unused functions which can make the kernel
+image smaller in some circumstances.  The binary gets somewhat larger.
+In return the resulting kernels (usually) have better performance.
+
+Build time and memory consumption at build time will increase.
 
 Normal "reasonable" builds work with less than 4GB of RAM, but very large
 configurations like allyesconfig need slightly more.
 
 Issues:
-- 64bit works, but only limited configs tested in a limited way.
-- Various workarounds in kernel for toolchain problems. Some 
+- Various workarounds in kernel needed for toolchain problems. Some 
 of them are obsolete.
 - A few kernel features are currently incompatible, in particular
 function tracing, because they require special compiler flags for
 specific files, which is not supported in LTO right now.
 - Some of the kernel changes for correct section attributes
 break obscure ports with broken tool chains (pa-risc) (WIP)
+- The build is faster with LTO_SLIM enabled, but this still triggers
+in some circumstances. If you have problems disable it.
 
 Configuration:
 - Enable CONFIG_LTO_MENU and then disable CONFIG_LTO_DISABLE.
 This is mainly to not have allyesconfig default to LTO.
 - FUNCTION_TRACER, STACK_TRACER, FUNCTION_GRAPH_TRACER have to disabled
 because they are currently incompatible with LTO.
+- MODVERSIONS have to be disabled because they are not fixed for LTO
+yet.
 
 Requirements:
 - Enough memory: 4GB for a standard build, ~6GB for allyesconfig
@@ -82,9 +88,10 @@ cd obj
 make -C ../linux-lto O=$(pwd)  oldconfig
 ./source/scripts/config --disable function_tracer --disable function_graph_tracer \
 			 --disable stack_tracer --enable lto_menu \
-                         --disable lto_disable --enable lto_slim --disable lto_debug \
+                         --disable lto_disable --disable lto_debug \
 export TMPDIR=$(pwd) 
 # this lowers memory usage with /tmp=tmpfs
+# note the special ar is only needed if CONFIG_LTO_SLIM is enabled
 nice -n20 make CC=gcc47 LD=ld-plugin AR=gcc-ar47 \
 -j $(getconf _NPROCESSORS_ONLN)
 
