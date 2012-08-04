@@ -34,8 +34,8 @@
  *	performance at the same time..
  */
 
-extern void vide(void);
-__asm__(".align 4\nvide: ret");
+extern __visible void vide(void);
+__asm__(".globl vide\n\t.align 4\nvide: ret");
 
 static void __cpuinit init_amd_k5(struct cpuinfo_x86 *c)
 {
