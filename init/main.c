@@ -466,7 +466,7 @@ static void __init mm_init(void)
 asmlinkage void __init start_kernel(void)
 {
 	char * command_line;
-	extern const struct kernel_param __start___param[], __stop___param[];
+	extern __visible const struct kernel_param __start___param[], __stop___param[];
 
 	/*
 	 * Need to run as early as possible, to initialize the

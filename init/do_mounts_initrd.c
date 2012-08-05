@@ -36,7 +36,7 @@ __setup("noinitrd", no_initrd);
 static int __init do_linuxrc(void *_shell)
 {
 	static const char *argv[] = { "linuxrc", NULL, };
-	extern const char *envp_init[];
+	extern __visible const char *envp_init[];
 	const char *shell = _shell;
 
 	sys_close(old_fd);sys_close(root_fd);
