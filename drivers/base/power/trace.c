@@ -166,7 +166,7 @@ void generate_resume_trace(const void *tracedata, unsigned int user)
 }
 EXPORT_SYMBOL(generate_resume_trace);
 
-extern char __tracedata_start, __tracedata_end;
+extern __visible char __tracedata_start, __tracedata_end;
 static int show_file_hash(unsigned int value)
 {
 	int match;

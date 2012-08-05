@@ -30,8 +30,8 @@ MODULE_LICENSE("GPL");
 
 #ifdef CONFIG_FW_LOADER
 
-extern struct builtin_fw __start_builtin_fw[];
-extern struct builtin_fw __end_builtin_fw[];
+extern __visible struct builtin_fw __start_builtin_fw[];
+extern __visible struct builtin_fw __end_builtin_fw[];
 
 static bool fw_get_builtin_firmware(struct firmware *fw, const char *name)
 {
