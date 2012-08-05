@@ -34,8 +34,8 @@
 #include <linux/device.h>
 #include <linux/netdevice.h>
 
-extern struct _ddebug __start___verbose[];
-extern struct _ddebug __stop___verbose[];
+extern __visible struct _ddebug __start___verbose[];
+extern __visible struct _ddebug __stop___verbose[];
 
 struct ddebug_table {
 	struct list_head link;
