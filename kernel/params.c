@@ -503,7 +503,7 @@ EXPORT_SYMBOL(param_ops_string);
 #define to_module_attr(n) container_of(n, struct module_attribute, attr)
 #define to_module_kobject(n) container_of(n, struct module_kobject, kobj)
 
-extern struct kernel_param __start___param[], __stop___param[];
+extern __visible struct kernel_param __start___param[], __stop___param[];
 
 struct param_attribute
 {
@@ -827,8 +827,8 @@ ssize_t __modver_version_show(struct module_attribute *mattr,
 	return sprintf(buf, "%s\n", vattr->version);
 }
 
-extern const struct module_version_attribute *__start___modver[];
-extern const struct module_version_attribute *__stop___modver[];
+extern __visible const struct module_version_attribute *__start___modver[];
+extern __visible const struct module_version_attribute *__stop___modver[];
 
 static void __init version_sysfs_builtin(void)
 {

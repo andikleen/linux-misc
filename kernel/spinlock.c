@@ -377,7 +377,7 @@ EXPORT_SYMBOL(_raw_spin_lock_nest_lock);
 notrace int in_lock_functions(unsigned long addr)
 {
 	/* Linker adds these: start and end of __lockfunc functions */
-	extern char __lock_text_start[], __lock_text_end[];
+	extern __visible char __lock_text_start[], __lock_text_end[];
 
 	return addr >= (unsigned long)__lock_text_start
 	&& addr < (unsigned long)__lock_text_end;
