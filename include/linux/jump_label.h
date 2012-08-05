@@ -113,8 +113,8 @@ static __always_inline bool static_branch(struct static_key *key)
 	return arch_static_branch(key);
 }
 
-extern struct jump_entry __start___jump_table[];
-extern struct jump_entry __stop___jump_table[];
+extern __visible struct jump_entry __start___jump_table[];
+extern __visible struct jump_entry __stop___jump_table[];
 
 extern void jump_label_init(void);
 extern void jump_label_lock(void);
