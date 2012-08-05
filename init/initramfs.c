@@ -493,8 +493,8 @@ static int __init retain_initrd_param(char *str)
 }
 __setup("retain_initrd", retain_initrd_param);
 
-extern char __initramfs_start[];
-extern unsigned long __initramfs_size;
+extern __visible char __initramfs_start[];
+extern __visible unsigned long __initramfs_size;
 #include <linux/initrd.h>
 #include <linux/kexec.h>
 
