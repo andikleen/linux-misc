@@ -10,7 +10,7 @@
 #endif
 
 #ifndef __ASSEMBLY__
-extern unsigned int __start___lwsync_fixup, __stop___lwsync_fixup;
+extern __visible unsigned int __start___lwsync_fixup, __stop___lwsync_fixup;
 extern void do_lwsync_fixups(unsigned long value, void *fixup_start,
 			     void *fixup_end);
 extern void do_final_fixups(void);

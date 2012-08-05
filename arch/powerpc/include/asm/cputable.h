@@ -125,7 +125,7 @@ struct cpu_spec {
 
 extern struct cpu_spec		*cur_cpu_spec;
 
-extern unsigned int __start___ftr_fixup, __stop___ftr_fixup;
+extern __visible unsigned int __start___ftr_fixup, __stop___ftr_fixup;
 
 extern struct cpu_spec *identify_cpu(unsigned long offset, unsigned int pvr);
 extern void do_feature_fixups(unsigned long value, void *fixup_start,
