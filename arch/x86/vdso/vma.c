@@ -18,15 +18,15 @@
 
 unsigned int __read_mostly vdso_enabled = 1;
 
-extern char vdso_start[], vdso_end[];
-extern unsigned short vdso_sync_cpuid;
+extern __visible char vdso_start[], vdso_end[];
+extern __visible unsigned short vdso_sync_cpuid;
 
-extern struct page *vdso_pages[];
+extern __visible struct page *vdso_pages[];
 static unsigned vdso_size;
 
 #ifdef CONFIG_X86_X32_ABI
-extern char vdsox32_start[], vdsox32_end[];
-extern struct page *vdsox32_pages[];
+extern __visible char vdsox32_start[], vdsox32_end[];
+extern __visible struct page *vdsox32_pages[];
 static unsigned vdsox32_size;
 
 static void __init patch_vdsox32(void *vdso, size_t len)
