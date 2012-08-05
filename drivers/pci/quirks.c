@@ -2947,20 +2947,20 @@ static void pci_do_fixups(struct pci_dev *dev, struct pci_fixup *f,
 		}
 }
 
-extern struct pci_fixup __start_pci_fixups_early[];
-extern struct pci_fixup __end_pci_fixups_early[];
-extern struct pci_fixup __start_pci_fixups_header[];
-extern struct pci_fixup __end_pci_fixups_header[];
-extern struct pci_fixup __start_pci_fixups_final[];
-extern struct pci_fixup __end_pci_fixups_final[];
-extern struct pci_fixup __start_pci_fixups_enable[];
-extern struct pci_fixup __end_pci_fixups_enable[];
-extern struct pci_fixup __start_pci_fixups_resume[];
-extern struct pci_fixup __end_pci_fixups_resume[];
-extern struct pci_fixup __start_pci_fixups_resume_early[];
-extern struct pci_fixup __end_pci_fixups_resume_early[];
-extern struct pci_fixup __start_pci_fixups_suspend[];
-extern struct pci_fixup __end_pci_fixups_suspend[];
+extern __visible struct pci_fixup __start_pci_fixups_early[];
+extern __visible struct pci_fixup __end_pci_fixups_early[];
+extern __visible struct pci_fixup __start_pci_fixups_header[];
+extern __visible struct pci_fixup __end_pci_fixups_header[];
+extern __visible struct pci_fixup __start_pci_fixups_final[];
+extern __visible struct pci_fixup __end_pci_fixups_final[];
+extern __visible struct pci_fixup __start_pci_fixups_enable[];
+extern __visible struct pci_fixup __end_pci_fixups_enable[];
+extern __visible struct pci_fixup __start_pci_fixups_resume[];
+extern __visible struct pci_fixup __end_pci_fixups_resume[];
+extern __visible struct pci_fixup __start_pci_fixups_resume_early[];
+extern __visible struct pci_fixup __end_pci_fixups_resume_early[];
+extern __visible struct pci_fixup __start_pci_fixups_suspend[];
+extern __visible struct pci_fixup __end_pci_fixups_suspend[];
 
 
 void pci_fixup_device(enum pci_fixup_pass pass, struct pci_dev *dev)
