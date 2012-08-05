@@ -106,8 +106,8 @@ static __always_inline bool static_key_true(struct static_key *key)
 	return !static_key_false(key);
 }
 
-extern struct jump_entry __start___jump_table[];
-extern struct jump_entry __stop___jump_table[];
+extern __visible struct jump_entry __start___jump_table[];
+extern __visible struct jump_entry __stop___jump_table[];
 
 extern void jump_label_init(void);
 extern void jump_label_lock(void);
