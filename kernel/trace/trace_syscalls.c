@@ -56,8 +56,8 @@ struct ftrace_event_class event_class_syscall_exit = {
 	.raw_init	= init_syscall_trace,
 };
 
-extern struct syscall_metadata *__start_syscalls_metadata[];
-extern struct syscall_metadata *__stop_syscalls_metadata[];
+extern __visible struct syscall_metadata *__start_syscalls_metadata[];
+extern __visible struct syscall_metadata *__stop_syscalls_metadata[];
 
 static struct syscall_metadata **syscalls_metadata;
 

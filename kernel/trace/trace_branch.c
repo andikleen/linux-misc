@@ -226,8 +226,8 @@ void ftrace_likely_update(struct ftrace_branch_data *f, int val, int expect)
 }
 EXPORT_SYMBOL(ftrace_likely_update);
 
-extern unsigned long __start_annotated_branch_profile[];
-extern unsigned long __stop_annotated_branch_profile[];
+extern __visible unsigned long __start_annotated_branch_profile[];
+extern __visible unsigned long __stop_annotated_branch_profile[];
 
 static int annotated_branch_stat_headers(struct seq_file *m)
 {
@@ -355,8 +355,8 @@ fs_initcall(init_annotated_branch_stats);
 
 #ifdef CONFIG_PROFILE_ALL_BRANCHES
 
-extern unsigned long __start_branch_profile[];
-extern unsigned long __stop_branch_profile[];
+extern __visible unsigned long __start_branch_profile[];
+extern __visible unsigned long __stop_branch_profile[];
 
 static int all_branch_stat_headers(struct seq_file *m)
 {
