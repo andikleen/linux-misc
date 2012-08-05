@@ -32,8 +32,8 @@
  */
 DEFINE_MUTEX(text_mutex);
 
-extern struct exception_table_entry __start___ex_table[];
-extern struct exception_table_entry __stop___ex_table[];
+extern __visible struct exception_table_entry __start___ex_table[];
+extern __visible struct exception_table_entry __stop___ex_table[];
 
 /* Cleared by build time tools if the table is already sorted. */
 u32 __initdata main_extable_sort_needed = 1;
