@@ -16,7 +16,7 @@ unsigned int __read_mostly vdso_enabled = 1;
 unsigned long um_vdso_addr;
 
 extern unsigned long task_size;
-extern char vdso_start[], vdso_end[];
+extern __visible char vdso_start[], vdso_end[];
 
 static struct page **vdsop;
 

@@ -247,8 +247,8 @@ static void __init_or_module add_nops(void *insns, unsigned int len)
 	}
 }
 
-extern struct alt_instr __alt_instructions[], __alt_instructions_end[];
-extern s32 __smp_locks[], __smp_locks_end[];
+extern __visible struct alt_instr __alt_instructions[], __alt_instructions_end[];
+extern __visible s32 __smp_locks[], __smp_locks_end[];
 void *text_poke_early(void *addr, const void *opcode, size_t len);
 
 /* Replace instructions with better alternatives for this CPU type.

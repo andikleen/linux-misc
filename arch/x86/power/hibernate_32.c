@@ -18,7 +18,7 @@
 extern int restore_image(void);
 
 /* References to section boundaries */
-extern const void __nosave_begin, __nosave_end;
+extern __visible const void __nosave_begin, __nosave_end;
 
 /* Pointer to the temporary resume page tables */
 pgd_t *resume_pg_dir;
