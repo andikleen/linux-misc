@@ -30,7 +30,7 @@ struct mod_arch_specific {
 
 #endif /* CONFIG_MMU */
 
-extern struct m68k_fixup_info __start_fixup[], __stop_fixup[];
+extern __visible struct m68k_fixup_info __start_fixup[], __stop_fixup[];
 
 struct module;
 extern void module_fixup(struct module *mod, struct m68k_fixup_info *start,
