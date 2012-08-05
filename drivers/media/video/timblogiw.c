@@ -745,7 +745,7 @@ static int timblogiw_mmap(struct file *file, struct vm_area_struct *vma)
 
 /* Platform device functions */
 
-static __devinitconst struct v4l2_ioctl_ops timblogiw_ioctl_ops = {
+static const __devinitconst struct v4l2_ioctl_ops timblogiw_ioctl_ops = {
 	.vidioc_querycap		= timblogiw_querycap,
 	.vidioc_enum_fmt_vid_cap	= timblogiw_enum_fmt,
 	.vidioc_g_fmt_vid_cap		= timblogiw_g_fmt,
@@ -767,7 +767,7 @@ static __devinitconst struct v4l2_ioctl_ops timblogiw_ioctl_ops = {
 	.vidioc_enum_framesizes		= timblogiw_enum_framesizes,
 };
 
-static __devinitconst struct v4l2_file_operations timblogiw_fops = {
+static const __devinitconst struct v4l2_file_operations timblogiw_fops = {
 	.owner		= THIS_MODULE,
 	.open		= timblogiw_open,
 	.release	= timblogiw_close,
@@ -777,7 +777,7 @@ static __devinitconst struct v4l2_file_operations timblogiw_fops = {
 	.poll		= timblogiw_poll,
 };
 
-static __devinitconst struct video_device timblogiw_template = {
+static const __devinitconst struct video_device timblogiw_template = {
 	.name		= TIMBLOGIWIN_NAME,
 	.fops		= &timblogiw_fops,
 	.ioctl_ops	= &timblogiw_ioctl_ops,
