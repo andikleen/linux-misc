@@ -27,8 +27,8 @@
 #include <linux/sched.h>
 #include <linux/static_key.h>
 
-extern struct tracepoint * const __start___tracepoints_ptrs[];
-extern struct tracepoint * const __stop___tracepoints_ptrs[];
+extern __visible struct tracepoint * const __start___tracepoints_ptrs[];
+extern __visible struct tracepoint * const __stop___tracepoints_ptrs[];
 
 /* Set to 1 to enable tracepoint debug output */
 static const int tracepoint_debug;

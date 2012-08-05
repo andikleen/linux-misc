@@ -1435,8 +1435,8 @@ static struct notifier_block trace_module_nb = {
 	.priority = 0,
 };
 
-extern struct ftrace_event_call *__start_ftrace_events[];
-extern struct ftrace_event_call *__stop_ftrace_events[];
+extern __visible struct ftrace_event_call *__start_ftrace_events[];
+extern __visible struct ftrace_event_call *__stop_ftrace_events[];
 
 static char bootup_event_buf[COMMAND_LINE_SIZE] __initdata;
 

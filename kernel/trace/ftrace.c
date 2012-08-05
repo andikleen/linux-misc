@@ -3866,8 +3866,8 @@ struct notifier_block ftrace_module_nb = {
 	.priority = 0,
 };
 
-extern unsigned long __start_mcount_loc[];
-extern unsigned long __stop_mcount_loc[];
+extern __visible unsigned long __start_mcount_loc[];
+extern __visible unsigned long __stop_mcount_loc[];
 
 void __init ftrace_init(void)
 {
