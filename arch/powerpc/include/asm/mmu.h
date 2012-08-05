@@ -130,7 +130,7 @@ static inline void mmu_clear_feature(unsigned long feature)
 	cur_cpu_spec->mmu_features &= ~feature;
 }
 
-extern unsigned int __start___mmu_ftr_fixup, __stop___mmu_ftr_fixup;
+extern __visible unsigned int __start___mmu_ftr_fixup, __stop___mmu_ftr_fixup;
 
 /* MMU initialization */
 extern void early_init_mmu(void);

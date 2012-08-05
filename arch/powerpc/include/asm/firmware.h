@@ -128,7 +128,7 @@ extern void machine_check_fwnmi(void);
 /* This is true if we are using the firmware NMI handler (typically LPAR) */
 extern int fwnmi_active;
 
-extern unsigned int __start___fw_ftr_fixup, __stop___fw_ftr_fixup;
+extern __visible unsigned int __start___fw_ftr_fixup, __stop___fw_ftr_fixup;
 
 #endif /* __ASSEMBLY__ */
 #endif /* __KERNEL__ */
