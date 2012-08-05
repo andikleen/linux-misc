@@ -44,8 +44,8 @@ extern struct rio_dev *rio_get_comptag(u32 comp_tag, struct rio_dev *from);
 extern struct device_attribute rio_dev_attrs[];
 extern spinlock_t rio_global_list_lock;
 
-extern struct rio_switch_ops __start_rio_switch_ops[];
-extern struct rio_switch_ops __end_rio_switch_ops[];
+extern __visible struct rio_switch_ops __start_rio_switch_ops[];
+extern __visible struct rio_switch_ops __end_rio_switch_ops[];
 
 /* Helpers internal to the RIO core code */
 #define DECLARE_RIO_SWITCH_SECTION(section, name, vid, did, init_hook) \
