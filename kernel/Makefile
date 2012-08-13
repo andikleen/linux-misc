@@ -23,6 +23,11 @@ CFLAGS_REMOVE_irq_work.o = -pg
 endif
 
 CFLAGS_sys_ni.o = $(DISABLE_LTO)
+ifdef CONFIG_X86_32
+# something broken with futex_wake on i386 when LTOed
+# disable for now
+CFLAGS_futex.o = $(DISABLE_LTO)
+endif
 
 obj-y += sched/
 obj-y += power/
