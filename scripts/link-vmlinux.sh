@@ -31,8 +31,9 @@
 set -e
 
 LD="$1"
-KBUILD_LDFLAGS="$2"
-LDFLAGS_vmlinux="$3"
+LDFINAL="$2"
+KBUILD_LDFLAGS="$3"
+LDFLAGS_vmlinux="$4"
 
 # Nice output in kbuild format
 # Will be supressed by "make -s"
@@ -82,9 +83,12 @@ modpost_link()
 		${KBUILD_VMLINUX_LIBS}				\
 		--end-group"
 
-	if [ -n "${CONFIG_LTO_CLANG}" ]; then
-		gen_initcalls
-		lds="-T .tmp_initcalls.lds"
+	if [ -n "${CONFIG_LTO}" ]; then
+		lds=""
+		if [ -n "${CONFIG_LTO_CLANG}" ] ; then
+			gen_initcalls
+			lds="-T .tmp_initcalls.lds"
+		fi
 
 		if [ -n "${CONFIG_MODVERSIONS}" ]; then
 			gen_symversions
@@ -98,7 +102,7 @@ modpost_link()
 		info LD ${1}
 	fi
 
-	${LD} ${KBUILD_LDFLAGS} -r -o ${1} ${lds} ${objects}
+	${LDFINAL} ${KBUILD_LDFLAGS} -r -o ${1} ${lds} ${objects}
 }
 
 objtool_link()
