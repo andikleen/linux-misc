@@ -75,7 +75,7 @@ modpost_link()
 		${KBUILD_VMLINUX_LIBS}				\
 		--end-group"
 
-	${LD} ${LDFLAGS} -r -o ${1} ${objects}
+	${LDFINAL} ${LDFLAGS} -r -o ${1} ${objects}
 }
 
 # Link of vmlinux
@@ -95,7 +95,7 @@ vmlinux_link()
 			--end-group				\
 			${1}"
 
-		${LD} ${LDFLAGS} ${LDFLAGS_vmlinux} -o ${2}	\
+		${LDFINAL} ${LDFLAGS} ${LDFLAGS_vmlinux} -o ${2}	\
 			-T ${lds} ${objects}
 	else
 		objects="-Wl,--whole-archive			\
@@ -278,7 +278,7 @@ if [ -n "${CONFIG_KALLSYMS}" ]; then
 	fi
 fi
 
-info LD vmlinux
+info LDFINAL vmlinux
 vmlinux_link "${kallsymso}" vmlinux
 
 if [ -n "${CONFIG_BUILDTIME_EXTABLE_SORT}" ]; then
