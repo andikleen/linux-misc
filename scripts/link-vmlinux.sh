@@ -56,7 +56,7 @@ modpost_link()
 		${KBUILD_VMLINUX_LIBS}				\
 		--end-group"
 
-	${LD} ${KBUILD_LDFLAGS} -r -o ${1} ${objects}
+	${LDFINAL} ${KBUILD_LDFLAGS} -r ${KBUILD_MODPOST_LDFLAGS} -o ${1} ${objects}
 }
 
 objtool_link()
@@ -92,15 +92,17 @@ vmlinux_link()
 	local objects
 	local strip_debug
 
-	info LD ${output}
+	info LDFINAL ${output}
 
 	# skip output file argument
 	shift
 
 	# The kallsyms linking does not need debug symbols included.
-	# except for LTO because gcc 10 LTO changes the layout of the data segment
-	# with --strip-debug
-	if [ "$output" != "${output#.tmp_vmlinux.kallsyms}" -a -z "$CONFIG_LTO" ] ; then
+	# except for gcc LTO because gcc 10 LTO changes the layout of the
+	# data segment with --strip-debug
+	if [ "$output" != "${output#.tmp_vmlinux.kallsyms}" -a 	\
+	     -z "$CONFIG_LTO"  -a 				\
+	     -n "$CONFIG_CC_IS_GCC" ] ; then
 		strip_debug=-Wl,--strip-debug
 	fi
 
@@ -113,7 +115,7 @@ vmlinux_link()
 			--end-group				\
 			${@}"
 
-		${LD} ${KBUILD_LDFLAGS} ${LDFLAGS_vmlinux}	\
+		${LDFINAL} ${KBUILD_LDFLAGS} ${LDFLAGS_vmlinux}	\
 			${strip_debug#-Wl,}			\
 			-o ${output}				\
 			-T ${lds} ${objects}
@@ -189,7 +191,38 @@ kallsyms()
 	fi
 
 	info KSYMS ${2}
-	${NM} -n ${1} | scripts/kallsyms ${kallsymopt} > ${2}
+	(
+	if [ -n "$CONFIG_LTO" -a -n "$CONFIG_KALLSYMS_SINGLE" -a -n "$CONFIG_CC_IS_GCC" ] &&
+		( ${OBJDUMP} -h ${1} | grep -q gnu\.lto) ; then
+        # workaround for slim LTO gcc-nm not outputing static symbols
+        # http://gcc.gnu.org/PR60016
+        # generate a fake symbol table based on the LTO function sections.
+        # This unfortunately "knows" about the internal LTO file format
+        # and only works for functions
+
+	# read the function names directly from the LTO object
+	objdump -h ${1} |
+		awk '/gnu\.lto_[a-z]/ {
+			gsub(/\.gnu\.lto_/,"");
+			gsub(/\..*/, "");
+			print "0 t " $2
+		     } '
+	# read the non LTO symbols with readelf (which doesn't use the LTO plugin,
+	# so we only get pure ELF symbols)
+	# readelf doesn't handle ar, so we have to expand the objects
+	echo ${1} | sed 's/ /\n/g' | grep built-in.a | while read i ; do
+		${AR} t $i | while read j ; do readelf -s $j ; done
+	done | awk 'NF >= 8 { print "0 t " $8 } '
+	# now handle the objects
+	echo ${1} | sed 's/ /\n/g' | grep '\.o$' | while read i ; do
+		readelf -s $i
+	done | awk 'NF >= 8 {
+	if ($8 !~ /Name|__gnu_lto_slim|\.c(\.[0-9a-f]+)?/) { print "0 t " $8 }
+	}'
+	else
+		${NM} -n ${1}
+	fi
+	) | scripts/kallsyms ${kallsymopt} > ${2}
 }
 
 # Perform one step in kallsyms generation, including temporary linking of
@@ -276,7 +309,7 @@ fi;
 ${MAKE} -f "${srctree}/scripts/Makefile.build" obj=init need-builtin=1
 
 #link vmlinux.o
-info LD vmlinux.o
+info LDFINAL vmlinux.o
 modpost_link vmlinux.o
 objtool_link vmlinux.o
 
@@ -340,6 +373,7 @@ if [ -n "${CONFIG_KALLSYMS}" ]; then
 	fi
 fi
 
+info LDFINAL vmlinux
 vmlinux_link vmlinux "${kallsymso}" ${btf_vmlinux_bin_o}
 
 # fill in BTF IDs
