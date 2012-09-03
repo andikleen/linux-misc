@@ -1319,6 +1319,77 @@ config LD_DEAD_CODE_DATA_ELIMINATION
 	  present. This option is not well tested yet, so use at your
 	  own risk.
 
+config ARCH_SUPPORTS_LTO
+	bool
+
+# Some ar versions leak file descriptors when using the LTO
+# plugin and cause strange errors when ulimit -n is too low.
+# Pick an arbitrary threshold, which should be enough for most
+# kernel configs. This was a regression that is only
+# in some transient binutils version, so either older or
+# new enough is ok.
+# This might not be the exact range with this bug.
+config BAD_AR
+	depends on LD_VERSION = 230000000
+	depends on $(shell,ulimit -n) < 4000
+	def_bool y
+
+config LTO_MENU
+	bool "Enable gcc link time optimization (LTO)"
+	depends on ARCH_SUPPORTS_LTO
+# for now. Does LLVM need the gcc infrastructure at all?
+	depends on CC_IS_GCC
+# 4.7 works mostly, but it sometimes loses symbols on large builds
+# This can be worked around by marking those symbols visible,
+# but that is fairly ugly and the problem is gone with 4.8
+# 4.8 was very slow
+# 4.9 was missing __attribute__((noreorder)) for ordering initcalls,
+# and needed -fno-toplevel-reorder, which can lead to missing symbols
+# 5.0 ICEs with newer kernels
+# so only support 6.0+
+	depends on GCC_VERSION >= 60000
+# binutils before 2.27 has various problems with plugins
+	depends on LD_VERSION >= 227000000
+	depends on !BAD_AR
+	help
+	  Enable whole program (link time) optimizations (LTO) for the the
+	  whole kernel and each module.  This usually increases compile time,
+	  but can lead to better code. It allows the compiler to inline
+	  functions between different files and do other global optimization.
+	  It allows the compiler to drop unused code.
+
+	  With this option the compiler will also do some global checking over
+	  different source files.
+
+	  This requires a gcc 6.0 or later compiler and not too old binutils.
+
+	  On larger non modular configurations this may need more than 4GB of
+	  RAM for the link phase. It will likely not work on those with a
+	  32bit hosted compiler.
+
+	  For more information see Documentation/kbild/lto-build.rst
+
+config LTO_DISABLE
+         bool "Disable LTO again"
+         depends on LTO_MENU
+         default n
+         help
+           This option is merely here so that allyesconfig or allmodconfig do
+           not enable LTO. If you want to actually use LTO do not enable.
+
+config LTO
+	bool
+	default y
+	depends on LTO_MENU && !LTO_DISABLE
+
+config LTO_CP_CLONE
+	bool "Allow aggressive cloning for function specialization"
+	depends on LTO
+	help
+	  Allow the compiler to clone and specialize functions for specific
+	  arguments when it determines these arguments are very commonly
+	  called.  Experimential. Will increase text size.
+
 config SYSCTL
 	bool
 
