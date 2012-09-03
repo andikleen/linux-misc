@@ -1,0 +1,53 @@
+#
+# Support for gcc link time optimization
+#
+
+DISABLE_LTO :=
+LTO_CFLAGS :=
+KBUILD_MOD_LDFLAGS :=
+KBUILD_MODPOST_LDFLAGS :=
+
+export DISABLE_LTO
+export LTO_CFLAGS
+export KBUILD_MOD_LDFLAGS
+export KBUILD_MODPOST_LDFLAGS
+
+ifdef CONFIG_LTO_GCC
+	LTO_CFLAGS := -flto
+
+	LTO_FINAL_CFLAGS := -flto=jobserver
+
+	KBUILD_MOD_LDFLAGS += -flinker-output=nolto-rel
+
+	KBUILD_MODPOST_LDFLAGS += -flinker-output=nolto-rel
+
+	# Used to disable LTO for specific files (e.g. vdso)
+	DISABLE_LTO := -fno-lto
+
+	LTO_FINAL_CFLAGS += ${LTO_CFLAGS} -fwhole-program
+
+	KBUILD_CFLAGS += ${LTO_CFLAGS}
+
+ifdef CONFIG_LTO_CP_CLONE
+	LTO_FINAL_CFLAGS += -fipa-cp-clone
+endif
+
+	# allow extra flags from command line
+	LTO_FINAL_CFLAGS += ${LTO_EXTRA_CFLAGS}
+
+	# For LTO we need to use gcc to do the linking, not ld
+	# directly. Use a wrapper to convert the ld command line
+	# to gcc
+	LDFINAL := ${CONFIG_SHELL} ${srctree}/scripts/gcc-ld \
+                  ${LTO_FINAL_CFLAGS}
+
+	# LTO gcc creates a lot of files in TMPDIR, and with /tmp as tmpfs
+	# it's easy to drive the machine OOM. Use the object directory
+	# instead for temporaries.
+	TMPDIR ?= $(objtree)
+	export TMPDIR
+
+	# use plugin aware tools
+	AR = $(CROSS_COMPILE)gcc-ar
+	NM = $(CROSS_COMPILE)gcc-nm
+endif # CONFIG_LTO_GCC

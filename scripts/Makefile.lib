@@ -184,11 +184,13 @@ endif
 endif
 
 part-of-module = $(if $(filter $(basename $@).o, $(real-obj-m)),y)
+single-file-module = $(if $(words $(obj-m)),1,,y)
 quiet_modtag = $(if $(part-of-module),[M],   )
 
 modkern_cflags =                                          \
 	$(if $(part-of-module),                           \
-		$(KBUILD_CFLAGS_MODULE) $(CFLAGS_MODULE), \
+                $(if $(single-file-module),$(DISABLE_LTO))   \
+                $(KBUILD_CFLAGS_MODULE) $(CFLAGS_MODULE), \
 		$(KBUILD_CFLAGS_KERNEL) $(CFLAGS_KERNEL) $(modfile_flags))
 
 modkern_aflags = $(if $(part-of-module),				\
