@@ -54,7 +54,7 @@ extern struct module __this_module;
 
 /* For every exported symbol, place a struct in the __ksymtab section */
 #define __EXPORT_SYMBOL(sym, sec)				\
-	extern typeof(sym) sym __visible;			\
+	extern typeof(sym) sym;					\
 	__CRC_SYMBOL(sym, sec)					\
 	static const char __kstrtab_##sym[]			\
 	__attribute__((section("__ksymtab_strings"), aligned(1))) \
@@ -85,13 +85,11 @@ extern struct module __this_module;
 
 #else /* !CONFIG_MODULES... */
 
-/* Even without modules keep the __visible side effect */
-
-#define EXPORT_SYMBOL(sym) extern typeof(sym) sym __visible
-#define EXPORT_SYMBOL_GPL(sym) extern typeof(sym) sym __visible
-#define EXPORT_SYMBOL_GPL_FUTURE(sym) extern typeof(sym) sym __visible
-#define EXPORT_UNUSED_SYMBOL(sym) extern typeof(sym) sym __visible
-#define EXPORT_UNUSED_SYMBOL_GPL(sym) extern typeof(sym) sym __visible
+#define EXPORT_SYMBOL(sym)
+#define EXPORT_SYMBOL_GPL(sym)
+#define EXPORT_SYMBOL_GPL_FUTURE(sym)
+#define EXPORT_UNUSED_SYMBOL(sym)
+#define EXPORT_UNUSED_SYMBOL_GPL(sym)
 
 #endif /* CONFIG_MODULES */
 #endif /* !__ASSEMBLY__ */
