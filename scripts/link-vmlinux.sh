@@ -41,7 +41,7 @@ info()
 # ${1} output file
 modpost_link()
 {
-	${LD} ${LDFLAGS} ${LDFLAGS_vmlinux} -r                               \
+	${LDFINAL} ${LDFLAGS} ${LDFLAGS_vmlinux} -r                          \
                 -T ${objtree}/${KBUILD_LDS} 			             \
                 -o ${1} ${KBUILD_VMLINUX_INIT}                               \
 		--start-group ${KBUILD_VMLINUX_MAIN} --end-group
@@ -153,7 +153,7 @@ fi;
 ${MAKE} -f "${srctree}/scripts/Makefile.build" obj=init
 
 #link vmlinux.o
-info LD vmlinux.o
+info LDFINAL vmlinux.o
 modpost_link vmlinux.o
 
 # modpost vmlinux.o to check for section mismatches
