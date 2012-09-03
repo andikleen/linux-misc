@@ -65,7 +65,7 @@ vmlinux_link()
 	local objects
 	local strip_debug
 
-	info LD ${output}
+	info LDFINAL ${output}
 
 	# skip output file argument
 	shift
@@ -86,7 +86,7 @@ vmlinux_link()
 			--end-group				\
 			${@}"
 
-		${LD} ${KBUILD_LDFLAGS} ${LDFLAGS_vmlinux}	\
+		${LDFINAL} ${KBUILD_LDFLAGS} ${LDFLAGS_vmlinux}	\
 			${strip_debug#-Wl,}			\
 			-o ${output}				\
 			-T ${lds} ${objects}
@@ -314,6 +314,7 @@ if [ -n "${CONFIG_KALLSYMS}" ]; then
 	fi
 fi
 
+info LDFINAL vmlinux
 vmlinux_link vmlinux "${kallsymso}" ${btf_vmlinux_bin_o}
 
 if [ -n "${CONFIG_BUILDTIME_TABLE_SORT}" ]; then
