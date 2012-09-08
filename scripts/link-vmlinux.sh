@@ -41,9 +41,7 @@ info()
 # ${1} output file
 modpost_link()
 {
-	${LD} ${LDFLAGS} ${LDFLAGS_vmlinux} -r                               \
-                -T ${objtree}/${KBUILD_LDS} 			             \
-                -o ${1} ${KBUILD_VMLINUX_INIT}                               \
+	${LD} ${LDFLAGS} -r -o ${1} ${KBUILD_VMLINUX_INIT}                   \
 		--start-group ${KBUILD_VMLINUX_MAIN} --end-group
 }
 
@@ -56,11 +54,14 @@ vmlinux_link()
 
 	if [ "${SRCARCH}" != "um" ]; then
 		${LD} ${LDFLAGS} ${LDFLAGS_vmlinux} -o ${2}                  \
-			-T ${lds} vmlinux.o		                     \
-			${1}
+			-T ${lds} ${KBUILD_VMLINUX_INIT}                     \
+			--start-group ${KBUILD_VMLINUX_MAIN} --end-group ${1}
 	else
 		${CC} ${CFLAGS_vmlinux} -o ${2}                              \
-			-Wl,-T,${lds} vmlinux.o		                     \
+			-Wl,-T,${lds} ${KBUILD_VMLINUX_INIT}                 \
+			-Wl,--start-group                                    \
+				 ${KBUILD_VMLINUX_MAIN}                      \
+			-Wl,--end-group                                      \
 			-lutil ${1}
 		rm -f linux
 	fi
