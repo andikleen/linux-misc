@@ -602,7 +602,7 @@ static void handle_modversions(struct module *mod, struct elf_info *info,
 	switch (sym->st_shndx) {
 	case SHN_COMMON:
 		if (!strncmp(symname, "__gnu_lto_", sizeof("__gnu_lto_")-1)) {
-			warn("Running modpost on non LTOed %s\n", mod->name);
+			/* Should warn here, but modpost runs before the linker */
 		} else
 			warn("\"%s\" [%s] is COMMON symbol\n", symname, mod->name);
 		break;
