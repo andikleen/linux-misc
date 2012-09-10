@@ -26,7 +26,7 @@ ifdef CONFIG_LTO_SLIM
 endif
 	DISABLE_LTO := -fno-lto
 
-	LTO_FINAL_CFLAGS += ${LTO_CFLAGS} -fwhole-program  -fmem-report -dH -flto-report
+	LTO_FINAL_CFLAGS += ${LTO_CFLAGS} -fwhole-program  
 
 	# workaround for http://gcc.gnu.org/PR50602
 	LTO_FINAL_CFLAGS += $(filter -freg-struct-return,${KBUILD_CFLAGS})
