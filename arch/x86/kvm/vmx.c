@@ -3718,8 +3718,6 @@ static void vmx_disable_intercept_for_msr(u32 msr, bool longmode_only)
 	__vmx_disable_intercept_for_msr(vmx_msr_bitmap_longmode, msr);
 }
 
-extern __visible unsigned long kvm_vmx_return;
-
 /*
  * Set up the vmcs's constant host-state fields, i.e., host-state fields that
  * will not change in the lifetime of the guest.
@@ -3755,7 +3753,8 @@ static void vmx_set_constant_host_state(void)
 	native_store_idt(&dt);
 	vmcs_writel(HOST_IDTR_BASE, dt.address);   /* 22.2.4 */
 
-	vmcs_writel(HOST_RIP, (unsigned long)&kvm_vmx_return); /* 22.2.5 */
+	asm("mov $.Lkvm_vmx_return, %0" : "=r"(tmpl));
+	vmcs_writel(HOST_RIP, tmpl); /* 22.2.5 */
 
 	rdmsr(MSR_IA32_SYSENTER_CS, low32, high32);
 	vmcs_write32(HOST_IA32_SYSENTER_CS, low32);
@@ -6306,10 +6305,9 @@ static void __noclone vmx_vcpu_run(struct kvm_vcpu *vcpu)
 		/* Enter guest mode */
 		"jne .Llaunched \n\t"
 		__ex(ASM_VMX_VMLAUNCH) "\n\t"
-		"jmp kvm_vmx_return \n\t"
+		"jmp .Lkvm_vmx_return \n\t"
 		".Llaunched: " __ex(ASM_VMX_VMRESUME) "\n\t"
-	        ".globl kvm_vmx_return\n"
-		"kvm_vmx_return: "
+		".Lkvm_vmx_return: "
 		/* Save guest registers, load host registers, keep flags */
 		"mov %0, %c[wordsize](%%"R"sp) \n\t"
 		"pop %0 \n\t"
