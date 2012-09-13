@@ -6327,6 +6327,7 @@ static void __noclone vmx_vcpu_run(struct kvm_vcpu *vcpu)
 		"pop  %%" _ASM_BP "; pop  %%" _ASM_DX " \n\t"
 		"setbe %c[fail](%0) \n\t"
 		".pushsection .rodata \n\t"
+		".globl vmx_return \n\t"
 		"vmx_return: " _ASM_PTR " 2b \n\t"
 		".popsection"
 	      : : "c"(vmx), "d"((unsigned long)HOST_RSP),
