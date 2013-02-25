@@ -18,8 +18,8 @@
 
 struct key *modsign_keyring;
 
-extern __initdata const u8 modsign_certificate_list[];
-extern __initdata const u8 modsign_certificate_list_end[];
+extern __initconst const u8 modsign_certificate_list[];
+extern __initconst const u8 modsign_certificate_list_end[];
 asm(".section .init.data,\"aw\"\n"
     SYMBOL_PREFIX "modsign_certificate_list:\n"
     ".incbin \"signing_key.x509\"\n"
@@ -31,7 +31,7 @@ asm(".section .init.data,\"aw\"\n"
  * We need to make sure ccache doesn't cache the .o file as it doesn't notice
  * if modsign.pub changes.
  */
-static __initdata const char annoy_ccache[] = __TIME__ "foo";
+static __initconst const char annoy_ccache[] = __TIME__ "foo";
 
 /*
  * Load the compiled-in keys
