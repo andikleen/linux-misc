@@ -18,9 +18,11 @@
 
 struct key *modsign_keyring;
 
-extern __initconst const u8 modsign_certificate_list[];
-extern __initconst const u8 modsign_certificate_list_end[];
+extern __initconst __visible const u8 modsign_certificate_list[];
+extern __initconst __visible const u8 modsign_certificate_list_end[];
 asm(".section .init.data,\"aw\"\n"
+    ".globl " SYMBOL_PREFIX "modsign_certificate_list\n"
+    ".globl " SYMBOL_PREFIX "modsign_certificate_list_end\n"
     SYMBOL_PREFIX "modsign_certificate_list:\n"
     ".incbin \"signing_key.x509\"\n"
     ".incbin \"extra_certificates\"\n"
