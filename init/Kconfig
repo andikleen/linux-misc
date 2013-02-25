@@ -1268,9 +1268,13 @@ config LTO_DEBUG
 config LTO_CP_CLONE
 	bool "Allow aggressive cloning for constant specialization"
 	depends on LTO
+	help
+	  Allow the compiler to clone functions for specific arguments.
+	  Experimential. Will increase text size.
 
 config LTO_SLIM
-	bool "Use slim lto"
+	#bool "Use slim lto"
+	def_bool y
 	depends on LTO
 	help
 	  Do not generate all code twice. The object files will only contain
