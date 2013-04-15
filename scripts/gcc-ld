@@ -18,6 +18,7 @@ while [ "$1" != "" ] ; do
 -rpath-link|--sort-section|--section-start|-Tbss|-Tdata|-Ttext|\
 --version-script|--dynamic-list|--version-exports-symbol|--wrap|-m)
 		A="$1" ; shift ; N="-Wl,$A,$1" ;;
+	--param) shift ; N="--param $1" ;;
 	-[m]*) N="$1" ;;
 	-*) N="-Wl,$1" ;;
 	*)  N="$1" ;;
