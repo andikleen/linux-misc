@@ -24,7 +24,7 @@ asmlinkage long sys_iopl(unsigned int);
 asmlinkage int sys_modify_ldt(int, void __user *, unsigned long);
 
 /* kernel/signal.c */
-long sys_rt_sigreturn(void);
+asmlinkage long sys_rt_sigreturn(void);
 
 /* kernel/tls.c */
 asmlinkage long sys_set_thread_area(struct user_desc __user *);
