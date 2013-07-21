@@ -284,11 +284,7 @@ static struct attribute *intel_knc_formats_attr[] = {
 	NULL,
 };
 
-<<<<<<< HEAD
 static const struct x86_pmu knc_pmu __initconst = {
-=======
-static __initconst const struct x86_pmu knc_pmu = {
->>>>>>> perf, x86: Fix some broken initconsts
 	.name			= "knc",
 	.handle_irq		= knc_pmu_handle_irq,
 	.disable_all		= knc_pmu_disable_all,
