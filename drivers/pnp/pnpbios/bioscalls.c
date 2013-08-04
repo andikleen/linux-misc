@@ -67,9 +67,9 @@ static struct desc_struct bad_bios_desc = GDT_ENTRY_INIT(0x4092,
  * after PnP BIOS oopses.
  */
 
-u32 pnp_bios_fault_esp;
-u32 pnp_bios_fault_eip;
-u32 pnp_bios_is_utter_crap = 0;
+__visible u32 pnp_bios_fault_esp;
+__visible u32 pnp_bios_fault_eip;
+__visible u32 pnp_bios_is_utter_crap = 0;
 
 static spinlock_t pnp_bios_lock;
 
