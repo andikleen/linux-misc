@@ -174,7 +174,6 @@ void show_trace(struct task_struct *task, struct pt_regs *regs,
 	show_trace_log_lvl(task, regs, stack, bp, "");
 }
 
-asmlinkage
 void show_stack(struct task_struct *task, unsigned long *sp)
 {
 	unsigned long bp = 0;
