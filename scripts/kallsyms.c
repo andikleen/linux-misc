@@ -190,7 +190,7 @@ static int symbol_valid(struct sym_entry *s)
 	 * specified so exclude them to get a stable symbol list.
 	 */
 	static char *special_symbols[] = {
-		"kallsyms_addresses",
+		"kallsyms_offsets",
 		"kallsyms_num_syms",
 		"kallsyms_names",
 		"kallsyms_markers",
@@ -322,19 +322,13 @@ static void write_src(void)
 	 * symbols that are declared static and are private to their
 	 * .o files.  This prevents .tmp_kallsyms.o or any other
 	 * object from referencing them.
+	 *
+	 * We do the offsets to _text now in kallsyms.c at runtime,
+	 * to get a relocationless symbol table.
 	 */
-	output_label("kallsyms_addresses");
+	output_label("kallsyms_offsets");
 	for (i = 0; i < table_cnt; i++) {
-		if (toupper(table[i].sym[0]) != 'A') {
-			if (_text <= table[i].addr)
-				printf("\tPTR\t_text + %#llx\n",
-					table[i].addr - _text);
-			else
-				printf("\tPTR\t_text - %#llx\n",
-					_text - table[i].addr);
-		} else {
-			printf("\tPTR\t%#llx\n", table[i].addr);
-		}
+		printf("\tPTR\t%#llx\n", table[i].addr - _text);
 	}
 	printf("\n");
 
