@@ -161,13 +161,15 @@ kallsyms()
 	if [ -n "${CONFIG_KALLSYMS_BASE_RELATIVE}" ]; then
 		kallsymopt="${kallsymopt} --base-relative"
 	fi
+	kallsymopt="${kallsymopt} $3 $4 $5"
 
 	local aflags="${KBUILD_AFLAGS} ${KBUILD_AFLAGS_KERNEL}               \
 		      ${NOSTDINC_FLAGS} ${LINUXINCLUDE} ${KBUILD_CPPFLAGS}"
 
 	local afile="`basename ${2} .o`.S"
 
-	${NM} -n ${1} | scripts/kallsyms ${kallsymopt} > ${afile}
+	${NM} -n ${1} | awk 'NF == 3 { print }' > ${afile/.S/.sym}
+	scripts/kallsyms ${kallsymopt} > ${afile} < ${afile/.S/.sym}
 	${CC} ${aflags} -c -o ${2} ${afile}
 }
 
@@ -277,7 +279,17 @@ fi
 kallsymso=""
 kallsymso_prev=""
 kallsyms_vmlinux=""
-if [ -n "${CONFIG_KALLSYMS}" ]; then
+if [ -n "${CONFIG_KALLSYMS}" -a -n "${CONFIG_KALLSYMS_SINGLE}" ]; then
+	# Generate kallsyms from the top level object files
+	# this is slightly off, and has wrong addresses,
+	# but gives us the conservative max length of the kallsyms
+	# table to link in something with the right size.
+	info KALLSYMS1 .tmp_kallsyms1.o
+	kallsyms "${KBUILD_VMLINUX_OBJS} ${KBUILD_VMLINUX_LIBS}" .tmp_kallsyms1.o \
+		--all-symbols \
+		"--pad-file=.kallsyms_pad"
+	kallsymso=.tmp_kallsyms1.o
+elif [ -n "${CONFIG_KALLSYMS}" ]; then
 
 	# kallsyms support
 	# Generate section listing all symbols and add it into vmlinux
@@ -316,6 +328,29 @@ fi
 
 info LDFINAL vmlinux
 vmlinux_link vmlinux "${kallsymso}" ${btf_vmlinux_bin_o}
+
+if [ -n "${CONFIG_KALLSYMS}" -a -n "${CONFIG_KALLSYMS_SINGLE}" ] ; then
+	# Now regenerate the kallsyms table and patch it into the
+	# previously linked file. We tell kallsyms to pad it
+	# to the previous length, so that no symbol changes.
+	info KALLSYMS2 .tmp_kallsyms2.o
+	kallsyms vmlinux .tmp_kallsyms2.o `cat .kallsyms_pad`
+
+	info OBJCOPY .tmp_kallsyms2.bin
+	${OBJCOPY} -O binary .tmp_kallsyms2.o .tmp_kallsyms2.bin
+
+	info PATCHFILE vmlinux
+	EF=scripts/elf_file_offset
+	if [ ! -r $EF ] ; then EF=source/$EF ; fi
+	SIZE=`stat -c%s .tmp_kallsyms2.bin`
+	OFF=`${OBJDUMP} --section-headers vmlinux |
+	     gawk -f $EF -v section=.kallsyms -v filesize=$SIZE`
+	if [ -z "$OFF" ] ; then
+		echo "Cannot find .kallsyms section in vmlinux binary"
+		exit 1
+	fi
+	scripts/patchfile vmlinux $OFF .tmp_kallsyms2.bin
+fi
 
 if [ -n "${CONFIG_BUILDTIME_TABLE_SORT}" ]; then
 	info SORTTAB vmlinux
