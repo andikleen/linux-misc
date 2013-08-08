@@ -4,7 +4,7 @@
 # the kernel for the build process.
 
 always-$(CONFIG_BUILD_BIN2C)			+= bin2c
-always-$(CONFIG_KALLSYMS)			+= kallsyms
+always-$(CONFIG_KALLSYMS)			+= kallsyms patchfile
 always-$(BUILD_C_RECORDMCOUNT)			+= recordmcount
 always-$(CONFIG_BUILDTIME_TABLE_SORT)		+= sorttable
 always-$(CONFIG_ASN1)				+= asn1_compiler
