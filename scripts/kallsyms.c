@@ -192,15 +192,19 @@ static int symbol_valid_tr(struct sym_entry *s)
 {
 	size_t i;
 	struct text_range *tr;
+	int valid = 0;
 
 	for (i = 0; i < ARRAY_SIZE(text_ranges); ++i) {
 		tr = &text_ranges[i];
+
+		if (tr->start && tr->end)
+			valid++;
 
 		if (s->addr >= tr->start && s->addr <= tr->end)
 			return 1;
 	}
 
-	return 0;
+	return valid ? 0 : 1;
 }
 
 static int symbol_valid(struct sym_entry *s)
@@ -242,11 +246,13 @@ static int symbol_valid(struct sym_entry *s)
 		 * the kallsyms data are added.  If these symbols move then
 		 * they may get dropped in pass 2, which breaks the kallsyms
 		 * rules.
+		 * But don't do this for predicted fake symbols with 0 value.
 		 */
-		if ((s->addr == text_range_text->end &&
+		if (((s->addr == text_range_text->end &&
 				strcmp((char *)s->sym + offset, text_range_text->etext)) ||
 		    (s->addr == text_range_inittext->end &&
 				strcmp((char *)s->sym + offset, text_range_inittext->etext)))
+			&& text_range_text->end != 0)
 			return 0;
 	}
 
