@@ -11,7 +11,7 @@
 
 HOST_EXTRACFLAGS += -I$(srctree)/tools/include
 
-hostprogs-$(CONFIG_KALLSYMS)     += kallsyms
+hostprogs-$(CONFIG_KALLSYMS)     += kallsyms patchfile
 hostprogs-$(CONFIG_LOGO)         += pnmtologo
 hostprogs-$(CONFIG_VT)           += conmakehash
 hostprogs-$(BUILD_C_RECORDMCOUNT) += recordmcount

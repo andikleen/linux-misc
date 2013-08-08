@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # link vmlinux
 #
@@ -135,13 +135,14 @@ kallsyms()
 	if [ -n "${CONFIG_KALLSYMS_BASE_RELATIVE}" ]; then
 		kallsymopt="${kallsymopt} --base-relative"
 	fi
+	kallsymopt="${kallsymopt} $3"
 
 	local aflags="${KBUILD_AFLAGS} ${KBUILD_AFLAGS_KERNEL}               \
 		      ${NOSTDINC_FLAGS} ${LINUXINCLUDE} ${KBUILD_CPPFLAGS}"
 
 	local afile="`basename ${2} .o`.S"
 
-	${NM} -n ${1} | scripts/kallsyms ${kallsymopt} > ${afile}
+	${NM} -n ${1} | awk 'NF == 3 { print }' | scripts/kallsyms ${kallsymopt} > ${afile}
 	${CC} ${aflags} -c -o ${2} ${afile}
 }
 
@@ -233,6 +234,7 @@ ${MAKE} -f "${srctree}/scripts/Makefile.modpost" vmlinux.o
 
 kallsymso=""
 kallsyms_vmlinux=""
+<<<<<<< HEAD
 if [ -n "${CONFIG_KALLSYMS}" ]; then
 
 	# kallsyms support
@@ -285,6 +287,45 @@ fi
 
 info LDFINAL vmlinux
 vmlinux_link "${kallsymso}" vmlinux
+=======
+
+if [ -n "${CONFIG_KALLSYMS}" ] ; then
+	# Generate kallsyms from the top level object files
+	# this is slightly off, and has wrong addresses,
+	# but gives us the conservative max length of the kallsyms
+	# table to link in something with the size.
+	info KALLSYMS1 .tmp_kallsyms1.o
+	kallsyms "${KBUILD_VMLINUX_INIT} ${KBUILD_VMLINUX_MAIN}" \
+		 .tmp_kallsyms1.o \
+		 "--pad-file=.kallsyms_pad"
+	kallsymsso=.tmp_kallsyms1.o
+fi
+
+info LD vmlinux
+vmlinux_link "${kallsymsso}" vmlinux
+if [ -n "${CONFIG_KALLSYMS}" ] ; then
+	# Now regenerate the kallsyms table and patch it into the
+	# previously linked file. We tell kallsyms to pad it
+	# to the previous length, so that no symbol changes.
+	info KALLSYMS2 .tmp_kallsyms2.o
+	kallsyms vmlinux .tmp_kallsyms2.o $(<.kallsyms_pad)
+
+	info OBJCOPY .tmp_kallsyms2.bin
+	${OBJCOPY} -O binary .tmp_kallsyms2.o .tmp_kallsyms2.bin
+
+	info PATCHFILE vmlinux
+	EF=scripts/elf_file_offset
+	if [ ! -r $EF ] ; then EF=source/$EF ; fi
+	OFF=$(${OBJDUMP} --section-headers vmlinux |
+	     gawk -f $EF \
+	-v section=.kallsyms -v filesize=$(stat -c%s .tmp_kallsyms2.bin) )
+	if [ -z "$OFF" ] ; then
+		echo "Cannot find .kallsyms section in vmlinux binary"
+		exit 1
+	fi
+	scripts/patchfile vmlinux $OFF .tmp_kallsyms2.bin
+fi
+>>>>>>> 32c31e3a6455... kbuild: Use single pass kallsyms
 
 if [ -n "${CONFIG_BUILDTIME_EXTABLE_SORT}" ]; then
 	info SORTEX vmlinux
@@ -294,6 +335,7 @@ fi
 info SYSMAP System.map
 mksysmap vmlinux System.map
 
+<<<<<<< HEAD
 # step a (see comment above)
 if [ -n "${CONFIG_KALLSYMS}" ]; then
 	mksysmap ${kallsyms_vmlinux} .tmp_System.map
@@ -305,5 +347,7 @@ if [ -n "${CONFIG_KALLSYMS}" ]; then
 	fi
 fi
 
+=======
+>>>>>>> 32c31e3a6455... kbuild: Use single pass kallsyms
 # We made a new kernel - delete old version file
 rm -f .old_version

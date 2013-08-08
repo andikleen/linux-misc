@@ -207,15 +207,19 @@ static int symbol_in_range(struct sym_entry *s, struct addr_range *ranges,
 {
 	size_t i;
 	struct addr_range *ar;
+	int valid = 0;
 
 	for (i = 0; i < entries; ++i) {
 		ar = &ranges[i];
+
+		if (ar->start && ar->end)
+			valid++;
 
 		if (s->addr >= ar->start && s->addr <= ar->end)
 			return 1;
 	}
 
-	return 0;
+	return valid ? 0 : 1;
 }
 
 static int symbol_valid(struct sym_entry *s)
@@ -275,8 +279,14 @@ static int symbol_valid(struct sym_entry *s)
 				       text_range_text->end_sym)) ||
 		    (s->addr == text_range_inittext->end &&
 				strcmp(sym_name,
-				       text_range_inittext->end_sym)))
-			return 0;
+				       text_range_inittext->end_sym))) {
+
+		 	/* But don't do this for predicted fake symbols
+			 * with 0 value. 
+			 */
+			if (test_range_text->end != 0)
+				return 0;
+		}
 	}
 
 	/* Exclude symbols which vary between passes. */

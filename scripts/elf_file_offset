@@ -1,0 +1,24 @@
+#!/bin/bash
+# find the file offset of a section in a ELF file
+# objdump --section-headers elf-file |
+# gawk -f elf_file_offset filesize=SIZE section=SECTIONNAME
+# gawk needed for strtonum()
+#Idx Name          Size      VMA               LMA               File off  Algn
+#  4 .kallsyms     001fd648  ffffffff81b1c068  0000000001b1c068  00d1c068  2**3
+
+$2 == section {
+	old = strtonum("0x" $3)
+	new = strtonum(filesize)
+	if (old < new) {
+		print "Not enough padding in vmlinux for new kallsyms, missing",new-old > "/dev/stderr"
+		print "Please lower (=increase) PAD_RATIO in kallsyms.c"
+		exit 1
+	}
+	print "0x" $6
+	# XXX doesn't exit in gawk 4.1.0 ?!?
+	#exit(0)
+}
+#END {
+#    print section " not found" > "/dev/stderr"
+#    exit 1
+#}
