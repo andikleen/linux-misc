@@ -15,7 +15,7 @@ merge_ksyms = \
 	TO=$(@D)/.tmp_$(@F:$(1)=_vermerged.o); \
 	cat $(shell find $(patsubst %.o,%.ver.c,$(filter %.o,$(2))) \
 		/dev/null -type f -size +2) /dev/null > $$TC; \
-	$(CC) -c -o $$TO $$TC; \
+	$(CC) $(c_flags) -c -o $$TO $$TC; \
         rm -f $$TC
 
 # after immediate linking generate a dummy .ver.c for the next step

@@ -29,8 +29,10 @@
  * The ratio to increase the padding, by how much the final kallsyms
  * can be larger. This is for symbols that are not visible before
  * final linking.
+ * TBD use different factors for the different tables. The token
+ * table is much more sensitive than others.
  */
-#define PAD_RATIO 20 /* 1/x = ~5% */
+#define PAD_RATIO 13 /* 1/x = ~8% */
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof(arr[0]))
 
