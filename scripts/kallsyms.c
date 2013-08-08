@@ -41,6 +41,13 @@ struct text_range {
 	unsigned long long start, end;
 };
 
+enum pads {
+	PAD_OFF,
+	PAD_NAMES,
+	PAD_MARKERS,
+	NUM_PAD
+};
+
 static unsigned long long _text;
 static struct text_range text_ranges[] = {
 	{ "_stext",     "_etext"     },
@@ -65,7 +72,7 @@ unsigned char best_table_len[256];
 
 static void usage(void)
 {
-	fprintf(stderr, "Usage: kallsyms [--all-symbols] [--symbol-prefix=<prefix char>] < in.map > out.S\n");
+	fprintf(stderr, "Usage: kallsyms [--all-symbols] [--symbol-prefix=<prefix char>] [--pad=A,B,C] [--padfile=name] < in.map > out.S\n");
 	exit(1);
 }
 
@@ -285,7 +292,14 @@ static int expand_symbol(unsigned char *data, int len, char *result)
 	return total;
 }
 
-static void write_src(void)
+static void bad_padding(char *msg, int diff)
+{
+	fprintf(stderr, "kallsyms: %s padding too short: %d missing\n",
+			msg, diff);
+	exit(EXIT_FAILURE);
+}
+
+static void write_src(int *pad, int *opad)
 {
 	unsigned int i, k, off;
 	unsigned int best_idx[256];
@@ -317,6 +331,13 @@ static void write_src(void)
 	for (i = 0; i < table_cnt; i++) {
 		printf("\tPTR\t%#llx\n", table[i].addr - _text);
 	}
+	if (pad) {
+		if (i > pad[PAD_OFF])
+			bad_padding("address pointers", i - pad[PAD_OFF]);
+		for (; i < pad[PAD_OFF]; i++)
+			printf("\tPTR\t0\n");
+	} else
+		opad[PAD_OFF] = table_cnt;
 	printf("\n");
 
 	output_label("kallsyms_num_syms");
@@ -345,11 +366,25 @@ static void write_src(void)
 
 		off += table[i].len + 1;
 	}
+	if (pad) {
+		if (off > pad[PAD_NAMES])
+			bad_padding("name table", off - pad[PAD_NAMES]);
+		if (off < pad[PAD_NAMES])
+			printf("\t.fill %d,1,0\n", pad[PAD_NAMES] - off);
+	} else
+		opad[PAD_NAMES] = off;
 	printf("\n");
 
 	output_label("kallsyms_markers");
 	for (i = 0; i < ((table_cnt + 255) >> 8); i++)
 		printf("\tPTR\t%d\n", markers[i]);
+	if (pad) {
+		if (i > pad[PAD_MARKERS])
+			bad_padding("markers", i - pad[PAD_MARKERS]);
+		for (; i < pad[PAD_MARKERS]; i++)
+			printf("\tPTR\t0\n");
+	} else
+		opad[PAD_MARKERS] = i;
 	printf("\n");
 
 	free(markers);
@@ -629,6 +664,10 @@ static void sort_symbols(void)
 
 int main(int argc, char **argv)
 {
+	int inpad[NUM_PAD], opad[NUM_PAD];
+	int *inpadp = NULL;
+	FILE *opadf = NULL;
+
 	if (argc >= 2) {
 		int i;
 		for (i = 1; i < argc; i++) {
@@ -640,6 +679,21 @@ int main(int argc, char **argv)
 				if ((*p == '"' && *(p+2) == '"') || (*p == '\'' && *(p+2) == '\''))
 					p++;
 				symbol_prefix_char = *p;
+			} else if (strncmp(argv[i], "--pad=", 6) == 0) {
+				inpadp = inpad;
+				if (sscanf(argv[i] + 6, "%d,%d,%d",
+					   inpad + 0,
+					   inpad + 1,
+					   inpad + 2) != NUM_PAD) {
+					fprintf(stderr, "Bad pad list\n");
+					exit(EXIT_FAILURE);
+				}
+			} else if (strncmp(argv[i], "--pad-file=", 11) == 0) {
+				opadf = fopen(argv[i] + 11, "w");
+				if (!opadf) {
+					fprintf(stderr, "Cannot open %s", argv[i]+11);
+					exit(EXIT_FAILURE);
+				}
 			} else
 				usage();
 		}
@@ -649,7 +703,10 @@ int main(int argc, char **argv)
 	read_map(stdin);
 	sort_symbols();
 	optimize_token_table();
-	write_src();
-
+	write_src(inpadp, opad);
+	if (opadf) {
+		fprintf(opadf, "--pad=%d,%d,%d\n", opad[0], opad[1], opad[2]);
+		fclose(opadf);
+	}
 	return 0;
 }
