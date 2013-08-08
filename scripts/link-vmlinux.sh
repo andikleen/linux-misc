@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # SPDX-License-Identifier: GPL-2.0
 #
 # link vmlinux
@@ -132,14 +132,33 @@ kallsyms()
 	if [ -n "${CONFIG_KALLSYMS_BASE_RELATIVE}" ]; then
 		kallsymopt="${kallsymopt} --base-relative"
 	fi
+	kallsymopt="${kallsymopt} $3"
 
 	local aflags="${KBUILD_AFLAGS} ${KBUILD_AFLAGS_KERNEL}               \
 		      ${NOSTDINC_FLAGS} ${LINUXINCLUDE} ${KBUILD_CPPFLAGS}"
 
-	local afile="`basename ${2} .o`.S"
+	# workaround for slim LTO gcc-nm not outputing static symbols
+	# http://gcc.gnu.org/PR60016
+	# generate a fake symbol table based on the LTO function sections.
+	# This unfortunately "knows" about the internal LTO file format
+	# and only works for functions
+	# needs perl for now when building for LTO
+	(
+	if $OBJDUMP --section-headers ${1} | grep -q \.gnu\.lto_ ; then
+		${OBJDUMP} --section-headers ${1} |
+		perl -ne '
+@n = split;
+next unless $n[1] =~ /\.gnu\.lto_([_a-zA-Z][^.]+)/;
+next if $n[1] eq $prev;
+$prev = $n[1];
+print "0 T ",$1,"\n"'
+	fi
+	${NM} -n ${1} | awk 'NF == 3 { print }'
+	)  > ${2}_sym
+	# run without pipe to make kallsyms errors stop the script
+	./scripts/kallsyms ${kallsymopt} < ${2}_sym |
+		${CC} ${aflags} -c -o ${2} -x assembler-with-cpp -
 
-	${NM} -n ${1} | scripts/kallsyms ${kallsymopt} > ${afile}
-	${CC} ${aflags} -c -o ${2} ${afile}
 }
 
 # Create map file with all symbols from ${1}
@@ -228,58 +247,43 @@ ${MAKE} -f "${srctree}/scripts/Makefile.modpost" vmlinux.o
 
 kallsymso=""
 kallsyms_vmlinux=""
-if [ -n "${CONFIG_KALLSYMS}" ]; then
 
-	# kallsyms support
-	# Generate section listing all symbols and add it into vmlinux
-	# It's a three step process:
-	# 1)  Link .tmp_vmlinux1 so it has all symbols and sections,
-	#     but __kallsyms is empty.
-	#     Running kallsyms on that gives us .tmp_kallsyms1.o with
-	#     the right size
-	# 2)  Link .tmp_vmlinux2 so it now has a __kallsyms section of
-	#     the right size, but due to the added section, some
-	#     addresses have shifted.
-	#     From here, we generate a correct .tmp_kallsyms2.o
-	# 3)  That link may have expanded the kernel image enough that
-	#     more linker branch stubs / trampolines had to be added, which
-	#     introduces new names, which further expands kallsyms. Do another
-	#     pass if that is the case. In theory it's possible this results
-	#     in even more stubs, but unlikely.
-	#     KALLSYMS_EXTRA_PASS=1 may also used to debug or work around
-	#     other bugs.
-	# 4)  The correct ${kallsymso} is linked into the final vmlinux.
-	#
-	# a)  Verify that the System.map from vmlinux matches the map from
-	#     ${kallsymso}.
-
-	kallsymso=.tmp_kallsyms2.o
-	kallsyms_vmlinux=.tmp_vmlinux2
-
-	# step 1
-	vmlinux_link "" .tmp_vmlinux1
-	kallsyms .tmp_vmlinux1 .tmp_kallsyms1.o
-
-	# step 2
-	vmlinux_link .tmp_kallsyms1.o .tmp_vmlinux2
-	kallsyms .tmp_vmlinux2 .tmp_kallsyms2.o
-
-	# step 3
-	size1=$(${CONFIG_SHELL} "${srctree}/scripts/file-size.sh" .tmp_kallsyms1.o)
-	size2=$(${CONFIG_SHELL} "${srctree}/scripts/file-size.sh" .tmp_kallsyms2.o)
-
-	if [ $size1 -ne $size2 ] || [ -n "${KALLSYMS_EXTRA_PASS}" ]; then
-		kallsymso=.tmp_kallsyms3.o
-		kallsyms_vmlinux=.tmp_vmlinux3
-
-		vmlinux_link .tmp_kallsyms2.o .tmp_vmlinux3
-
-		kallsyms .tmp_vmlinux3 .tmp_kallsyms3.o
-	fi
+if [ -n "${CONFIG_KALLSYMS}" ] ; then
+	# Generate kallsyms from the top level object files
+	# this is slightly off, and has wrong addresses,
+	# but gives us the conservative max length of the kallsyms
+	# table to link in something with the size.
+	info KALLSYMS1 .tmp_kallsyms1.o
+	kallsyms "${KBUILD_VMLINUX_INIT} ${KBUILD_VMLINUX_MAIN}" \
+		 .tmp_kallsyms1.o \
+		 "--pad-file=.kallsyms_pad"
+	kallsymsso=.tmp_kallsyms1.o
 fi
 
 info LDFINAL vmlinux
-vmlinux_link "${kallsymso}" vmlinux
+vmlinux_link "${kallsymsso}" vmlinux
+if [ -n "${CONFIG_KALLSYMS}" ] ; then
+	# Now regenerate the kallsyms table and patch it into the
+	# previously linked file. We tell kallsyms to pad it
+	# to the previous length, so that no symbol changes.
+	info KALLSYMS2 .tmp_kallsyms2.o
+	kallsyms vmlinux .tmp_kallsyms2.o $(<.kallsyms_pad)
+
+	info OBJCOPY .tmp_kallsyms2.bin
+	${OBJCOPY} -O binary .tmp_kallsyms2.o .tmp_kallsyms2.bin
+
+	info PATCHFILE vmlinux
+	EF=scripts/elf_file_offset
+	if [ ! -r $EF ] ; then EF=source/$EF ; fi
+	OFF=$(${OBJDUMP} --section-headers vmlinux |
+	     gawk -f $EF \
+	-v section=.kallsyms -v filesize=$(stat -c%s .tmp_kallsyms2.bin) )
+	if [ -z "$OFF" ] ; then
+		echo "Cannot find .kallsyms section in vmlinux binary"
+		exit 1
+	fi
+	scripts/patchfile vmlinux $OFF .tmp_kallsyms2.bin
+fi
 
 if [ -n "${CONFIG_BUILDTIME_EXTABLE_SORT}" ]; then
 	info SORTEX vmlinux

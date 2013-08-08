@@ -208,15 +208,19 @@ static int symbol_in_range(struct sym_entry *s, struct addr_range *ranges,
 {
 	size_t i;
 	struct addr_range *ar;
+	int valid = 0;
 
 	for (i = 0; i < entries; ++i) {
 		ar = &ranges[i];
+
+		if (ar->start && ar->end)
+			valid++;
 
 		if (s->addr >= ar->start && s->addr <= ar->end)
 			return 1;
 	}
 
-	return 0;
+	return valid ? 0 : 1;
 }
 
 static int symbol_valid(struct sym_entry *s)
@@ -272,8 +276,14 @@ static int symbol_valid(struct sym_entry *s)
 				       text_range_text->end_sym)) ||
 		    (s->addr == text_range_inittext->end &&
 				strcmp(sym_name,
-				       text_range_inittext->end_sym)))
-			return 0;
+				       text_range_inittext->end_sym))) {
+
+			/* But don't do this for predicted fake symbols
+			 * with 0 value.
+			 */
+			if (text_range_text->end != 0)
+				return 0;
+		}
 	}
 
 	/* Exclude symbols which vary between passes. */
@@ -832,7 +842,7 @@ int main(int argc, char **argv)
 				absolute_percpu = 1;
 			else if (strcmp(argv[i], "--base-relative") == 0)
 				base_relative = 1;
-			} else if (strncmp(argv[i], "--pad=", 6) == 0) {
+			else if (strncmp(argv[i], "--pad=", 6) == 0) {
 				inpadp = inpad;
 				if (sscanf(argv[i] + 6, "%d,%d,%d,%d",
 					   inpad + 0,
