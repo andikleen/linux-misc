@@ -13,6 +13,12 @@
 
 /*-------------------------------------------------------------------------*/
 
+static int override_alt = -1;
+module_param_named(alt, override_alt, int, 0644);
+MODULE_PARM_DESC(alt, ">= 0 to override altsetting selection");
+
+/*-------------------------------------------------------------------------*/
+
 /* FIXME make these public somewhere; usbdevfs.h? */
 struct usbtest_param {
 	/* inputs */
@@ -103,6 +109,10 @@ get_endpoints(struct usbtest_dev *dev, struct usb_interface *intf)
 		iso_in = iso_out = NULL;
 		alt = intf->altsetting + tmp;
 
+		if (override_alt >= 0 &&
+				override_alt != alt->desc.bAlternateSetting)
+			continue;
+
 		/* take the first altsetting with in-bulk + out-bulk;
 		 * ignore other endpoints and altsettings.
 		 */
@@ -144,6 +154,7 @@ try_iso:
 
 found:
 	udev = testdev_to_usbdev(dev);
+	dev->info->alt = alt->desc.bAlternateSetting;
 	if (alt->desc.bAlternateSetting != 0) {
 		tmp = usb_set_interface(udev,
 				alt->desc.bInterfaceNumber,
@@ -736,9 +747,9 @@ static int ch9_postconfig(struct usbtest_dev *dev)
 
 	/* [9.4.5] get_status always works */
 	retval = usb_get_status(udev, USB_RECIP_DEVICE, 0, dev->buf);
-	if (retval != 2) {
+	if (retval) {
 		dev_err(&iface->dev, "get dev status --> %d\n", retval);
-		return (retval < 0) ? retval : -EDOM;
+		return retval;
 	}
 
 	/* FIXME configuration.bmAttributes says if we could try to set/clear
@@ -747,9 +758,9 @@ static int ch9_postconfig(struct usbtest_dev *dev)
 
 	retval = usb_get_status(udev, USB_RECIP_INTERFACE,
 			iface->altsetting[0].desc.bInterfaceNumber, dev->buf);
-	if (retval != 2) {
+	if (retval) {
 		dev_err(&iface->dev, "get interface status --> %d\n", retval);
-		return (retval < 0) ? retval : -EDOM;
+		return retval;
 	}
 	/* FIXME get status for each endpoint in the interface */
 
@@ -1340,7 +1351,6 @@ static int verify_halted(struct usbtest_dev *tdev, int ep, struct urb *urb)
 				ep, retval);
 		return retval;
 	}
-	le16_to_cpus(&status);
 	if (status != 1) {
 		ERROR(tdev, "ep %02x bogus status: %04x != 1\n", ep, status);
 		return -EINVAL;
@@ -2280,7 +2290,7 @@ usbtest_probe(struct usb_interface *intf, const struct usb_device_id *id)
 			wtest = " intr-out";
 		}
 	} else {
-		if (info->autoconf) {
+		if (override_alt >= 0 || info->autoconf) {
 			int status;
 
 			status = get_endpoints(dev, intf);

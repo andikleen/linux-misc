@@ -31,7 +31,6 @@ struct gfs2_holder;
 struct gfs2_glock;
 struct gfs2_quota_data;
 struct gfs2_trans;
-struct gfs2_ail;
 struct gfs2_jdesc;
 struct gfs2_sbd;
 struct lm_lockops;
@@ -52,9 +51,8 @@ struct gfs2_log_header_host {
  */
 
 struct gfs2_log_operations {
-	void (*lo_add) (struct gfs2_sbd *sdp, struct gfs2_bufdata *bd);
 	void (*lo_before_commit) (struct gfs2_sbd *sdp);
-	void (*lo_after_commit) (struct gfs2_sbd *sdp, struct gfs2_ail *ai);
+	void (*lo_after_commit) (struct gfs2_sbd *sdp, struct gfs2_trans *tr);
 	void (*lo_before_scan) (struct gfs2_jdesc *jd,
 				struct gfs2_log_header_host *head, int pass);
 	int (*lo_scan_elements) (struct gfs2_jdesc *jd, unsigned int start,
@@ -140,7 +138,7 @@ struct gfs2_bufdata {
 	struct list_head bd_list;
 	const struct gfs2_log_operations *bd_ops;
 
-	struct gfs2_ail *bd_ail;
+	struct gfs2_trans *bd_tr;
 	struct list_head bd_ail_st_list;
 	struct list_head bd_ail_gl_list;
 };
@@ -212,7 +210,7 @@ struct gfs2_glock_operations {
 	int (*go_lock) (struct gfs2_holder *gh);
 	void (*go_unlock) (struct gfs2_holder *gh);
 	int (*go_dump)(struct seq_file *seq, const struct gfs2_glock *gl);
-	void (*go_callback) (struct gfs2_glock *gl);
+	void (*go_callback)(struct gfs2_glock *gl, bool remote);
 	const int go_type;
 	const unsigned long go_flags;
 #define GLOF_ASPACE 1
@@ -341,6 +339,7 @@ enum {
 	GIF_QD_LOCKED		= 1,
 	GIF_ALLOC_FAILED	= 2,
 	GIF_SW_PAGED		= 3,
+	GIF_ORDERED		= 4,
 };
 
 struct gfs2_inode {
@@ -357,6 +356,7 @@ struct gfs2_inode {
 	struct gfs2_rgrpd *i_rgd;
 	u64 i_goal;	/* goal block for allocations */
 	struct rw_semaphore i_rw_mutex;
+	struct list_head i_ordered;
 	struct list_head i_trunc_list;
 	__be64 *i_hash_cache;
 	u32 i_entries;
@@ -391,7 +391,6 @@ struct gfs2_revoke_replay {
 };
 
 enum {
-	QDF_USER		= 0,
 	QDF_CHANGE		= 1,
 	QDF_LOCKED		= 2,
 	QDF_REFRESH		= 3,
@@ -403,7 +402,7 @@ struct gfs2_quota_data {
 
 	atomic_t qd_count;
 
-	u32 qd_id;
+	struct kqid qd_id;
 	unsigned long qd_flags;		/* QDF_... */
 
 	s64 qd_change;
@@ -433,6 +432,7 @@ struct gfs2_trans {
 	struct gfs2_holder tr_t_gh;
 
 	int tr_touched;
+	int tr_attached;
 
 	unsigned int tr_num_buf_new;
 	unsigned int tr_num_databuf_new;
@@ -440,14 +440,12 @@ struct gfs2_trans {
 	unsigned int tr_num_databuf_rm;
 	unsigned int tr_num_revoke;
 	unsigned int tr_num_revoke_rm;
-};
 
-struct gfs2_ail {
-	struct list_head ai_list;
+	struct list_head tr_list;
 
-	unsigned int ai_first;
-	struct list_head ai_ail1_list;
-	struct list_head ai_ail2_list;
+	unsigned int tr_first;
+	struct list_head tr_ail1_list;
+	struct list_head tr_ail2_list;
 };
 
 struct gfs2_journal_extent {
@@ -588,6 +586,7 @@ struct lm_lockstruct {
 	struct dlm_lksb ls_control_lksb; /* control_lock */
 	char ls_control_lvb[GDLM_LVB_SIZE]; /* control_lock lvb */
 	struct completion ls_sync_wait; /* {control,mounted}_{lock,unlock} */
+	char *ls_lvb_bits;
 
 	spinlock_t ls_recover_spin; /* protects following fields */
 	unsigned long ls_recover_flags; /* DFL_ */
@@ -641,6 +640,7 @@ struct gfs2_sbd {
 	wait_queue_head_t sd_glock_wait;
 	atomic_t sd_glock_disposal;
 	struct completion sd_locking_init;
+	struct completion sd_wdack;
 	struct delayed_work sd_control_work;
 
 	/* Inode Stuff */
@@ -708,6 +708,7 @@ struct gfs2_sbd {
 
 	spinlock_t sd_log_lock;
 
+	struct gfs2_trans *sd_log_tr;
 	unsigned int sd_log_blks_reserved;
 	unsigned int sd_log_commited_buf;
 	unsigned int sd_log_commited_databuf;
@@ -723,6 +724,7 @@ struct gfs2_sbd {
 	struct list_head sd_log_le_revoke;
 	struct list_head sd_log_le_databuf;
 	struct list_head sd_log_le_ordered;
+	spinlock_t sd_ordered_lock;
 
 	atomic_t sd_log_thresh1;
 	atomic_t sd_log_thresh2;
@@ -758,10 +760,7 @@ struct gfs2_sbd {
 	unsigned int sd_replayed_blocks;
 
 	/* For quiescing the filesystem */
-
 	struct gfs2_holder sd_freeze_gh;
-	struct mutex sd_freeze_lock;
-	unsigned int sd_freeze_count;
 
 	char sd_fsname[GFS2_FSNAME_LEN];
 	char sd_table_name[GFS2_FSNAME_LEN];

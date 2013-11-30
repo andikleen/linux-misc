@@ -31,8 +31,10 @@
 #include <linux/syscore_ops.h>
 #include <linux/timer.h>
 #include <linux/irq.h>
+#include <linux/delay.h>
+#include <linux/clocksource.h>
 
-#include <clocksource/arm_generic.h>
+#include <clocksource/arm_arch_timer.h>
 
 #include <asm/thread_info.h>
 #include <asm/stacktrace.h>
@@ -59,7 +61,26 @@ unsigned long profile_pc(struct pt_regs *regs)
 EXPORT_SYMBOL(profile_pc);
 #endif
 
+static u64 sched_clock_mult __read_mostly;
+
+unsigned long long notrace sched_clock(void)
+{
+	return arch_timer_read_counter() * sched_clock_mult;
+}
+
 void __init time_init(void)
 {
-	arm_generic_timer_init();
+	u32 arch_timer_rate;
+
+	clocksource_of_init();
+
+	arch_timer_rate = arch_timer_get_rate();
+	if (!arch_timer_rate)
+		panic("Unable to initialise architected timer.\n");
+
+	/* Cache the sched_clock multiplier to save a divide in the hot path. */
+	sched_clock_mult = NSEC_PER_SEC / arch_timer_rate;
+
+	/* Calibrate the delay loop directly */
+	lpj_fine = arch_timer_rate / HZ;
 }

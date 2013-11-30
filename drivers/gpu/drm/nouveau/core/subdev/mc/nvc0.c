@@ -33,14 +33,17 @@ nvc0_mc_intr[] = {
 	{ 0x00000001, NVDEV_ENGINE_PPP },
 	{ 0x00000020, NVDEV_ENGINE_COPY0 },
 	{ 0x00000040, NVDEV_ENGINE_COPY1 },
+	{ 0x00000080, NVDEV_ENGINE_COPY2 },
 	{ 0x00000100, NVDEV_ENGINE_FIFO },
 	{ 0x00001000, NVDEV_ENGINE_GR },
 	{ 0x00008000, NVDEV_ENGINE_BSP },
+	{ 0x00040000, NVDEV_SUBDEV_THERM },
 	{ 0x00020000, NVDEV_ENGINE_VP },
 	{ 0x00100000, NVDEV_SUBDEV_TIMER },
 	{ 0x00200000, NVDEV_SUBDEV_GPIO },
 	{ 0x02000000, NVDEV_SUBDEV_LTCG },
 	{ 0x04000000, NVDEV_ENGINE_DISP },
+	{ 0x10000000, NVDEV_SUBDEV_BUS },
 	{ 0x40000000, NVDEV_SUBDEV_IBUS },
 	{ 0x80000000, NVDEV_ENGINE_SW },
 	{},
@@ -54,13 +57,11 @@ nvc0_mc_ctor(struct nouveau_object *parent, struct nouveau_object *engine,
 	struct nvc0_mc_priv *priv;
 	int ret;
 
-	ret = nouveau_mc_create(parent, engine, oclass, &priv);
+	ret = nouveau_mc_create(parent, engine, oclass, nvc0_mc_intr, &priv);
 	*pobject = nv_object(priv);
 	if (ret)
 		return ret;
 
-	nv_subdev(priv)->intr = nouveau_mc_intr;
-	priv->base.intr_map = nvc0_mc_intr;
 	return 0;
 }
 

@@ -153,7 +153,6 @@ static int ad5755_write_ctrl(struct iio_dev *indio_dev, unsigned int channel,
 static int ad5755_read(struct iio_dev *indio_dev, unsigned int addr)
 {
 	struct ad5755_state *st = iio_priv(indio_dev);
-	struct spi_message m;
 	int ret;
 	struct spi_transfer t[] = {
 		{
@@ -167,16 +166,12 @@ static int ad5755_read(struct iio_dev *indio_dev, unsigned int addr)
 		},
 	};
 
-	spi_message_init(&m);
-	spi_message_add_tail(&t[0], &m);
-	spi_message_add_tail(&t[1], &m);
-
 	mutex_lock(&indio_dev->mlock);
 
 	st->data[0].d32 = cpu_to_be32(AD5755_READ_FLAG | (addr << 16));
 	st->data[1].d32 = cpu_to_be32(AD5755_NOOP);
 
-	ret = spi_sync(st->spi, &m);
+	ret = spi_sync_transfer(st->spi, t, ARRAY_SIZE(t));
 	if (ret >= 0)
 		ret = be32_to_cpu(st->data[1].d32) & 0xffff;
 
@@ -398,11 +393,11 @@ static const struct iio_chan_spec_ext_info ad5755_ext_info[] = {
 #define AD5755_CHANNEL(_bits) {					\
 	.indexed = 1,						\
 	.output = 1,						\
-	.info_mask = IIO_CHAN_INFO_RAW_SEPARATE_BIT |		\
-		IIO_CHAN_INFO_SCALE_SEPARATE_BIT |		\
-		IIO_CHAN_INFO_OFFSET_SEPARATE_BIT |		\
-		IIO_CHAN_INFO_CALIBSCALE_SEPARATE_BIT |		\
-		IIO_CHAN_INFO_CALIBBIAS_SEPARATE_BIT,		\
+	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |		\
+		BIT(IIO_CHAN_INFO_SCALE) |			\
+		BIT(IIO_CHAN_INFO_OFFSET) |			\
+		BIT(IIO_CHAN_INFO_CALIBSCALE) |			\
+		BIT(IIO_CHAN_INFO_CALIBBIAS),			\
 	.scan_type = IIO_ST('u', (_bits), 16, 16 - (_bits)),	\
 	.ext_info = ad5755_ext_info,				\
 }
@@ -570,7 +565,7 @@ static int ad5755_probe(struct spi_device *spi)
 	struct ad5755_state *st;
 	int ret;
 
-	indio_dev = iio_device_alloc(sizeof(*st));
+	indio_dev = devm_iio_device_alloc(&spi->dev, sizeof(*st));
 	if (indio_dev == NULL) {
 		dev_err(&spi->dev, "Failed to allocate iio device\n");
 		return  -ENOMEM;
@@ -594,24 +589,19 @@ static int ad5755_probe(struct spi_device *spi)
 
 	ret = ad5755_init_channels(indio_dev, pdata);
 	if (ret)
-		goto error_free;
+		return ret;
 
 	ret = ad5755_setup_pdata(indio_dev, pdata);
 	if (ret)
-		goto error_free;
+		return ret;
 
 	ret = iio_device_register(indio_dev);
 	if (ret) {
 		dev_err(&spi->dev, "Failed to register iio device: %d\n", ret);
-		goto error_free;
+		return ret;
 	}
 
 	return 0;
-
-error_free:
-	iio_device_free(indio_dev);
-
-	return ret;
 }
 
 static int ad5755_remove(struct spi_device *spi)
@@ -619,7 +609,6 @@ static int ad5755_remove(struct spi_device *spi)
 	struct iio_dev *indio_dev = spi_get_drvdata(spi);
 
 	iio_device_unregister(indio_dev);
-	iio_device_free(indio_dev);
 
 	return 0;
 }

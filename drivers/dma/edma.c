@@ -24,7 +24,7 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 
-#include <mach/edma.h>
+#include <linux/platform_data/edma.h>
 
 #include "dmaengine.h"
 #include "virt-dma.h"
@@ -56,6 +56,7 @@ struct edma_desc {
 	struct list_head		node;
 	int				absync;
 	int				pset_nr;
+	int				processed;
 	struct edmacc_param		pset[0];
 };
 
@@ -69,9 +70,8 @@ struct edma_chan {
 	int				ch_num;
 	bool				alloced;
 	int				slot[EDMA_MAX_SLOTS];
-	dma_addr_t			addr;
-	int				addr_width;
-	int				maxburst;
+	int				missed;
+	struct dma_slave_config		cfg;
 };
 
 struct edma_cc {
@@ -106,22 +106,34 @@ static void edma_desc_free(struct virt_dma_desc *vdesc)
 /* Dispatch a queued descriptor to the controller (caller holds lock) */
 static void edma_execute(struct edma_chan *echan)
 {
-	struct virt_dma_desc *vdesc = vchan_next_desc(&echan->vchan);
+	struct virt_dma_desc *vdesc;
 	struct edma_desc *edesc;
-	int i;
+	struct device *dev = echan->vchan.chan.device->dev;
+	int i, j, left, nslots;
 
-	if (!vdesc) {
-		echan->edesc = NULL;
-		return;
+	/* If either we processed all psets or we're still not started */
+	if (!echan->edesc ||
+	    echan->edesc->pset_nr == echan->edesc->processed) {
+		/* Get next vdesc */
+		vdesc = vchan_next_desc(&echan->vchan);
+		if (!vdesc) {
+			echan->edesc = NULL;
+			return;
+		}
+		list_del(&vdesc->node);
+		echan->edesc = to_edma_desc(&vdesc->tx);
 	}
 
-	list_del(&vdesc->node);
+	edesc = echan->edesc;
 
-	echan->edesc = edesc = to_edma_desc(&vdesc->tx);
+	/* Find out how many left */
+	left = edesc->pset_nr - edesc->processed;
+	nslots = min(MAX_NR_SG, left);
 
 	/* Write descriptor PaRAM set(s) */
-	for (i = 0; i < edesc->pset_nr; i++) {
-		edma_write_slot(echan->slot[i], &edesc->pset[i]);
+	for (i = 0; i < nslots; i++) {
+		j = i + edesc->processed;
+		edma_write_slot(echan->slot[i], &edesc->pset[j]);
 		dev_dbg(echan->vchan.chan.device->dev,
 			"\n pset[%d]:\n"
 			"  chnum\t%d\n"
@@ -134,24 +146,50 @@ static void edma_execute(struct edma_chan *echan)
 			"  bidx\t%08x\n"
 			"  cidx\t%08x\n"
 			"  lkrld\t%08x\n",
-			i, echan->ch_num, echan->slot[i],
-			edesc->pset[i].opt,
-			edesc->pset[i].src,
-			edesc->pset[i].dst,
-			edesc->pset[i].a_b_cnt,
-			edesc->pset[i].ccnt,
-			edesc->pset[i].src_dst_bidx,
-			edesc->pset[i].src_dst_cidx,
-			edesc->pset[i].link_bcntrld);
+			j, echan->ch_num, echan->slot[i],
+			edesc->pset[j].opt,
+			edesc->pset[j].src,
+			edesc->pset[j].dst,
+			edesc->pset[j].a_b_cnt,
+			edesc->pset[j].ccnt,
+			edesc->pset[j].src_dst_bidx,
+			edesc->pset[j].src_dst_cidx,
+			edesc->pset[j].link_bcntrld);
 		/* Link to the previous slot if not the last set */
-		if (i != (edesc->pset_nr - 1))
+		if (i != (nslots - 1))
 			edma_link(echan->slot[i], echan->slot[i+1]);
-		/* Final pset links to the dummy pset */
-		else
-			edma_link(echan->slot[i], echan->ecc->dummy_slot);
 	}
 
-	edma_start(echan->ch_num);
+	edesc->processed += nslots;
+
+	/*
+	 * If this is either the last set in a set of SG-list transactions
+	 * then setup a link to the dummy slot, this results in all future
+	 * events being absorbed and that's OK because we're done
+	 */
+	if (edesc->processed == edesc->pset_nr)
+		edma_link(echan->slot[nslots-1], echan->ecc->dummy_slot);
+
+	edma_resume(echan->ch_num);
+
+	if (edesc->processed <= MAX_NR_SG) {
+		dev_dbg(dev, "first transfer starting %d\n", echan->ch_num);
+		edma_start(echan->ch_num);
+	}
+
+	/*
+	 * This happens due to setup times between intermediate transfers
+	 * in long SG lists which have to be broken up into transfers of
+	 * MAX_NR_SG
+	 */
+	if (echan->missed) {
+		dev_dbg(dev, "missed event in execute detected\n");
+		edma_clean_channel(echan->ch_num);
+		edma_stop(echan->ch_num);
+		edma_start(echan->ch_num);
+		edma_trigger_channel(echan->ch_num);
+		echan->missed = 0;
+	}
 }
 
 static int edma_terminate_all(struct edma_chan *echan)
@@ -178,29 +216,14 @@ static int edma_terminate_all(struct edma_chan *echan)
 	return 0;
 }
 
-
 static int edma_slave_config(struct edma_chan *echan,
-	struct dma_slave_config *config)
+	struct dma_slave_config *cfg)
 {
-	if ((config->src_addr_width > DMA_SLAVE_BUSWIDTH_4_BYTES) ||
-	    (config->dst_addr_width > DMA_SLAVE_BUSWIDTH_4_BYTES))
+	if (cfg->src_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES ||
+	    cfg->dst_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES)
 		return -EINVAL;
 
-	if (config->direction == DMA_MEM_TO_DEV) {
-		if (config->dst_addr)
-			echan->addr = config->dst_addr;
-		if (config->dst_addr_width)
-			echan->addr_width = config->dst_addr_width;
-		if (config->dst_maxburst)
-			echan->maxburst = config->dst_maxburst;
-	} else if (config->direction == DMA_DEV_TO_MEM) {
-		if (config->src_addr)
-			echan->addr = config->src_addr;
-		if (config->src_addr_width)
-			echan->addr_width = config->src_addr_width;
-		if (config->src_maxburst)
-			echan->maxburst = config->src_maxburst;
-	}
+	memcpy(&echan->cfg, cfg, sizeof(echan->cfg));
 
 	return 0;
 }
@@ -235,22 +258,32 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
 	struct edma_chan *echan = to_edma_chan(chan);
 	struct device *dev = chan->device->dev;
 	struct edma_desc *edesc;
+	dma_addr_t dev_addr;
+	enum dma_slave_buswidth dev_width;
+	u32 burst;
 	struct scatterlist *sg;
-	int i;
 	int acnt, bcnt, ccnt, src, dst, cidx;
 	int src_bidx, dst_bidx, src_cidx, dst_cidx;
+	int i, nslots;
 
 	if (unlikely(!echan || !sgl || !sg_len))
 		return NULL;
 
-	if (echan->addr_width == DMA_SLAVE_BUSWIDTH_UNDEFINED) {
-		dev_err(dev, "Undefined slave buswidth\n");
+	if (direction == DMA_DEV_TO_MEM) {
+		dev_addr = echan->cfg.src_addr;
+		dev_width = echan->cfg.src_addr_width;
+		burst = echan->cfg.src_maxburst;
+	} else if (direction == DMA_MEM_TO_DEV) {
+		dev_addr = echan->cfg.dst_addr;
+		dev_width = echan->cfg.dst_addr_width;
+		burst = echan->cfg.dst_maxburst;
+	} else {
+		dev_err(dev, "%s: bad direction?\n", __func__);
 		return NULL;
 	}
 
-	if (sg_len > MAX_NR_SG) {
-		dev_err(dev, "Exceeded max SG segments %d > %d\n",
-			sg_len, MAX_NR_SG);
+	if (dev_width == DMA_SLAVE_BUSWIDTH_UNDEFINED) {
+		dev_err(dev, "Undefined slave buswidth\n");
 		return NULL;
 	}
 
@@ -263,26 +296,33 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
 
 	edesc->pset_nr = sg_len;
 
-	for_each_sg(sgl, sg, sg_len, i) {
-		/* Allocate a PaRAM slot, if needed */
+	/* Allocate a PaRAM slot, if needed */
+	nslots = min_t(unsigned, MAX_NR_SG, sg_len);
+
+	for (i = 0; i < nslots; i++) {
 		if (echan->slot[i] < 0) {
 			echan->slot[i] =
 				edma_alloc_slot(EDMA_CTLR(echan->ch_num),
 						EDMA_SLOT_ANY);
 			if (echan->slot[i] < 0) {
 				dev_err(dev, "Failed to allocate slot\n");
+				kfree(edesc);
 				return NULL;
 			}
 		}
+	}
 
-		acnt = echan->addr_width;
+	/* Configure PaRAM sets for each SG */
+	for_each_sg(sgl, sg, sg_len, i) {
+
+		acnt = dev_width;
 
 		/*
 		 * If the maxburst is equal to the fifo width, use
 		 * A-synced transfers. This allows for large contiguous
 		 * buffer transfers using only one PaRAM set.
 		 */
-		if (echan->maxburst == 1) {
+		if (burst == 1) {
 			edesc->absync = false;
 			ccnt = sg_dma_len(sg) / acnt / (SZ_64K - 1);
 			bcnt = sg_dma_len(sg) / acnt - ccnt * (SZ_64K - 1);
@@ -302,7 +342,7 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
 		 */
 		} else {
 			edesc->absync = true;
-			bcnt = echan->maxburst;
+			bcnt = burst;
 			ccnt = sg_dma_len(sg) / (acnt * bcnt);
 			if (ccnt > (SZ_64K - 1)) {
 				dev_err(dev, "Exceeded max SG segment size\n");
@@ -313,13 +353,13 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
 
 		if (direction == DMA_MEM_TO_DEV) {
 			src = sg_dma_address(sg);
-			dst = echan->addr;
+			dst = dev_addr;
 			src_bidx = acnt;
 			src_cidx = cidx;
 			dst_bidx = 0;
 			dst_cidx = 0;
 		} else {
-			src = echan->addr;
+			src = dev_addr;
 			dst = sg_dma_address(sg);
 			src_bidx = 0;
 			src_cidx = 0;
@@ -331,6 +371,12 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
 		/* Configure A or AB synchronized transfers */
 		if (edesc->absync)
 			edesc->pset[i].opt |= SYNCDIM;
+
+		/* If this is the last in a current SG set of transactions,
+		   enable interrupts so that next set is processed */
+		if (!((i+1) % MAX_NR_SG))
+			edesc->pset[i].opt |= TCINTEN;
+
 		/* If this is the last set, enable completion interrupt flag */
 		if (i == sg_len - 1)
 			edesc->pset[i].opt |= TCINTEN;
@@ -356,27 +402,65 @@ static void edma_callback(unsigned ch_num, u16 ch_status, void *data)
 	struct device *dev = echan->vchan.chan.device->dev;
 	struct edma_desc *edesc;
 	unsigned long flags;
+	struct edmacc_param p;
 
-	/* Stop the channel */
-	edma_stop(echan->ch_num);
+	/* Pause the channel */
+	edma_pause(echan->ch_num);
 
 	switch (ch_status) {
 	case DMA_COMPLETE:
-		dev_dbg(dev, "transfer complete on channel %d\n", ch_num);
-
 		spin_lock_irqsave(&echan->vchan.lock, flags);
 
 		edesc = echan->edesc;
 		if (edesc) {
+			if (edesc->processed == edesc->pset_nr) {
+				dev_dbg(dev, "Transfer complete, stopping channel %d\n", ch_num);
+				edma_stop(echan->ch_num);
+				vchan_cookie_complete(&edesc->vdesc);
+			} else {
+				dev_dbg(dev, "Intermediate transfer complete on channel %d\n", ch_num);
+			}
+
 			edma_execute(echan);
-			vchan_cookie_complete(&edesc->vdesc);
 		}
 
 		spin_unlock_irqrestore(&echan->vchan.lock, flags);
 
 		break;
 	case DMA_CC_ERROR:
-		dev_dbg(dev, "transfer error on channel %d\n", ch_num);
+		spin_lock_irqsave(&echan->vchan.lock, flags);
+
+		edma_read_slot(EDMA_CHAN_SLOT(echan->slot[0]), &p);
+
+		/*
+		 * Issue later based on missed flag which will be sure
+		 * to happen as:
+		 * (1) we finished transmitting an intermediate slot and
+		 *     edma_execute is coming up.
+		 * (2) or we finished current transfer and issue will
+		 *     call edma_execute.
+		 *
+		 * Important note: issuing can be dangerous here and
+		 * lead to some nasty recursion when we are in a NULL
+		 * slot. So we avoid doing so and set the missed flag.
+		 */
+		if (p.a_b_cnt == 0 && p.ccnt == 0) {
+			dev_dbg(dev, "Error occurred, looks like slot is null, just setting miss\n");
+			echan->missed = 1;
+		} else {
+			/*
+			 * The slot is already programmed but the event got
+			 * missed, so its safe to issue it here.
+			 */
+			dev_dbg(dev, "Error occurred but slot is non-null, TRIGGERING\n");
+			edma_clean_channel(echan->ch_num);
+			edma_stop(echan->ch_num);
+			edma_start(echan->ch_num);
+			edma_trigger_channel(echan->ch_num);
+		}
+
+		spin_unlock_irqrestore(&echan->vchan.lock, flags);
+
 		break;
 	default:
 		break;
@@ -503,8 +587,6 @@ static enum dma_status edma_tx_status(struct dma_chan *chan,
 	} else if (echan->edesc && echan->edesc->vdesc.tx.cookie == cookie) {
 		struct edma_desc *edesc = echan->edesc;
 		txstate->residue = edma_desc_size(edesc);
-	} else {
-		txstate->residue = 0;
 	}
 	spin_unlock_irqrestore(&echan->vchan.lock, flags);
 
@@ -621,13 +703,11 @@ static struct platform_device *pdev0, *pdev1;
 static const struct platform_device_info edma_dev_info0 = {
 	.name = "edma-dma-engine",
 	.id = 0,
-	.dma_mask = DMA_BIT_MASK(32),
 };
 
 static const struct platform_device_info edma_dev_info1 = {
 	.name = "edma-dma-engine",
 	.id = 1,
-	.dma_mask = DMA_BIT_MASK(32),
 };
 
 static int edma_init(void)
@@ -641,6 +721,8 @@ static int edma_init(void)
 			ret = PTR_ERR(pdev0);
 			goto out;
 		}
+		pdev0->dev.dma_mask = &pdev0->dev.coherent_dma_mask;
+		pdev0->dev.coherent_dma_mask = DMA_BIT_MASK(32);
 	}
 
 	if (EDMA_CTLRS == 2) {
@@ -650,6 +732,8 @@ static int edma_init(void)
 			platform_device_unregister(pdev0);
 			ret = PTR_ERR(pdev1);
 		}
+		pdev1->dev.dma_mask = &pdev1->dev.coherent_dma_mask;
+		pdev1->dev.coherent_dma_mask = DMA_BIT_MASK(32);
 	}
 
 out:
@@ -666,6 +750,6 @@ static void __exit edma_exit(void)
 }
 module_exit(edma_exit);
 
-MODULE_AUTHOR("Matt Porter <mporter@ti.com>");
+MODULE_AUTHOR("Matt Porter <matt.porter@linaro.org>");
 MODULE_DESCRIPTION("TI EDMA DMA engine driver");
 MODULE_LICENSE("GPL v2");

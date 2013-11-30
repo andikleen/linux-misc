@@ -40,6 +40,7 @@ config ARCH_DAVINCI_DA850
 	bool "DA850/OMAP-L138/AM18x based system"
 	select ARCH_DAVINCI_DA8XX
 	select ARCH_HAS_CPUFREQ
+	select CPU_FREQ_TABLE
 	select CP_INTC
 
 config ARCH_DAVINCI_DA8XX
@@ -62,6 +63,7 @@ config MACH_DA8XX_DT
 	bool "Support DA8XX platforms using device tree"
 	default y
 	depends on ARCH_DAVINCI_DA8XX
+	select PINCTRL
 	help
 	  Say y here to include support for TI DaVinci DA850 based using
 	  Flattened Device Tree. More information at Documentation/devicetree

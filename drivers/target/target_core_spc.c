@@ -1,7 +1,7 @@
 /*
  * SCSI Primary Commands (SPC) parsing and emulation.
  *
- * (c) Copyright 2002-2012 RisingTide Systems LLC.
+ * (c) Copyright 2002-2013 Datera, Inc.
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *
@@ -35,7 +35,7 @@
 #include "target_core_alua.h"
 #include "target_core_pr.h"
 #include "target_core_ua.h"
-
+#include "target_core_xcopy.h"
 
 static void spc_fill_alua_data(struct se_port *port, unsigned char *buf)
 {
@@ -66,8 +66,8 @@ static void spc_fill_alua_data(struct se_port *port, unsigned char *buf)
 	spin_unlock(&tg_pt_gp_mem->tg_pt_gp_mem_lock);
 }
 
-static sense_reason_t
-spc_emulate_inquiry_std(struct se_cmd *cmd, char *buf)
+sense_reason_t
+spc_emulate_inquiry_std(struct se_cmd *cmd, unsigned char *buf)
 {
 	struct se_lun *lun = cmd->se_lun;
 	struct se_device *dev = cmd->se_dev;
@@ -95,15 +95,25 @@ spc_emulate_inquiry_std(struct se_cmd *cmd, char *buf)
 	 */
 	spc_fill_alua_data(lun->lun_sep, buf);
 
+	/*
+	 * Set Third-Party Copy (3PC) bit to indicate support for EXTENDED_COPY
+	 */
+	if (dev->dev_attrib.emulate_3pc)
+		buf[5] |= 0x8;
+
 	buf[7] = 0x2; /* CmdQue=1 */
 
-	snprintf(&buf[8], 8, "LIO-ORG");
-	snprintf(&buf[16], 16, "%s", dev->t10_wwn.model);
-	snprintf(&buf[32], 4, "%s", dev->t10_wwn.revision);
+	memcpy(&buf[8], "LIO-ORG ", 8);
+	memset(&buf[16], 0x20, 16);
+	memcpy(&buf[16], dev->t10_wwn.model,
+	       min_t(size_t, strlen(dev->t10_wwn.model), 16));
+	memcpy(&buf[32], dev->t10_wwn.revision,
+	       min_t(size_t, strlen(dev->t10_wwn.revision), 4));
 	buf[4] = 31; /* Set additional length to 31 */
 
 	return 0;
 }
+EXPORT_SYMBOL(spc_emulate_inquiry_std);
 
 /* unit serial number */
 static sense_reason_t
@@ -125,8 +135,8 @@ spc_emulate_evpd_80(struct se_cmd *cmd, unsigned char *buf)
 	return 0;
 }
 
-static void spc_parse_naa_6h_vendor_specific(struct se_device *dev,
-		unsigned char *buf)
+void spc_parse_naa_6h_vendor_specific(struct se_device *dev,
+				      unsigned char *buf)
 {
 	unsigned char *p = &dev->t10_wwn.unit_serial[0];
 	int cnt;
@@ -160,7 +170,7 @@ static void spc_parse_naa_6h_vendor_specific(struct se_device *dev,
  * Device identification VPD, for a complete list of
  * DESIGNATOR TYPEs see spc4r17 Table 459.
  */
-static sense_reason_t
+sense_reason_t
 spc_emulate_evpd_83(struct se_cmd *cmd, unsigned char *buf)
 {
 	struct se_device *dev = cmd->se_dev;
@@ -404,17 +414,33 @@ check_scsi_name:
 	buf[3] = (len & 0xff); /* Page Length for VPD 0x83 */
 	return 0;
 }
+EXPORT_SYMBOL(spc_emulate_evpd_83);
+
+static bool
+spc_check_dev_wce(struct se_device *dev)
+{
+	bool wce = false;
+
+	if (dev->transport->get_write_cache)
+		wce = dev->transport->get_write_cache(dev);
+	else if (dev->dev_attrib.emulate_write_cache > 0)
+		wce = true;
+
+	return wce;
+}
 
 /* Extended INQUIRY Data VPD Page */
 static sense_reason_t
 spc_emulate_evpd_86(struct se_cmd *cmd, unsigned char *buf)
 {
+	struct se_device *dev = cmd->se_dev;
+
 	buf[3] = 0x3c;
 	/* Set HEADSUP, ORDSUP, SIMPSUP */
 	buf[5] = 0x07;
 
 	/* If WriteCache emulation is enabled, set V_SUP */
-	if (cmd->se_dev->dev_attrib.emulate_write_cache > 0)
+	if (spc_check_dev_wce(dev))
 		buf[6] = 0x01;
 	return 0;
 }
@@ -440,6 +466,11 @@ spc_emulate_evpd_b0(struct se_cmd *cmd, unsigned char *buf)
 
 	/* Set WSNZ to 1 */
 	buf[4] = 0x01;
+	/*
+	 * Set MAXIMUM COMPARE AND WRITE LENGTH
+	 */
+	if (dev->dev_attrib.emulate_caw)
+		buf[5] = 0x01;
 
 	/*
 	 * Set OPTIMAL TRANSFER LENGTH GRANULARITY
@@ -764,7 +795,7 @@ static int spc_modesense_caching(struct se_device *dev, u8 pc, u8 *p)
 	if (pc == 1)
 		goto out;
 
-	if (dev->dev_attrib.emulate_write_cache > 0)
+	if (spc_check_dev_wce(dev))
 		p[2] = 0x04; /* Write Cache Enable */
 	p[12] = 0x20; /* Disabled Read Ahead */
 
@@ -876,7 +907,7 @@ static sense_reason_t spc_emulate_modesense(struct se_cmd *cmd)
 	     (cmd->se_deve->lun_flags & TRANSPORT_LUNFLAGS_READ_ONLY)))
 		spc_modesense_write_protect(&buf[length], type);
 
-	if ((dev->dev_attrib.emulate_write_cache > 0) &&
+	if ((spc_check_dev_wce(dev)) &&
 	    (dev->dev_attrib.emulate_fua_write > 0))
 		spc_modesense_dpofua(&buf[length], type);
 
@@ -983,6 +1014,14 @@ static sense_reason_t spc_emulate_modeselect(struct se_cmd *cmd)
 	int ret = 0;
 	int i;
 
+	if (!cmd->data_length) {
+		target_complete_cmd(cmd, GOOD);
+		return 0;
+	}
+
+	if (cmd->data_length < off + 2)
+		return TCM_PARAMETER_LIST_LENGTH_ERROR;
+
 	buf = transport_kmap_data_sg(cmd);
 	if (!buf)
 		return TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
@@ -1007,6 +1046,11 @@ static sense_reason_t spc_emulate_modeselect(struct se_cmd *cmd)
 	goto out;
 
 check_contents:
+	if (cmd->data_length < off + length) {
+		ret = TCM_PARAMETER_LIST_LENGTH_ERROR;
+		goto out;
+	}
+
 	if (memcmp(buf + off, tbuf, length))
 		ret = TCM_INVALID_PARAMETER_LIST;
 
@@ -1217,8 +1261,14 @@ spc_parse_cdb(struct se_cmd *cmd, unsigned int *size)
 		*size = (cdb[6] << 24) | (cdb[7] << 16) | (cdb[8] << 8) | cdb[9];
 		break;
 	case EXTENDED_COPY:
-	case READ_ATTRIBUTE:
+		*size = get_unaligned_be32(&cdb[10]);
+		cmd->execute_cmd = target_do_xcopy;
+		break;
 	case RECEIVE_COPY_RESULTS:
+		*size = get_unaligned_be32(&cdb[10]);
+		cmd->execute_cmd = target_do_receive_copy_results;
+		break;
+	case READ_ATTRIBUTE:
 	case WRITE_ATTRIBUTE:
 		*size = (cdb[10] << 24) | (cdb[11] << 16) |
 		       (cdb[12] << 8) | cdb[13];

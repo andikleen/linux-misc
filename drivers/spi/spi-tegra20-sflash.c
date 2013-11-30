@@ -33,8 +33,7 @@
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/spi/spi.h>
-#include <linux/spi/spi-tegra.h>
-#include <mach/clk.h>
+#include <linux/clk/tegra.h>
 
 #define SPI_COMMAND				0x000
 #define SPI_GO					BIT(30)
@@ -269,9 +268,7 @@ static int tegra_sflash_start_transfer_one(struct spi_device *spi,
 	u32 speed;
 	unsigned long command;
 
-	speed = t->speed_hz ? t->speed_hz : spi->max_speed_hz;
-	if (!speed)
-		speed = tsd->spi_max_frequency;
+	speed = t->speed_hz;
 	if (speed != tsd->cur_speed) {
 		clk_set_rate(tsd->clk, speed);
 		tsd->cur_speed = speed;
@@ -319,6 +316,15 @@ static int tegra_sflash_start_transfer_one(struct spi_device *spi,
 	return  tegra_sflash_start_cpu_based_transfer(tsd, t);
 }
 
+static int tegra_sflash_setup(struct spi_device *spi)
+{
+	struct tegra_sflash_data *tsd = spi_master_get_devdata(spi->master);
+
+	/* Set speed to the spi max fequency if spi device has not set */
+	spi->max_speed_hz = spi->max_speed_hz ? : tsd->spi_max_frequency;
+	return 0;
+}
+
 static int tegra_sflash_transfer_one_message(struct spi_master *master,
 			struct spi_message *msg)
 {
@@ -328,12 +334,6 @@ static int tegra_sflash_transfer_one_message(struct spi_master *master,
 	struct spi_transfer *xfer;
 	struct spi_device *spi = msg->spi;
 	int ret;
-
-	ret = pm_runtime_get_sync(tsd->dev);
-	if (ret < 0) {
-		dev_err(tsd->dev, "pm_runtime_get() failed, err = %d\n", ret);
-		return ret;
-	}
 
 	msg->status = 0;
 	msg->actual_length = 0;
@@ -374,7 +374,6 @@ exit:
 	tegra_sflash_writel(tsd, tsd->def_command_reg, SPI_COMMAND);
 	msg->status = ret;
 	spi_finalize_current_message(master);
-	pm_runtime_put(tsd->dev);
 	return ret;
 }
 
@@ -432,23 +431,13 @@ static irqreturn_t tegra_sflash_isr(int irq, void *context_data)
 	return handle_cpu_based_xfer(tsd);
 }
 
-static struct tegra_spi_platform_data *tegra_sflash_parse_dt(
-		struct platform_device *pdev)
+static void tegra_sflash_parse_dt(struct tegra_sflash_data *tsd)
 {
-	struct tegra_spi_platform_data *pdata;
-	struct device_node *np = pdev->dev.of_node;
-	u32 max_freq;
+	struct device_node *np = tsd->dev->of_node;
 
-	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-	if (!pdata) {
-		dev_err(&pdev->dev, "Memory alloc for pdata failed\n");
-		return NULL;
-	}
-
-	if (!of_property_read_u32(np, "spi-max-frequency", &max_freq))
-		pdata->spi_max_frequency = max_freq;
-
-	return pdata;
+	if (of_property_read_u32(np, "spi-max-frequency",
+					&tsd->spi_max_frequency))
+		tsd->spi_max_frequency = 25000000; /* 25MHz */
 }
 
 static struct of_device_id tegra_sflash_of_match[] = {
@@ -462,27 +451,14 @@ static int tegra_sflash_probe(struct platform_device *pdev)
 	struct spi_master	*master;
 	struct tegra_sflash_data	*tsd;
 	struct resource		*r;
-	struct tegra_spi_platform_data *pdata = pdev->dev.platform_data;
 	int ret;
 	const struct of_device_id *match;
 
-	match = of_match_device(of_match_ptr(tegra_sflash_of_match),
-					&pdev->dev);
+	match = of_match_device(tegra_sflash_of_match, &pdev->dev);
 	if (!match) {
 		dev_err(&pdev->dev, "Error: No device match found\n");
 		return -ENODEV;
 	}
-
-	if (!pdata && pdev->dev.of_node)
-		pdata = tegra_sflash_parse_dt(pdev);
-
-	if (!pdata) {
-		dev_err(&pdev->dev, "No platform data, exiting\n");
-		return -ENODEV;
-	}
-
-	if (!pdata->spi_max_frequency)
-		pdata->spi_max_frequency = 25000000; /* 25MHz */
 
 	master = spi_alloc_master(&pdev->dev, sizeof(*tsd));
 	if (!master) {
@@ -492,27 +468,24 @@ static int tegra_sflash_probe(struct platform_device *pdev)
 
 	/* the spi->mode bits understood by this driver: */
 	master->mode_bits = SPI_CPOL | SPI_CPHA;
+	master->setup = tegra_sflash_setup;
 	master->transfer_one_message = tegra_sflash_transfer_one_message;
+	master->auto_runtime_pm = true;
 	master->num_chipselect = MAX_CHIP_SELECT;
 	master->bus_num = -1;
 
-	dev_set_drvdata(&pdev->dev, master);
+	platform_set_drvdata(pdev, master);
 	tsd = spi_master_get_devdata(master);
 	tsd->master = master;
 	tsd->dev = &pdev->dev;
 	spin_lock_init(&tsd->lock);
 
+	tegra_sflash_parse_dt(tsd);
+
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (!r) {
-		dev_err(&pdev->dev, "No IO memory resource\n");
-		ret = -ENODEV;
-		goto exit_free_master;
-	}
-	tsd->base = devm_request_and_ioremap(&pdev->dev, r);
-	if (!tsd->base) {
-		dev_err(&pdev->dev,
-			"Cannot request memregion/iomap dma address\n");
-		ret = -EADDRNOTAVAIL;
+	tsd->base = devm_ioremap_resource(&pdev->dev, r);
+	if (IS_ERR(tsd->base)) {
+		ret = PTR_ERR(tsd->base);
 		goto exit_free_master;
 	}
 
@@ -525,14 +498,13 @@ static int tegra_sflash_probe(struct platform_device *pdev)
 		goto exit_free_master;
 	}
 
-	tsd->clk = devm_clk_get(&pdev->dev, "spi");
+	tsd->clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(tsd->clk)) {
 		dev_err(&pdev->dev, "can not get clock\n");
 		ret = PTR_ERR(tsd->clk);
 		goto exit_free_irq;
 	}
 
-	tsd->spi_max_frequency = pdata->spi_max_frequency;
 	init_completion(&tsd->xfer_completion);
 	pm_runtime_enable(&pdev->dev);
 	if (!pm_runtime_enabled(&pdev->dev)) {
@@ -577,7 +549,7 @@ exit_free_master:
 
 static int tegra_sflash_remove(struct platform_device *pdev)
 {
-	struct spi_master *master = dev_get_drvdata(&pdev->dev);
+	struct spi_master *master = platform_get_drvdata(pdev);
 	struct tegra_sflash_data	*tsd = spi_master_get_devdata(master);
 
 	free_irq(tsd->irq, tsd);
@@ -652,7 +624,7 @@ static struct platform_driver tegra_sflash_driver = {
 		.name		= "spi-tegra-sflash",
 		.owner		= THIS_MODULE,
 		.pm		= &slink_pm_ops,
-		.of_match_table	= of_match_ptr(tegra_sflash_of_match),
+		.of_match_table	= tegra_sflash_of_match,
 	},
 	.probe =	tegra_sflash_probe,
 	.remove =	tegra_sflash_remove,

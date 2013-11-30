@@ -21,8 +21,8 @@ static const __u8 root_hub_hub_des[] =
 	0x00,			/*   (per-port OC, no power switching) */
 	0x01,			/*  __u8  bPwrOn2pwrGood; 2ms */
 	0x00,			/*  __u8  bHubContrCurrent; 0 mA */
-	0x00,			/*  __u8  DeviceRemovable; *** 7 Ports max *** */
-	0xff			/*  __u8  PortPwrCtrlMask; *** 7 ports max *** */
+	0x00,			/*  __u8  DeviceRemovable; *** 7 Ports max */
+	0xff			/*  __u8  PortPwrCtrlMask; *** 7 ports max */
 };
 
 #define	UHCI_RH_MAXCHILD	7
@@ -225,7 +225,8 @@ static int uhci_hub_status_data(struct usb_hcd *hcd, char *buf)
 		/* auto-stop if nothing connected for 1 second */
 		if (any_ports_active(uhci))
 			uhci->rh_state = UHCI_RH_RUNNING;
-		else if (time_after_eq(jiffies, uhci->auto_stop_time))
+		else if (time_after_eq(jiffies, uhci->auto_stop_time) &&
+				!uhci->wait_for_hp)
 			suspend_rh(uhci, UHCI_RH_AUTO_STOPPED);
 		break;
 

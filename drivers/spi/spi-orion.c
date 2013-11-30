@@ -19,6 +19,7 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/clk.h>
+#include <linux/sizes.h>
 #include <asm/unaligned.h>
 
 #define DRIVER_NAME			"orion_spi"
@@ -366,7 +367,7 @@ msg_done:
 	return 0;
 }
 
-static int __init orion_spi_reset(struct orion_spi *orion_spi)
+static int orion_spi_reset(struct orion_spi *orion_spi)
 {
 	/* Verify that the CS is deasserted */
 	orion_spi_set_cs(orion_spi, 0);
@@ -396,7 +397,7 @@ static int orion_spi_setup(struct spi_device *spi)
 	return 0;
 }
 
-static int __init orion_spi_probe(struct platform_device *pdev)
+static int orion_spi_probe(struct platform_device *pdev)
 {
 	struct spi_master *master;
 	struct orion_spi *spi;
@@ -428,7 +429,7 @@ static int __init orion_spi_probe(struct platform_device *pdev)
 	master->transfer_one_message = orion_spi_transfer_one_message;
 	master->num_chipselect = ORION_NUM_CHIPSELECTS;
 
-	dev_set_drvdata(&pdev->dev, master);
+	platform_set_drvdata(pdev, master);
 
 	spi = spi_master_get_devdata(master);
 	spi->master = master;
@@ -446,30 +447,22 @@ static int __init orion_spi_probe(struct platform_device *pdev)
 	spi->min_speed = DIV_ROUND_UP(tclk_hz, 30);
 
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (r == NULL) {
-		status = -ENODEV;
+	spi->base = devm_ioremap_resource(&pdev->dev, r);
+	if (IS_ERR(spi->base)) {
+		status = PTR_ERR(spi->base);
 		goto out_rel_clk;
 	}
-
-	if (!request_mem_region(r->start, resource_size(r),
-				dev_name(&pdev->dev))) {
-		status = -EBUSY;
-		goto out_rel_clk;
-	}
-	spi->base = ioremap(r->start, SZ_1K);
 
 	if (orion_spi_reset(spi) < 0)
-		goto out_rel_mem;
+		goto out_rel_clk;
 
 	master->dev.of_node = pdev->dev.of_node;
 	status = spi_register_master(master);
 	if (status < 0)
-		goto out_rel_mem;
+		goto out_rel_clk;
 
 	return status;
 
-out_rel_mem:
-	release_mem_region(r->start, resource_size(r));
 out_rel_clk:
 	clk_disable_unprepare(spi->clk);
 	clk_put(spi->clk);
@@ -479,20 +472,16 @@ out:
 }
 
 
-static int __exit orion_spi_remove(struct platform_device *pdev)
+static int orion_spi_remove(struct platform_device *pdev)
 {
 	struct spi_master *master;
-	struct resource *r;
 	struct orion_spi *spi;
 
-	master = dev_get_drvdata(&pdev->dev);
+	master = platform_get_drvdata(pdev);
 	spi = spi_master_get_devdata(master);
 
 	clk_disable_unprepare(spi->clk);
 	clk_put(spi->clk);
-
-	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	release_mem_region(r->start, resource_size(r));
 
 	spi_unregister_master(master);
 
@@ -513,20 +502,11 @@ static struct platform_driver orion_spi_driver = {
 		.owner	= THIS_MODULE,
 		.of_match_table = of_match_ptr(orion_spi_of_match_table),
 	},
-	.remove		= __exit_p(orion_spi_remove),
+	.probe		= orion_spi_probe,
+	.remove		= orion_spi_remove,
 };
 
-static int __init orion_spi_init(void)
-{
-	return platform_driver_probe(&orion_spi_driver, orion_spi_probe);
-}
-module_init(orion_spi_init);
-
-static void __exit orion_spi_exit(void)
-{
-	platform_driver_unregister(&orion_spi_driver);
-}
-module_exit(orion_spi_exit);
+module_platform_driver(orion_spi_driver);
 
 MODULE_DESCRIPTION("Orion SPI driver");
 MODULE_AUTHOR("Shadi Ammouri <shadi@marvell.com>");

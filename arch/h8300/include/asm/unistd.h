@@ -29,17 +29,8 @@
 #define __ARCH_WANT_SYS_OLDUMOUNT
 #define __ARCH_WANT_SYS_SIGPENDING
 #define __ARCH_WANT_SYS_SIGPROCMASK
-#define __ARCH_WANT_SYS_RT_SIGACTION
-#define __ARCH_WANT_SYS_RT_SIGSUSPEND
 #define __ARCH_WANT_SYS_FORK
 #define __ARCH_WANT_SYS_VFORK
 #define __ARCH_WANT_SYS_CLONE
-
-/*
- * "Conditional" syscalls
- */
-#define cond_syscall(name)						\
-  asm (".weak\t_" #name "\n"				\
-       ".set\t_" #name ",_sys_ni_syscall");
 
 #endif /* _ASM_H8300_UNISTD_H_ */

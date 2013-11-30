@@ -35,7 +35,6 @@
 #define __ARCH_WANT_SYS_OLDUMOUNT
 #define __ARCH_WANT_SYS_SIGPENDING
 #define __ARCH_WANT_SYS_SIGPROCMASK
-#define __ARCH_WANT_SYS_RT_SIGACTION
 # ifdef CONFIG_32BIT
 #  define __ARCH_WANT_STAT64
 #  define __ARCH_WANT_SYS_TIME
@@ -43,6 +42,8 @@
 # ifdef CONFIG_MIPS32_O32
 #  define __ARCH_WANT_COMPAT_SYS_TIME
 # endif
+#define __ARCH_WANT_SYS_FORK
+#define __ARCH_WANT_SYS_CLONE
 
 /* whitelists for checksyscalls */
 #define __IGNORE_select
@@ -61,13 +62,5 @@
 #endif
 
 #endif /* !__ASSEMBLY__ */
-
-/*
- * "Conditional" syscalls
- *
- * What we want is __attribute__((weak,alias("sys_ni_syscall"))),
- * but it doesn't work on all toolchains, so we just do it by hand
- */
-#define cond_syscall(x) asm(".weak\t" #x "\n" #x "\t=\tsys_ni_syscall")
 
 #endif /* _ASM_UNISTD_H */

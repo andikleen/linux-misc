@@ -245,7 +245,7 @@ static void cpm_uart_int_rx(struct uart_port *port)
 	int i;
 	unsigned char ch;
 	u8 *cp;
-	struct tty_struct *tty = port->state->port.tty;
+	struct tty_port *tport = &port->state->port;
 	struct uart_cpm_port *pinfo = (struct uart_cpm_port *)port;
 	cbd_t __iomem *bdp;
 	u16 status;
@@ -276,7 +276,7 @@ static void cpm_uart_int_rx(struct uart_port *port)
 		/* If we have not enough room in tty flip buffer, then we try
 		 * later, which will be the next rx-interrupt or a timeout
 		 */
-		if(tty_buffer_request_room(tty, i) < i) {
+		if (tty_buffer_request_room(tport, i) < i) {
 			printk(KERN_WARNING "No room in flip buffer\n");
 			return;
 		}
@@ -302,7 +302,7 @@ static void cpm_uart_int_rx(struct uart_port *port)
 			}
 #endif
 		      error_return:
-			tty_insert_flip_char(tty, ch, flg);
+			tty_insert_flip_char(tport, ch, flg);
 
 		}		/* End while (i--) */
 
@@ -322,7 +322,7 @@ static void cpm_uart_int_rx(struct uart_port *port)
 	pinfo->rx_cur = bdp;
 
 	/* activate BH processing */
-	tty_flip_buffer_push(tty);
+	tty_flip_buffer_push(tport);
 
 	return;
 
@@ -507,7 +507,7 @@ static void cpm_uart_set_termios(struct uart_port *port,
 
 	baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk / 16);
 	if (baud < HW_BUF_SPD_THRESHOLD ||
-	    (pinfo->port.state && pinfo->port.state->port.tty->low_latency))
+	    (pinfo->port.state && pinfo->port.state->port.low_latency))
 		pinfo->rx_fifosize = 1;
 	else
 		pinfo->rx_fifosize = RX_BUF_SIZE;
@@ -1213,8 +1213,32 @@ static int cpm_uart_init_port(struct device_node *np,
 		goto out_pram;
 	}
 
-	for (i = 0; i < NUM_GPIOS; i++)
-		pinfo->gpios[i] = of_get_gpio(np, i);
+	for (i = 0; i < NUM_GPIOS; i++) {
+		int gpio;
+
+		pinfo->gpios[i] = -1;
+
+		gpio = of_get_gpio(np, i);
+
+		if (gpio_is_valid(gpio)) {
+			ret = gpio_request(gpio, "cpm_uart");
+			if (ret) {
+				pr_err("can't request gpio #%d: %d\n", i, ret);
+				continue;
+			}
+			if (i == GPIO_RTS || i == GPIO_DTR)
+				ret = gpio_direction_output(gpio, 0);
+			else
+				ret = gpio_direction_input(gpio);
+			if (ret) {
+				pr_err("can't set direction for gpio #%d: %d\n",
+					i, ret);
+				gpio_free(gpio);
+				continue;
+			}
+			pinfo->gpios[i] = gpio;
+		}
+	}
 
 #ifdef CONFIG_PPC_EARLY_DEBUG_CPM
 	udbg_putc = NULL;
@@ -1384,7 +1408,7 @@ static int cpm_uart_probe(struct platform_device *ofdev)
 	if (index >= UART_NR)
 		return -ENODEV;
 
-	dev_set_drvdata(&ofdev->dev, pinfo);
+	platform_set_drvdata(ofdev, pinfo);
 
 	/* initialize the device pointer for the port */
 	pinfo->port.dev = &ofdev->dev;
@@ -1398,7 +1422,7 @@ static int cpm_uart_probe(struct platform_device *ofdev)
 
 static int cpm_uart_remove(struct platform_device *ofdev)
 {
-	struct uart_cpm_port *pinfo = dev_get_drvdata(&ofdev->dev);
+	struct uart_cpm_port *pinfo = platform_get_drvdata(ofdev);
 	return uart_remove_one_port(&cpm_reg, &pinfo->port);
 }
 

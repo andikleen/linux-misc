@@ -94,6 +94,18 @@
 #define CPUINFO_PROC	"cpu model"
 #endif
 
+#ifdef __arc__
+#define rmb()		asm volatile("" ::: "memory")
+#define cpu_relax()	rmb()
+#define CPUINFO_PROC	"Processor"
+#endif
+
+#ifdef __metag__
+#define rmb()		asm volatile("" ::: "memory")
+#define cpu_relax()	asm volatile("" ::: "memory")
+#define CPUINFO_PROC	"CPU"
+#endif
+
 #include <time.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -112,6 +124,9 @@
 
 #ifndef NSEC_PER_SEC
 # define NSEC_PER_SEC			1000000000ULL
+#endif
+#ifndef NSEC_PER_USEC
+# define NSEC_PER_USEC			1000ULL
 #endif
 
 static inline unsigned long long rdclock(void)
@@ -206,6 +221,7 @@ struct perf_record_opts {
 	bool	     pipe_output;
 	bool	     raw_samples;
 	bool	     sample_address;
+	bool	     sample_weight;
 	bool	     sample_time;
 	bool	     period;
 	unsigned int freq;

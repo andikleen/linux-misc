@@ -26,13 +26,12 @@
 #include <linux/iio/iio.h>
 #include <linux/iio/trigger.h>
 #include <linux/iio/sysfs.h>
-#include "hid-sensor-attributes.h"
 #include "hid-sensor-trigger.h"
 
 static int hid_sensor_data_rdy_trigger_set_state(struct iio_trigger *trig,
 						bool state)
 {
-	struct hid_sensor_iio_common *st = trig->private_data;
+	struct hid_sensor_common *st = iio_trigger_get_drvdata(trig);
 	int state_val;
 
 	state_val = state ? 1 : 0;
@@ -64,7 +63,7 @@ static const struct iio_trigger_ops hid_sensor_trigger_ops = {
 };
 
 int hid_sensor_setup_trigger(struct iio_dev *indio_dev, const char *name,
-				struct hid_sensor_iio_common *attrb)
+				struct hid_sensor_common *attrb)
 {
 	int ret;
 	struct iio_trigger *trig;
@@ -77,7 +76,7 @@ int hid_sensor_setup_trigger(struct iio_dev *indio_dev, const char *name,
 	}
 
 	trig->dev.parent = indio_dev->dev.parent;
-	trig->private_data = attrb;
+	iio_trigger_set_drvdata(trig, attrb);
 	trig->ops = &hid_sensor_trigger_ops;
 	ret = iio_trigger_register(trig);
 

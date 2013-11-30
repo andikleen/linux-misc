@@ -848,10 +848,8 @@ static int smsc9420_alloc_rx_buffer(struct smsc9420_pdata *pd, int index)
 	BUG_ON(pd->rx_buffers[index].skb);
 	BUG_ON(pd->rx_buffers[index].mapping);
 
-	if (unlikely(!skb)) {
-		smsc_warn(RX_ERR, "Failed to allocate new skb!");
+	if (unlikely(!skb))
 		return -ENOMEM;
-	}
 
 	mapping = pci_map_single(pd->pdev, skb_tail_pointer(skb),
 				 PKT_BUF_SZ, PCI_DMA_FROMDEVICE);
@@ -1179,7 +1177,7 @@ static int smsc9420_mii_probe(struct net_device *dev)
 		phydev->phy_id);
 
 	phydev = phy_connect(dev, dev_name(&phydev->dev),
-		smsc9420_phy_adjust_link, 0, PHY_INTERFACE_MODE_MII);
+			     smsc9420_phy_adjust_link, PHY_INTERFACE_MODE_MII);
 
 	if (IS_ERR(phydev)) {
 		pr_err("%s: Could not attach to PHY\n", dev->name);
@@ -1250,12 +1248,11 @@ static int smsc9420_alloc_tx_ring(struct smsc9420_pdata *pd)
 
 	BUG_ON(!pd->tx_ring);
 
-	pd->tx_buffers = kmalloc((sizeof(struct smsc9420_ring_info) *
-		TX_RING_SIZE), GFP_KERNEL);
-	if (!pd->tx_buffers) {
-		smsc_warn(IFUP, "Failed to allocated tx_buffers");
+	pd->tx_buffers = kmalloc_array(TX_RING_SIZE,
+				       sizeof(struct smsc9420_ring_info),
+				       GFP_KERNEL);
+	if (!pd->tx_buffers)
 		return -ENOMEM;
-	}
 
 	/* Initialize the TX Ring */
 	for (i = 0; i < TX_RING_SIZE; i++) {
@@ -1359,8 +1356,7 @@ static int smsc9420_open(struct net_device *dev)
 	smsc9420_reg_write(pd, INT_STAT, 0xFFFFFFFF);
 	smsc9420_pci_flush_write(pd);
 
-	result = request_irq(irq, smsc9420_isr, IRQF_SHARED | IRQF_DISABLED,
-			     DRV_NAME, pd);
+	result = request_irq(irq, smsc9420_isr, IRQF_SHARED, DRV_NAME, pd);
 	if (result) {
 		smsc_warn(IFUP, "Unable to use IRQ = %d", irq);
 		result = -ENODEV;

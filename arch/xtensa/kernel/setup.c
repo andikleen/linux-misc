@@ -152,8 +152,8 @@ static int __init parse_tag_initrd(const bp_tag_t* tag)
 {
 	meminfo_t* mi;
 	mi = (meminfo_t*)(tag->data);
-	initrd_start = (void*)(mi->start);
-	initrd_end = (void*)(mi->end);
+	initrd_start = __va(mi->start);
+	initrd_end = __va(mi->end);
 
 	return 0;
 }
@@ -164,14 +164,13 @@ __tagtable(BP_TAG_INITRD, parse_tag_initrd);
 
 static int __init parse_tag_fdt(const bp_tag_t *tag)
 {
-	dtb_start = (void *)(tag->data[0]);
+	dtb_start = __va(tag->data[0]);
 	return 0;
 }
 
 __tagtable(BP_TAG_FDT, parse_tag_fdt);
 
-void __init early_init_dt_setup_initrd_arch(unsigned long start,
-		unsigned long end)
+void __init early_init_dt_setup_initrd_arch(u64 start, u64 end)
 {
 	initrd_start = (void *)__va(start);
 	initrd_end = (void *)__va(end);
@@ -256,7 +255,7 @@ void __init early_init_devtree(void *params)
 static void __init copy_devtree(void)
 {
 	void *alloc = early_init_dt_alloc_memory_arch(
-			be32_to_cpu(initial_boot_params->totalsize), 0);
+			be32_to_cpu(initial_boot_params->totalsize), 8);
 	if (alloc) {
 		memcpy(alloc, initial_boot_params,
 				be32_to_cpu(initial_boot_params->totalsize));
@@ -328,6 +327,27 @@ extern char _UserExceptionVector_literal_start;
 extern char _UserExceptionVector_text_end;
 extern char _DoubleExceptionVector_literal_start;
 extern char _DoubleExceptionVector_text_end;
+#if XCHAL_EXCM_LEVEL >= 2
+extern char _Level2InterruptVector_text_start;
+extern char _Level2InterruptVector_text_end;
+#endif
+#if XCHAL_EXCM_LEVEL >= 3
+extern char _Level3InterruptVector_text_start;
+extern char _Level3InterruptVector_text_end;
+#endif
+#if XCHAL_EXCM_LEVEL >= 4
+extern char _Level4InterruptVector_text_start;
+extern char _Level4InterruptVector_text_end;
+#endif
+#if XCHAL_EXCM_LEVEL >= 5
+extern char _Level5InterruptVector_text_start;
+extern char _Level5InterruptVector_text_end;
+#endif
+#if XCHAL_EXCM_LEVEL >= 6
+extern char _Level6InterruptVector_text_start;
+extern char _Level6InterruptVector_text_end;
+#endif
+
 
 
 #ifdef CONFIG_S32C1I_SELFTEST
@@ -482,6 +502,27 @@ void __init setup_arch(char **cmdline_p)
 	mem_reserve(__pa(&_DoubleExceptionVector_literal_start),
 		    __pa(&_DoubleExceptionVector_text_end), 0);
 
+#if XCHAL_EXCM_LEVEL >= 2
+	mem_reserve(__pa(&_Level2InterruptVector_text_start),
+		    __pa(&_Level2InterruptVector_text_end), 0);
+#endif
+#if XCHAL_EXCM_LEVEL >= 3
+	mem_reserve(__pa(&_Level3InterruptVector_text_start),
+		    __pa(&_Level3InterruptVector_text_end), 0);
+#endif
+#if XCHAL_EXCM_LEVEL >= 4
+	mem_reserve(__pa(&_Level4InterruptVector_text_start),
+		    __pa(&_Level4InterruptVector_text_end), 0);
+#endif
+#if XCHAL_EXCM_LEVEL >= 5
+	mem_reserve(__pa(&_Level5InterruptVector_text_start),
+		    __pa(&_Level5InterruptVector_text_end), 0);
+#endif
+#if XCHAL_EXCM_LEVEL >= 6
+	mem_reserve(__pa(&_Level6InterruptVector_text_start),
+		    __pa(&_Level6InterruptVector_text_end), 0);
+#endif
+
 	bootmem_init();
 
 #ifdef CONFIG_OF
@@ -543,8 +584,8 @@ c_show(struct seq_file *f, void *slot)
 		     "bogomips\t: %lu.%02lu\n",
 		     XCHAL_BUILD_UNIQUE_ID,
 		     XCHAL_HAVE_BE ?  "big" : "little",
-		     CCOUNT_PER_JIFFY/(1000000/HZ),
-		     (CCOUNT_PER_JIFFY/(10000/HZ)) % 100,
+		     ccount_freq/1000000,
+		     (ccount_freq/10000) % 100,
 		     loops_per_jiffy/(500000/HZ),
 		     (loops_per_jiffy/(5000/HZ)) % 100);
 

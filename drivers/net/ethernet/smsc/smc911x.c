@@ -1522,9 +1522,10 @@ smc911x_ethtool_setsettings(struct net_device *dev, struct ethtool_cmd *cmd)
 static void
 smc911x_ethtool_getdrvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
-	strncpy(info->driver, CARDNAME, sizeof(info->driver));
-	strncpy(info->version, version, sizeof(info->version));
-	strncpy(info->bus_info, dev_name(dev->dev.parent), sizeof(info->bus_info));
+	strlcpy(info->driver, CARDNAME, sizeof(info->driver));
+	strlcpy(info->version, version, sizeof(info->version));
+	strlcpy(info->bus_info, dev_name(dev->dev.parent),
+		sizeof(info->bus_info));
 }
 
 static int smc911x_ethtool_nwayreset(struct net_device *dev)
@@ -2035,7 +2036,7 @@ static int smc911x_drv_probe(struct platform_device *pdev)
 	struct net_device *ndev;
 	struct resource *res;
 	struct smc911x_local *lp;
-	unsigned int *addr;
+	void __iomem *addr;
 	int ret;
 
 	DBG(SMC_DEBUG_FUNC, "--> %s\n",  __func__);
@@ -2066,7 +2067,7 @@ static int smc911x_drv_probe(struct platform_device *pdev)
 	lp->netdev = ndev;
 #ifdef SMC_DYNAMIC_BUS_CONFIG
 	{
-		struct smc911x_platdata *pd = pdev->dev.platform_data;
+		struct smc911x_platdata *pd = dev_get_platdata(&pdev->dev);
 		if (!pd) {
 			ret = -EINVAL;
 			goto release_both;
@@ -2086,7 +2087,6 @@ static int smc911x_drv_probe(struct platform_device *pdev)
 	ndev->base_addr = res->start;
 	ret = smc911x_probe(ndev);
 	if (ret != 0) {
-		platform_set_drvdata(pdev, NULL);
 		iounmap(addr);
 release_both:
 		free_netdev(ndev);
@@ -2112,7 +2112,6 @@ static int smc911x_drv_remove(struct platform_device *pdev)
 	struct resource *res;
 
 	DBG(SMC_DEBUG_FUNC, "--> %s\n", __func__);
-	platform_set_drvdata(pdev, NULL);
 
 	unregister_netdev(ndev);
 

@@ -23,7 +23,6 @@
 #include <mach/hardware.h>
 #include <mach/map.h>
 
-#include <mach/regs-sys.h>
 #include <mach/regs-clock.h>
 
 #include <plat/cpu.h>
@@ -32,6 +31,8 @@
 #include <plat/clock.h>
 #include <plat/clock-clksrc.h>
 #include <plat/pll.h>
+
+#include "regs-sys.h"
 
 /* fin_apll, fin_mpll and fin_epll are all the same clock, which we call
  * ext_xtal_mux for want of an actual name from the manual.
@@ -1003,6 +1004,4 @@ void __init s3c64xx_register_clocks(unsigned long xtal,
 	for (cnt = 0; cnt < ARRAY_SIZE(clksrc_cdev); cnt++)
 		s3c_register_clksrc(clksrc_cdev[cnt], 1);
 	clkdev_add_table(s3c64xx_clk_lookup, ARRAY_SIZE(s3c64xx_clk_lookup));
-
-	s3c_pwmclk_init();
 }

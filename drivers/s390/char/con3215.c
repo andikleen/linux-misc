@@ -412,8 +412,9 @@ static void raw3215_irq(struct ccw_device *cdev, unsigned long intparm,
 				break;
 
 			case CTRLCHAR_CTRL:
-				tty_insert_flip_char(tty, cchar, TTY_NORMAL);
-				tty_flip_buffer_push(tty);
+				tty_insert_flip_char(&raw->port, cchar,
+						TTY_NORMAL);
+				tty_flip_buffer_push(&raw->port);
 				break;
 
 			case CTRLCHAR_NONE:
@@ -425,8 +426,9 @@ static void raw3215_irq(struct ccw_device *cdev, unsigned long intparm,
 					count++;
 				} else
 					count -= 2;
-				tty_insert_flip_string(tty, raw->inbuf, count);
-				tty_flip_buffer_push(tty);
+				tty_insert_flip_string(&raw->port, raw->inbuf,
+						count);
+				tty_flip_buffer_push(&raw->port);
 				break;
 			}
 		} else if (req->type == RAW3215_WRITE) {
@@ -500,7 +502,7 @@ static void raw3215_make_room(struct raw3215_info *raw, unsigned int length)
 		raw3215_try_io(raw);
 		raw->flags &= ~RAW3215_FLUSHING;
 #ifdef CONFIG_TN3215_CONSOLE
-		wait_cons_dev();
+		ccw_device_wait_idle(raw->cdev);
 #endif
 		/* Enough room freed up ? */
 		if (RAW3215_BUFFER_SIZE - raw->count >= length)
@@ -856,7 +858,7 @@ static void con3215_flush(void)
 	raw = raw3215[0];  /* console 3215 is the first one */
 	if (raw->port.flags & ASYNC_SUSPENDED)
 		/* The console is still frozen for suspend. */
-		if (ccw_device_force_console())
+		if (ccw_device_force_console(raw->cdev))
 			/* Forcing didn't work, no panic message .. */
 			return;
 	spin_lock_irqsave(get_ccwdev_lock(raw->cdev), flags);
@@ -970,7 +972,7 @@ static int tty3215_open(struct tty_struct *tty, struct file * filp)
 
 	tty_port_tty_set(&raw->port, tty);
 
-	tty->low_latency = 0;  /* don't use bottom half for pushing chars */
+	raw->port.low_latency = 0; /* don't use bottom half for pushing chars */
 	/*
 	 * Start up 3215 device
 	 */

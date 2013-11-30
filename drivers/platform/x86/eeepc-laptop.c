@@ -1007,7 +1007,7 @@ static int eeepc_get_fan_pwm(void)
 
 static void eeepc_set_fan_pwm(int value)
 {
-	value = SENSORS_LIMIT(value, 0, 255);
+	value = clamp_val(value, 0, 255);
 	value = value * 100 / 255;
 	ec_write(EEEPC_EC_FAN_PWM, value);
 }
@@ -1269,7 +1269,6 @@ static void eeepc_acpi_notify(struct acpi_device *device, u32 event)
 	if (event > ACPI_MAX_SYS_NOTIFY)
 		return;
 	count = eeepc->event_count[event % 128]++;
-	acpi_bus_generate_proc_event(device, event, count);
 	acpi_bus_generate_netlink_event(device->pnp.device_class,
 					dev_name(&device->dev), event,
 					count);
@@ -1501,7 +1500,7 @@ fail_platform:
 	return result;
 }
 
-static int eeepc_acpi_remove(struct acpi_device *device, int type)
+static int eeepc_acpi_remove(struct acpi_device *device)
 {
 	struct eeepc_laptop *eeepc = acpi_driver_data(device);
 

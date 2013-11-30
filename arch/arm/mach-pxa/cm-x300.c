@@ -29,7 +29,7 @@
 #include <linux/pwm_backlight.h>
 
 #include <linux/i2c.h>
-#include <linux/i2c/pca953x.h>
+#include <linux/platform_data/pca953x.h>
 #include <linux/i2c/pxa-i2c.h>
 
 #include <linux/mfd/da903x.h>
@@ -854,7 +854,7 @@ MACHINE_START(CM_X300, "CM-X300 module")
 	.nr_irqs	= PXA_NR_IRQS,
 	.init_irq	= pxa3xx_init_irq,
 	.handle_irq	= pxa3xx_handle_irq,
-	.timer		= &pxa_timer,
+	.init_time	= pxa_timer_init,
 	.init_machine	= cm_x300_init,
 	.fixup		= cm_x300_fixup,
 	.restart	= pxa_restart,

@@ -37,7 +37,7 @@ nv04_mc_intr[] = {
 	{ 0x00100000, NVDEV_SUBDEV_TIMER },
 	{ 0x01000000, NVDEV_ENGINE_DISP },	/* NV04- PCRTC0 */
 	{ 0x02000000, NVDEV_ENGINE_DISP },	/* NV11- PCRTC1 */
-	{ 0x10000000, NVDEV_SUBDEV_GPIO },	/* PBUS */
+	{ 0x10000000, NVDEV_SUBDEV_BUS },
 	{ 0x80000000, NVDEV_ENGINE_SW },
 	{}
 };
@@ -50,13 +50,11 @@ nv04_mc_ctor(struct nouveau_object *parent, struct nouveau_object *engine,
 	struct nv04_mc_priv *priv;
 	int ret;
 
-	ret = nouveau_mc_create(parent, engine, oclass, &priv);
+	ret = nouveau_mc_create(parent, engine, oclass, nv04_mc_intr, &priv);
 	*pobject = nv_object(priv);
 	if (ret)
 		return ret;
 
-	nv_subdev(priv)->intr = nouveau_mc_intr;
-	priv->base.intr_map = nv04_mc_intr;
 	return 0;
 }
 

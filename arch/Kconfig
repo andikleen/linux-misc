@@ -103,6 +103,22 @@ config UPROBES
 
 	  If in doubt, say "N".
 
+config HAVE_64BIT_ALIGNED_ACCESS
+	def_bool 64BIT && !HAVE_EFFICIENT_UNALIGNED_ACCESS
+	help
+	  Some architectures require 64 bit accesses to be 64 bit
+	  aligned, which also requires structs containing 64 bit values
+	  to be 64 bit aligned too. This includes some 32 bit
+	  architectures which can do 64 bit accesses, as well as 64 bit
+	  architectures without unaligned access.
+
+	  This symbol should be selected by an architecture if 64 bit
+	  accesses are required to be 64 bit aligned in this way even
+	  though it is not a 64 bit architecture.
+
+	  See Documentation/unaligned-memory-access.txt for more
+	  information on the topic of unaligned memory accesses.
+
 config HAVE_EFFICIENT_UNALIGNED_ACCESS
 	bool
 	help
@@ -140,9 +156,6 @@ config ARCH_USE_BUILTIN_BSWAP
 	 Any architecture with load-and-swap or store-and-swap
 	 instructions should set this. And it shouldn't hurt to set it
 	 on architectures that don't have such instructions.
-
-config HAVE_SYSCALL_WRAPPERS
-	bool
 
 config KRETPROBES
 	def_bool y
@@ -198,6 +211,9 @@ config USE_GENERIC_SMP_HELPERS
 	bool
 
 config GENERIC_SMP_IDLE_THREAD
+       bool
+
+config GENERIC_IDLE_POLL_SETUP
        bool
 
 # Select if arch init_task initializer is different to init/init_task.c
@@ -268,9 +284,6 @@ config HAVE_PERF_USER_STACK_DUMP
 	  architectures.
 
 config HAVE_ARCH_JUMP_LABEL
-	bool
-
-config HAVE_ARCH_MUTEX_CPU_RELAX
 	bool
 
 config HAVE_RCU_TABLE_FREE
@@ -349,6 +362,9 @@ config HAVE_IRQ_TIME_ACCOUNTING
 config HAVE_ARCH_TRANSPARENT_HUGEPAGE
 	bool
 
+config HAVE_ARCH_SOFT_DIRTY
+	bool
+
 config HAVE_MOD_ARCH_SPECIFIC
 	bool
 	help
@@ -368,8 +384,11 @@ config MODULES_USE_ELF_REL
 	  Modules only use ELF REL relocations.  Modules with ELF RELA
 	  relocations will give an error.
 
-config GENERIC_SIGALTSTACK
+config HAVE_UNDERSCORE_SYMBOL_PREFIX
 	bool
+	help
+	  Some architectures generate an _ in front of C symbols; things like
+	  module loading and assembly files need to know about this.
 
 #
 # ABI hall of shame
@@ -384,5 +403,37 @@ config CLONE_BACKWARDS2
 	bool
 	help
 	  Architecture has the first two arguments of clone(2) swapped.
+
+config CLONE_BACKWARDS3
+	bool
+	help
+	  Architecture has tls passed as the 3rd argument of clone(2),
+	  not the 5th one.
+
+config ODD_RT_SIGACTION
+	bool
+	help
+	  Architecture has unusual rt_sigaction(2) arguments
+
+config OLD_SIGSUSPEND
+	bool
+	help
+	  Architecture has old sigsuspend(2) syscall, of one-argument variety
+
+config OLD_SIGSUSPEND3
+	bool
+	help
+	  Even weirder antique ABI - three-argument sigsuspend(2)
+
+config OLD_SIGACTION
+	bool
+	help
+	  Architecture has old sigaction(2) syscall.  Nope, not the same
+	  as OLD_SIGSUSPEND | OLD_SIGSUSPEND3 - alpha has sigsuspend(2),
+	  but fairly different variant of sigaction(2), thanks to OSF/1
+	  compatibility...
+
+config COMPAT_OLD_SIGACTION
+	bool
 
 source "kernel/gcov/Kconfig"

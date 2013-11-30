@@ -83,13 +83,10 @@ static int __init omap_init_vrfb(void)
 	pdev = platform_device_register_resndata(NULL, "omapvrfb", -1,
 			res, num_res, NULL, 0);
 
-	if (IS_ERR(pdev))
-		return PTR_ERR(pdev);
-	else
-		return 0;
+	return PTR_RET(pdev);
 }
 
-arch_initcall(omap_init_vrfb);
+omap_arch_initcall(omap_init_vrfb);
 #endif
 
 #if defined(CONFIG_FB_OMAP2) || defined(CONFIG_FB_OMAP2_MODULE)
@@ -113,6 +110,6 @@ static int __init omap_init_fb(void)
 	return platform_device_register(&omap_fb_device);
 }
 
-arch_initcall(omap_init_fb);
+omap_arch_initcall(omap_init_fb);
 
 #endif

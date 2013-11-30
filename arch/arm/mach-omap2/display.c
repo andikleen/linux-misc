@@ -226,7 +226,7 @@ static struct platform_device *create_dss_pdev(const char *pdev_name,
 		dev_set_name(&pdev->dev, "%s", pdev->name);
 
 	ohs[0] = oh;
-	od = omap_device_alloc(pdev, ohs, 1, NULL, 0);
+	od = omap_device_alloc(pdev, ohs, 1);
 	if (IS_ERR(od)) {
 		pr_err("Could not alloc omap_device for %s\n", pdev_name);
 		r = -ENOMEM;
@@ -400,7 +400,7 @@ int __init omap_display_init(struct omap_dss_board_info *board_data)
 
 	/* Create devices for DPI and SDI */
 
-	pdev = create_simple_dss_pdev("omapdss_dpi", -1,
+	pdev = create_simple_dss_pdev("omapdss_dpi", 0,
 			board_data, sizeof(*board_data), dss_pdev);
 	if (IS_ERR(pdev)) {
 		pr_err("Could not build platform_device for omapdss_dpi\n");
@@ -408,7 +408,7 @@ int __init omap_display_init(struct omap_dss_board_info *board_data)
 	}
 
 	if (cpu_is_omap34xx()) {
-		pdev = create_simple_dss_pdev("omapdss_sdi", -1,
+		pdev = create_simple_dss_pdev("omapdss_sdi", 0,
 				board_data, sizeof(*board_data), dss_pdev);
 		if (IS_ERR(pdev)) {
 			pr_err("Could not build platform_device for omapdss_sdi\n");

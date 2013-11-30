@@ -63,9 +63,9 @@ int		max_rport_logins = BFA_FCS_MAX_RPORT_LOGINS;
 u32	bfi_image_cb_size, bfi_image_ct_size, bfi_image_ct2_size;
 u32	*bfi_image_cb, *bfi_image_ct, *bfi_image_ct2;
 
-#define BFAD_FW_FILE_CB		"cbfw-3.1.0.0.bin"
-#define BFAD_FW_FILE_CT		"ctfw-3.1.0.0.bin"
-#define BFAD_FW_FILE_CT2	"ct2fw-3.1.0.0.bin"
+#define BFAD_FW_FILE_CB		"cbfw-3.2.1.1.bin"
+#define BFAD_FW_FILE_CT		"ctfw-3.2.1.1.bin"
+#define BFAD_FW_FILE_CT2	"ct2fw-3.2.1.1.bin"
 
 static u32 *bfad_load_fwimg(struct pci_dev *pdev);
 static void bfad_free_fwimg(void);
@@ -1034,7 +1034,7 @@ bfad_start_ops(struct bfad_s *bfad) {
 			sizeof(driver_info.host_os_patch) - 1);
 
 	strncpy(driver_info.os_device_name, bfad->pci_name,
-		sizeof(driver_info.os_device_name - 1));
+		sizeof(driver_info.os_device_name) - 1);
 
 	/* FCS driver info init */
 	spin_lock_irqsave(&bfad->bfad_lock, flags);
@@ -1720,6 +1720,14 @@ struct pci_device_id bfad_id_table[] = {
 		.class_mask = ~0,
 	},
 
+	{
+		.vendor = BFA_PCI_VENDOR_ID_BROCADE,
+		.device = BFA_PCI_DEVICE_ID_CT2_QUAD,
+		.subvendor = PCI_ANY_ID,
+		.subdevice = PCI_ANY_ID,
+		.class = (PCI_CLASS_SERIAL_FIBER << 8),
+		.class_mask = ~0,
+	},
 	{0, 0},
 };
 

@@ -3,7 +3,7 @@
  *
  * This file contains SPC-3 compliant asymmetric logical unit assigntment (ALUA)
  *
- * (c) Copyright 2009-2012 RisingTide Systems LLC.
+ * (c) Copyright 2009-2013 Datera, Inc.
  *
  * Nicholas A. Bellinger <nab@kernel.org>
  *
@@ -27,6 +27,7 @@
 #include <linux/spinlock.h>
 #include <linux/configfs.h>
 #include <linux/export.h>
+#include <linux/file.h>
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
 #include <asm/unaligned.h>
@@ -408,6 +409,7 @@ static inline int core_alua_state_standby(
 	case REPORT_LUNS:
 	case RECEIVE_DIAGNOSTIC:
 	case SEND_DIAGNOSTIC:
+		return 0;
 	case MAINTENANCE_IN:
 		switch (cdb[1] & 0x1f) {
 		case MI_REPORT_TARGET_PGS:
@@ -450,6 +452,7 @@ static inline int core_alua_state_unavailable(
 	switch (cdb[0]) {
 	case INQUIRY:
 	case REPORT_LUNS:
+		return 0;
 	case MAINTENANCE_IN:
 		switch (cdb[1] & 0x1f) {
 		case MI_REPORT_TARGET_PGS:
@@ -490,6 +493,7 @@ static inline int core_alua_state_transition(
 	switch (cdb[0]) {
 	case INQUIRY:
 	case REPORT_LUNS:
+		return 0;
 	case MAINTENANCE_IN:
 		switch (cdb[1] & 0x1f) {
 		case MI_REPORT_TARGET_PGS:
@@ -553,6 +557,9 @@ target_alua_state_check(struct se_cmd *cmd)
 	 * a ALUA logical unit group.
 	 */
 	tg_pt_gp_mem = port->sep_alua_tg_pt_gp_mem;
+	if (!tg_pt_gp_mem)
+		return 0;
+
 	spin_lock(&tg_pt_gp_mem->tg_pt_gp_mem_lock);
 	tg_pt_gp = tg_pt_gp_mem->tg_pt_gp;
 	out_alua_state = atomic_read(&tg_pt_gp->tg_pt_gp_alua_access_state);
@@ -715,36 +722,18 @@ static int core_alua_write_tpg_metadata(
 	unsigned char *md_buf,
 	u32 md_buf_len)
 {
-	mm_segment_t old_fs;
-	struct file *file;
-	struct iovec iov[1];
-	int flags = O_RDWR | O_CREAT | O_TRUNC, ret;
+	struct file *file = filp_open(path, O_RDWR | O_CREAT | O_TRUNC, 0600);
+	int ret;
 
-	memset(iov, 0, sizeof(struct iovec));
-
-	file = filp_open(path, flags, 0600);
-	if (IS_ERR(file) || !file || !file->f_dentry) {
-		pr_err("filp_open(%s) for ALUA metadata failed\n",
-			path);
+	if (IS_ERR(file)) {
+		pr_err("filp_open(%s) for ALUA metadata failed\n", path);
 		return -ENODEV;
 	}
-
-	iov[0].iov_base = &md_buf[0];
-	iov[0].iov_len = md_buf_len;
-
-	old_fs = get_fs();
-	set_fs(get_ds());
-	ret = vfs_writev(file, &iov[0], 1, &file->f_pos);
-	set_fs(old_fs);
-
-	if (ret < 0) {
+	ret = kernel_write(file, md_buf, md_buf_len, 0);
+	if (ret < 0)
 		pr_err("Error writing ALUA metadata file: %s\n", path);
-		filp_close(file, NULL);
-		return -EIO;
-	}
-	filp_close(file, NULL);
-
-	return 0;
+	fput(file);
+	return (ret < 0) ? -EIO : 0;
 }
 
 /*
@@ -1770,10 +1759,10 @@ ssize_t core_alua_store_access_type(
 	unsigned long tmp;
 	int ret;
 
-	ret = strict_strtoul(page, 0, &tmp);
+	ret = kstrtoul(page, 0, &tmp);
 	if (ret < 0) {
 		pr_err("Unable to extract alua_access_type\n");
-		return -EINVAL;
+		return ret;
 	}
 	if ((tmp != 0) && (tmp != 1) && (tmp != 2) && (tmp != 3)) {
 		pr_err("Illegal value for alua_access_type:"
@@ -1808,10 +1797,10 @@ ssize_t core_alua_store_nonop_delay_msecs(
 	unsigned long tmp;
 	int ret;
 
-	ret = strict_strtoul(page, 0, &tmp);
+	ret = kstrtoul(page, 0, &tmp);
 	if (ret < 0) {
 		pr_err("Unable to extract nonop_delay_msecs\n");
-		return -EINVAL;
+		return ret;
 	}
 	if (tmp > ALUA_MAX_NONOP_DELAY_MSECS) {
 		pr_err("Passed nonop_delay_msecs: %lu, exceeds"
@@ -1839,10 +1828,10 @@ ssize_t core_alua_store_trans_delay_msecs(
 	unsigned long tmp;
 	int ret;
 
-	ret = strict_strtoul(page, 0, &tmp);
+	ret = kstrtoul(page, 0, &tmp);
 	if (ret < 0) {
 		pr_err("Unable to extract trans_delay_msecs\n");
-		return -EINVAL;
+		return ret;
 	}
 	if (tmp > ALUA_MAX_TRANS_DELAY_MSECS) {
 		pr_err("Passed trans_delay_msecs: %lu, exceeds"
@@ -1870,10 +1859,10 @@ ssize_t core_alua_store_implict_trans_secs(
 	unsigned long tmp;
 	int ret;
 
-	ret = strict_strtoul(page, 0, &tmp);
+	ret = kstrtoul(page, 0, &tmp);
 	if (ret < 0) {
 		pr_err("Unable to extract implict_trans_secs\n");
-		return -EINVAL;
+		return ret;
 	}
 	if (tmp > ALUA_MAX_IMPLICT_TRANS_SECS) {
 		pr_err("Passed implict_trans_secs: %lu, exceeds"
@@ -1901,10 +1890,10 @@ ssize_t core_alua_store_preferred_bit(
 	unsigned long tmp;
 	int ret;
 
-	ret = strict_strtoul(page, 0, &tmp);
+	ret = kstrtoul(page, 0, &tmp);
 	if (ret < 0) {
 		pr_err("Unable to extract preferred ALUA value\n");
-		return -EINVAL;
+		return ret;
 	}
 	if ((tmp != 0) && (tmp != 1)) {
 		pr_err("Illegal value for preferred ALUA: %lu\n", tmp);
@@ -1936,10 +1925,10 @@ ssize_t core_alua_store_offline_bit(
 	if (!lun->lun_sep)
 		return -ENODEV;
 
-	ret = strict_strtoul(page, 0, &tmp);
+	ret = kstrtoul(page, 0, &tmp);
 	if (ret < 0) {
 		pr_err("Unable to extract alua_tg_pt_offline value\n");
-		return -EINVAL;
+		return ret;
 	}
 	if ((tmp != 0) && (tmp != 1)) {
 		pr_err("Illegal value for alua_tg_pt_offline: %lu\n",
@@ -1975,10 +1964,10 @@ ssize_t core_alua_store_secondary_status(
 	unsigned long tmp;
 	int ret;
 
-	ret = strict_strtoul(page, 0, &tmp);
+	ret = kstrtoul(page, 0, &tmp);
 	if (ret < 0) {
 		pr_err("Unable to extract alua_tg_pt_status\n");
-		return -EINVAL;
+		return ret;
 	}
 	if ((tmp != ALUA_STATUS_NONE) &&
 	    (tmp != ALUA_STATUS_ALTERED_BY_EXPLICT_STPG) &&
@@ -2008,10 +1997,10 @@ ssize_t core_alua_store_secondary_write_metadata(
 	unsigned long tmp;
 	int ret;
 
-	ret = strict_strtoul(page, 0, &tmp);
+	ret = kstrtoul(page, 0, &tmp);
 	if (ret < 0) {
 		pr_err("Unable to extract alua_tg_pt_write_md\n");
-		return -EINVAL;
+		return ret;
 	}
 	if ((tmp != 0) && (tmp != 1)) {
 		pr_err("Illegal value for alua_tg_pt_write_md:"

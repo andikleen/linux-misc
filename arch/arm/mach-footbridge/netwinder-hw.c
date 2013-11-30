@@ -634,9 +634,9 @@ fixup_netwinder(struct tag *tags, char **cmdline, struct meminfo *mi)
 #endif
 }
 
-static void netwinder_restart(char mode, const char *cmd)
+static void netwinder_restart(enum reboot_mode mode, const char *cmd)
 {
-	if (mode == 's') {
+	if (mode == REBOOT_SOFT) {
 		/* Jump into the ROM */
 		soft_restart(0x41000000);
 	} else {
@@ -766,6 +766,6 @@ MACHINE_START(NETWINDER, "Rebel-NetWinder")
 	.fixup		= fixup_netwinder,
 	.map_io		= footbridge_map_io,
 	.init_irq	= footbridge_init_irq,
-	.timer		= &isa_timer,
+	.init_time	= isa_timer_init,
 	.restart	= netwinder_restart,
 MACHINE_END

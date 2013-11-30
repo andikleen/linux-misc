@@ -51,14 +51,15 @@ nouveau_channel_idle(struct nouveau_channel *chan)
 	struct nouveau_fence *fence = NULL;
 	int ret;
 
-	ret = nouveau_fence_new(chan, &fence);
+	ret = nouveau_fence_new(chan, false, &fence);
 	if (!ret) {
 		ret = nouveau_fence_wait(fence, false, false);
 		nouveau_fence_unref(&fence);
 	}
 
 	if (ret)
-		NV_ERROR(cli, "failed to idle channel 0x%08x\n", chan->handle);
+		NV_ERROR(cli, "failed to idle channel 0x%08x [%s]\n",
+			 chan->handle, cli->base.name);
 	return ret;
 }
 
@@ -146,7 +147,7 @@ nouveau_channel_prep(struct nouveau_drm *drm, struct nouveau_cli *cli,
 		args.limit = client->vm->vmm->limit - 1;
 	} else
 	if (chan->push.buffer->bo.mem.mem_type == TTM_PL_VRAM) {
-		u64 limit = pfb->ram.size - imem->reserved - 1;
+		u64 limit = pfb->ram->size - imem->reserved - 1;
 		if (device->card_type == NV_04) {
 			/* nv04 vram pushbuf hack, retarget to its location in
 			 * the framebuffer bar rather than direct vram access..
@@ -281,7 +282,7 @@ nouveau_channel_init(struct nouveau_channel *chan, u32 vram, u32 gart)
 		} else {
 			args.flags = NV_DMA_TARGET_VRAM | NV_DMA_ACCESS_RDWR;
 			args.start = 0;
-			args.limit = pfb->ram.size - imem->reserved - 1;
+			args.limit = pfb->ram->size - imem->reserved - 1;
 		}
 
 		ret = nouveau_object_new(nv_object(client), chan->handle, vram,

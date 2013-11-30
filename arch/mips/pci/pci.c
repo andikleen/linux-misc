@@ -1,6 +1,6 @@
 /*
- * This program is free software; you can redistribute  it and/or modify it
- * under  the terms of  the GNU General  Public License as published by the
+ * This program is free software; you can redistribute	it and/or modify it
+ * under  the terms of	the GNU General	 Public License as published by the
  * Free Software Foundation;  either version 2 of the  License, or (at your
  * option) any later version.
  *
@@ -113,9 +113,7 @@ static void pcibios_scanbus(struct pci_controller *hose)
 		if (!pci_has_flag(PCI_PROBE_ONLY)) {
 			pci_bus_size_bridges(bus);
 			pci_bus_assign_resources(bus);
-			pci_enable_bridges(bus);
 		}
-		bus->dev.of_node = hose->of_node;
 	}
 }
 
@@ -169,15 +167,33 @@ void pci_load_of_ranges(struct pci_controller *hose, struct device_node *node)
 		}
 	}
 }
+
+struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)
+{
+	struct pci_controller *hose = bus->sysdata;
+
+	return of_node_get(hose->of_node);
+}
 #endif
 
 static DEFINE_MUTEX(pci_scan_mutex);
 
 void register_pci_controller(struct pci_controller *hose)
 {
-	if (request_resource(&iomem_resource, hose->mem_resource) < 0)
+	struct resource *parent;
+
+	parent = hose->mem_resource->parent;
+	if (!parent)
+		parent = &iomem_resource;
+
+	if (request_resource(parent, hose->mem_resource) < 0)
 		goto out;
-	if (request_resource(&ioport_resource, hose->io_resource) < 0) {
+
+	parent = hose->io_resource->parent;
+	if (!parent)
+		parent = &ioport_resource;
+
+	if (request_resource(parent, hose->io_resource) < 0) {
 		release_resource(hose->mem_resource);
 		goto out;
 	}

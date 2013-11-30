@@ -1,6 +1,7 @@
 /*
  * arch/arm/mach-tegra/common.c
  *
+ * Copyright (c) 2013 NVIDIA Corporation. All rights reserved.
  * Copyright (C) 2010 Google, Inc.
  *
  * Author:
@@ -21,22 +22,23 @@
 #include <linux/io.h>
 #include <linux/clk.h>
 #include <linux/delay.h>
-#include <linux/of_irq.h>
+#include <linux/reboot.h>
+#include <linux/irqchip.h>
+#include <linux/clk-provider.h>
 
 #include <asm/hardware/cache-l2x0.h>
-#include <asm/hardware/gic.h>
-
-#include <mach/powergate.h>
 
 #include "board.h"
-#include "clock.h"
 #include "common.h"
+#include "cpuidle.h"
 #include "fuse.h"
 #include "iomap.h"
+#include "irq.h"
 #include "pmc.h"
 #include "apbio.h"
 #include "sleep.h"
 #include "pm.h"
+#include "reset.h"
 
 /*
  * Storage for debug-macro.S's state.
@@ -57,19 +59,17 @@ u32 tegra_uart_config[4] = {
 };
 
 #ifdef CONFIG_OF
-static const struct of_device_id tegra_dt_irq_match[] __initconst = {
-	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init },
-	{ }
-};
-
 void __init tegra_dt_init_irq(void)
 {
+	of_clk_init(NULL);
+	tegra_pmc_init();
 	tegra_init_irq();
-	of_irq_init(tegra_dt_irq_match);
+	irqchip_init();
+	tegra_legacy_irq_syscore_init();
 }
 #endif
 
-void tegra_assert_system_reset(char mode, const char *cmd)
+void tegra_assert_system_reset(enum reboot_mode mode, const char *cmd)
 {
 	void __iomem *reset = IO_ADDRESS(TEGRA_PMC_BASE + 0);
 	u32 reg;
@@ -78,43 +78,6 @@ void tegra_assert_system_reset(char mode, const char *cmd)
 	reg |= 0x10;
 	writel_relaxed(reg, reset);
 }
-
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-static __initdata struct tegra_clk_init_table tegra20_clk_init_table[] = {
-	/* name		parent		rate		enabled */
-	{ "clk_m",	NULL,		0,		true },
-	{ "pll_p",	"clk_m",	216000000,	true },
-	{ "pll_p_out1",	"pll_p",	28800000,	true },
-	{ "pll_p_out2",	"pll_p",	48000000,	true },
-	{ "pll_p_out3",	"pll_p",	72000000,	true },
-	{ "pll_p_out4",	"pll_p",	24000000,	true },
-	{ "pll_c",	"clk_m",	600000000,	true },
-	{ "pll_c_out1",	"pll_c",	120000000,	true },
-	{ "sclk",	"pll_c_out1",	120000000,	true },
-	{ "hclk",	"sclk",		120000000,	true },
-	{ "pclk",	"hclk",		60000000,	true },
-	{ "csite",	NULL,		0,		true },
-	{ "emc",	NULL,		0,		true },
-	{ "cpu",	NULL,		0,		true },
-	{ NULL,		NULL,		0,		0},
-};
-#endif
-
-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
-static __initdata struct tegra_clk_init_table tegra30_clk_init_table[] = {
-	/* name		parent		rate		enabled */
-	{ "clk_m",	NULL,		0,		true },
-	{ "pll_p",	"pll_ref",	408000000,	true },
-	{ "pll_p_out1",	"pll_p",	9600000,	true },
-	{ "pll_p_out4",	"pll_p",	102000000,	true },
-	{ "sclk",	"pll_p_out4",	102000000,	true },
-	{ "hclk",	"sclk",		102000000,	true },
-	{ "pclk",	"hclk",		51000000,	true },
-	{ "csite",	NULL,		0,		true },
-	{ NULL,		NULL,		0,		0},
-};
-#endif
-
 
 static void __init tegra_init_cache(void)
 {
@@ -134,34 +97,19 @@ static void __init tegra_init_cache(void)
 
 }
 
-#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-void __init tegra20_init_early(void)
+void __init tegra_init_early(void)
 {
+	tegra_cpu_reset_handler_init();
 	tegra_apb_io_init();
 	tegra_init_fuse();
-	tegra2_init_clocks();
-	tegra_clk_init_from_table(tegra20_clk_init_table);
 	tegra_init_cache();
-	tegra_pmc_init();
 	tegra_powergate_init();
-	tegra20_hotplug_init();
+	tegra_hotplug_init();
 }
-#endif
-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
-void __init tegra30_init_early(void)
-{
-	tegra_apb_io_init();
-	tegra_init_fuse();
-	tegra30_init_clocks();
-	tegra_clk_init_from_table(tegra30_clk_init_table);
-	tegra_init_cache();
-	tegra_pmc_init();
-	tegra_powergate_init();
-	tegra30_hotplug_init();
-}
-#endif
 
 void __init tegra_init_late(void)
 {
+	tegra_init_suspend();
+	tegra_cpuidle_init();
 	tegra_powergate_debugfs_init();
 }

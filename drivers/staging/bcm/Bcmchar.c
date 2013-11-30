@@ -13,7 +13,7 @@
 * Returns	  - Zero(Success)
 ****************************************************************/
 
-static int bcm_char_open(struct inode *inode, struct file * filp)
+static int bcm_char_open(struct inode *inode, struct file *filp)
 {
 	struct bcm_mini_adapter *Adapter = NULL;
 	struct bcm_tarang_data *pTarang = NULL;
@@ -1004,16 +1004,16 @@ cntrlEnd:
 		if (copy_from_user(&IoBuffer, argp, sizeof(struct bcm_ioctl_buffer)))
 			return -EFAULT;
 
-		len = min_t(ulong, IoBuffer.OutputLength, strlen(VER_FILEVERSION_STR) + 1);
+		len = min_t(ulong, IoBuffer.OutputLength, strlen(DRV_VERSION) + 1);
 
-		if (copy_to_user(IoBuffer.OutputBuffer, VER_FILEVERSION_STR, len))
+		if (copy_to_user(IoBuffer.OutputBuffer, DRV_VERSION, len))
 			return -EFAULT;
 		Status = STATUS_SUCCESS;
 		break;
 	}
 
 	case IOCTL_BCM_GET_CURRENT_STATUS: {
-		LINK_STATE link_state;
+		struct bcm_link_state link_state;
 
 		/* Copy Ioctl Buffer structure */
 		if (copy_from_user(&IoBuffer, argp, sizeof(struct bcm_ioctl_buffer))) {
@@ -1148,8 +1148,8 @@ cntrlEnd:
 
 		if (((ULONG)pBulkBuffer->Register & 0x0F000000) != 0x0F000000 ||
 			((ULONG)pBulkBuffer->Register & 0x3)) {
-			kfree(pvBuffer);
 			BCM_DEBUG_PRINT (Adapter, DBG_TYPE_PRINTK, 0, 0, "WRM Done On invalid Address : %x Access Denied.\n", (int)pBulkBuffer->Register);
+			kfree(pvBuffer);
 			Status = -EINVAL;
 			break;
 		}
@@ -1229,13 +1229,13 @@ cntrlEnd:
 	case IOCTL_BCM_SET_DEBUG:
 #ifdef DEBUG
 	{
-		USER_BCM_DBG_STATE sUserDebugState;
+		struct bcm_user_debug_state sUserDebugState;
 
 		BCM_DEBUG_PRINT(Adapter, DBG_TYPE_OTHERS, OSAL_DBG, DBG_LVL_ALL, "In SET_DEBUG ioctl\n");
 		if (copy_from_user(&IoBuffer, argp, sizeof(struct bcm_ioctl_buffer)))
 			return -EFAULT;
 
-		if (copy_from_user(&sUserDebugState, IoBuffer.InputBuffer, sizeof(USER_BCM_DBG_STATE)))
+		if (copy_from_user(&sUserDebugState, IoBuffer.InputBuffer, sizeof(struct bcm_user_debug_state)))
 			return -EFAULT;
 
 		BCM_DEBUG_PRINT (Adapter, DBG_TYPE_PRINTK, 0, 0, "IOCTL_BCM_SET_DEBUG: OnOff=%d Type = 0x%x ",
@@ -1783,16 +1783,16 @@ cntrlEnd:
 		}
 
 		if (IsFlash2x(Adapter) == TRUE) {
-			if (IoBuffer.OutputLength < sizeof(FLASH2X_CS_INFO))
+			if (IoBuffer.OutputLength < sizeof(struct bcm_flash2x_cs_info))
 				return -EINVAL;
 
-			if (copy_to_user(IoBuffer.OutputBuffer, Adapter->psFlash2xCSInfo, sizeof(FLASH2X_CS_INFO)))
+			if (copy_to_user(IoBuffer.OutputBuffer, Adapter->psFlash2xCSInfo, sizeof(struct bcm_flash2x_cs_info)))
 				return -EFAULT;
 		} else {
-			if (IoBuffer.OutputLength < sizeof(FLASH_CS_INFO))
+			if (IoBuffer.OutputLength < sizeof(struct bcm_flash_cs_info))
 				return -EINVAL;
 
-			if (copy_to_user(IoBuffer.OutputBuffer, Adapter->psFlashCSInfo, sizeof(FLASH_CS_INFO)))
+			if (copy_to_user(IoBuffer.OutputBuffer, Adapter->psFlashCSInfo, sizeof(struct bcm_flash_cs_info)))
 				return -EFAULT;
 		}
 	}

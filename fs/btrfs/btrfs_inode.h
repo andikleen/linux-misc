@@ -40,6 +40,8 @@
 #define BTRFS_INODE_HAS_ASYNC_EXTENT		6
 #define BTRFS_INODE_NEEDS_FULL_SYNC		7
 #define BTRFS_INODE_COPY_EVERYTHING		8
+#define BTRFS_INODE_IN_DELALLOC_LIST		9
+#define BTRFS_INODE_READDIO_NEED_LOCK		10
 
 /* in memory btrfs inode */
 struct btrfs_inode {
@@ -91,7 +93,7 @@ struct btrfs_inode {
 
 	unsigned long runtime_flags;
 
-	/* Keep track of who's O_SYNC/fsycing currently */
+	/* Keep track of who's O_SYNC/fsyncing currently */
 	atomic_t sync_writers;
 
 	/* full 64 bit generation number, struct vfs_inode doesn't have a big
@@ -211,9 +213,51 @@ static inline bool btrfs_is_free_space_inode(struct inode *inode)
 static inline int btrfs_inode_in_log(struct inode *inode, u64 generation)
 {
 	if (BTRFS_I(inode)->logged_trans == generation &&
-	    BTRFS_I(inode)->last_sub_trans <= BTRFS_I(inode)->last_log_commit)
+	    BTRFS_I(inode)->last_sub_trans <=
+	    BTRFS_I(inode)->last_log_commit &&
+	    BTRFS_I(inode)->last_sub_trans <=
+	    BTRFS_I(inode)->root->last_log_commit)
 		return 1;
 	return 0;
+}
+
+struct btrfs_dio_private {
+	struct inode *inode;
+	u64 logical_offset;
+	u64 disk_bytenr;
+	u64 bytes;
+	void *private;
+
+	/* number of bios pending for this dio */
+	atomic_t pending_bios;
+
+	/* IO errors */
+	int errors;
+
+	/* orig_bio is our btrfs_io_bio */
+	struct bio *orig_bio;
+
+	/* dio_bio came from fs/direct-io.c */
+	struct bio *dio_bio;
+	u8 csum[0];
+};
+
+/*
+ * Disable DIO read nolock optimization, so new dio readers will be forced
+ * to grab i_mutex. It is used to avoid the endless truncate due to
+ * nonlocked dio read.
+ */
+static inline void btrfs_inode_block_unlocked_dio(struct inode *inode)
+{
+	set_bit(BTRFS_INODE_READDIO_NEED_LOCK, &BTRFS_I(inode)->runtime_flags);
+	smp_mb();
+}
+
+static inline void btrfs_inode_resume_unlocked_dio(struct inode *inode)
+{
+	smp_mb__before_clear_bit();
+	clear_bit(BTRFS_INODE_READDIO_NEED_LOCK,
+		  &BTRFS_I(inode)->runtime_flags);
 }
 
 #endif

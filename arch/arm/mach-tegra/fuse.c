@@ -2,6 +2,7 @@
  * arch/arm/mach-tegra/fuse.c
  *
  * Copyright (C) 2010 Google, Inc.
+ * Copyright (c) 2013, NVIDIA CORPORATION.  All rights reserved.
  *
  * Author:
  *	Colin Cross <ccross@android.com>
@@ -20,6 +21,7 @@
 #include <linux/kernel.h>
 #include <linux/io.h>
 #include <linux/export.h>
+#include <linux/tegra-soc.h>
 
 #include "fuse.h"
 #include "iomap.h"
@@ -105,6 +107,11 @@ static void tegra_get_process_id(void)
 	tegra_core_process_id = (reg >> 12) & 3;
 }
 
+u32 tegra_read_chipid(void)
+{
+	return readl_relaxed(IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x804);
+}
+
 void tegra_init_fuse(void)
 {
 	u32 id;
@@ -119,7 +126,7 @@ void tegra_init_fuse(void)
 	reg = tegra_apb_readl(TEGRA_APB_MISC_BASE + STRAP_OPT);
 	tegra_bct_strapping = (reg & RAM_ID_MASK) >> RAM_CODE_SHIFT;
 
-	id = readl_relaxed(IO_ADDRESS(TEGRA_APB_MISC_BASE) + 0x804);
+	id = tegra_read_chipid();
 	tegra_chip_id = (id >> 8) & 0xff;
 
 	switch (tegra_chip_id) {
@@ -130,6 +137,9 @@ void tegra_init_fuse(void)
 	case TEGRA30:
 		tegra_fuse_spare_bit = TEGRA30_FUSE_SPARE_BIT;
 		tegra_init_speedo_data = &tegra30_init_speedo_data;
+		break;
+	case TEGRA114:
+		tegra_init_speedo_data = &tegra114_init_speedo_data;
 		break;
 	default:
 		pr_warn("Tegra: unknown chip id %d\n", tegra_chip_id);

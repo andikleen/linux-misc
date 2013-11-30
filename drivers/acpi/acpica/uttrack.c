@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- * Copyright (C) 2000 - 2012, Intel Corp.
+ * Copyright (C) 2000 - 2013, Intel Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -436,10 +436,10 @@ acpi_ut_remove_allocation(struct acpi_debug_mem_block *allocation,
 	struct acpi_memory_list *mem_list;
 	acpi_status status;
 
-	ACPI_FUNCTION_TRACE(ut_remove_allocation);
+	ACPI_FUNCTION_NAME(ut_remove_allocation);
 
 	if (acpi_gbl_disable_mem_tracking) {
-		return_ACPI_STATUS(AE_OK);
+		return (AE_OK);
 	}
 
 	mem_list = acpi_gbl_global_list;
@@ -450,12 +450,12 @@ acpi_ut_remove_allocation(struct acpi_debug_mem_block *allocation,
 		ACPI_ERROR((module, line,
 			    "Empty allocation list, nothing to free!"));
 
-		return_ACPI_STATUS(AE_OK);
+		return (AE_OK);
 	}
 
 	status = acpi_ut_acquire_mutex(ACPI_MTX_MEMORY);
 	if (ACPI_FAILURE(status)) {
-		return_ACPI_STATUS(status);
+		return (status);
 	}
 
 	/* Unlink */
@@ -470,15 +470,15 @@ acpi_ut_remove_allocation(struct acpi_debug_mem_block *allocation,
 		(allocation->next)->previous = allocation->previous;
 	}
 
+	ACPI_DEBUG_PRINT((ACPI_DB_ALLOCATIONS, "Freeing %p, size 0%X\n",
+			  &allocation->user_space, allocation->size));
+
 	/* Mark the segment as deleted */
 
 	ACPI_MEMSET(&allocation->user_space, 0xEA, allocation->size);
 
-	ACPI_DEBUG_PRINT((ACPI_DB_ALLOCATIONS, "Freeing size 0%X\n",
-			  allocation->size));
-
 	status = acpi_ut_release_mutex(ACPI_MTX_MEMORY);
-	return_ACPI_STATUS(status);
+	return (status);
 }
 
 /*******************************************************************************
@@ -603,6 +603,7 @@ void acpi_ut_dump_allocations(u32 component, const char *module)
 					switch (ACPI_GET_DESCRIPTOR_TYPE
 						(descriptor)) {
 					case ACPI_DESC_TYPE_OPERAND:
+
 						if (element->size ==
 						    sizeof(union
 							   acpi_operand_object))
@@ -613,6 +614,7 @@ void acpi_ut_dump_allocations(u32 component, const char *module)
 						break;
 
 					case ACPI_DESC_TYPE_PARSER:
+
 						if (element->size ==
 						    sizeof(union
 							   acpi_parse_object)) {
@@ -622,6 +624,7 @@ void acpi_ut_dump_allocations(u32 component, const char *module)
 						break;
 
 					case ACPI_DESC_TYPE_NAMED:
+
 						if (element->size ==
 						    sizeof(struct
 							   acpi_namespace_node))
@@ -632,6 +635,7 @@ void acpi_ut_dump_allocations(u32 component, const char *module)
 						break;
 
 					default:
+
 						break;
 					}
 
@@ -639,6 +643,7 @@ void acpi_ut_dump_allocations(u32 component, const char *module)
 
 					switch (descriptor_type) {
 					case ACPI_DESC_TYPE_OPERAND:
+
 						acpi_os_printf
 						    ("%12.12s RefCount 0x%04X\n",
 						     acpi_ut_get_type_name
@@ -649,6 +654,7 @@ void acpi_ut_dump_allocations(u32 component, const char *module)
 						break;
 
 					case ACPI_DESC_TYPE_PARSER:
+
 						acpi_os_printf
 						    ("AmlOpcode 0x%04hX\n",
 						     descriptor->op.asl.
@@ -656,6 +662,7 @@ void acpi_ut_dump_allocations(u32 component, const char *module)
 						break;
 
 					case ACPI_DESC_TYPE_NAMED:
+
 						acpi_os_printf("%4.4s\n",
 							       acpi_ut_get_node_name
 							       (&descriptor->
@@ -663,6 +670,7 @@ void acpi_ut_dump_allocations(u32 component, const char *module)
 						break;
 
 					default:
+
 						acpi_os_printf("\n");
 						break;
 					}

@@ -9,6 +9,7 @@
  *
  */
 
+#include <linux/err.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/types.h>
@@ -153,6 +154,10 @@ static void mmp_tdma_disable_chan(struct mmp_tdma_chan *tdmac)
 {
 	writel(readl(tdmac->reg_base + TDCR) & ~TDCR_CHANEN,
 					tdmac->reg_base + TDCR);
+
+	/* disable irq */
+	writel(0, tdmac->reg_base + TDIMR);
+
 	tdmac->status = DMA_SUCCESS;
 }
 
@@ -455,7 +460,8 @@ static enum dma_status mmp_tdma_tx_status(struct dma_chan *chan,
 {
 	struct mmp_tdma_chan *tdmac = to_mmp_tdma_chan(chan);
 
-	dma_set_residue(txstate, tdmac->buf_len - tdmac->pos);
+	dma_set_tx_state(txstate, chan->completed_cookie, chan->cookie,
+			 tdmac->buf_len - tdmac->pos);
 
 	return tdmac->status;
 }
@@ -544,12 +550,9 @@ static int mmp_tdma_probe(struct platform_device *pdev)
 	}
 
 	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (!iores)
-		return -EINVAL;
-
-	tdev->base = devm_request_and_ioremap(&pdev->dev, iores);
-	if (!tdev->base)
-		return -EADDRNOTAVAIL;
+	tdev->base = devm_ioremap_resource(&pdev->dev, iores);
+	if (IS_ERR(tdev->base))
+		return PTR_ERR(tdev->base);
 
 	INIT_LIST_HEAD(&tdev->device.channels);
 

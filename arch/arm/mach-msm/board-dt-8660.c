@@ -12,24 +12,12 @@
 
 #include <linux/init.h>
 #include <linux/of.h>
-#include <linux/of_irq.h>
 #include <linux/of_platform.h>
 
 #include <asm/mach/arch.h>
-#include <asm/hardware/gic.h>
+#include <asm/mach/map.h>
 
-#include <mach/board.h>
 #include "common.h"
-
-static const struct of_device_id msm_dt_gic_match[] __initconst = {
-	{ .compatible = "qcom,msm-8660-qgic", .data = gic_of_init },
-	{}
-};
-
-static void __init msm8x60_init_irq(void)
-{
-	of_irq_init(msm_dt_gic_match);
-}
 
 static void __init msm8x60_init_late(void)
 {
@@ -54,11 +42,7 @@ static const char *msm8x60_fluid_match[] __initdata = {
 
 DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
 	.smp = smp_ops(msm_smp_ops),
-	.map_io = msm_map_msm8x60_io,
-	.init_irq = msm8x60_init_irq,
-	.handle_irq = gic_handle_irq,
 	.init_machine = msm8x60_dt_init,
 	.init_late = msm8x60_init_late,
-	.timer = &msm_dt_timer,
 	.dt_compat = msm8x60_fluid_match,
 MACHINE_END

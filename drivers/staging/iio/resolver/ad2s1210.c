@@ -130,15 +130,12 @@ static int ad2s1210_config_read(struct ad2s1210_state *st,
 		.rx_buf = st->rx,
 		.tx_buf = st->tx,
 	};
-	struct spi_message msg;
 	int ret = 0;
 
 	ad2s1210_set_mode(MOD_CONFIG, st);
-	spi_message_init(&msg);
-	spi_message_add_tail(&xfer, &msg);
 	st->tx[0] = address | AD2S1210_MSB_IS_HIGH;
 	st->tx[1] = AD2S1210_REG_FAULT;
-	ret = spi_sync(st->sdev, &msg);
+	ret = spi_sync_transfer(st->sdev, &xfer, 1);
 	if (ret < 0)
 		return ret;
 	st->old_data = true;
@@ -193,21 +190,6 @@ static inline int ad2s1210_soft_reset(struct ad2s1210_state *st)
 		return ret;
 
 	return ad2s1210_config_write(st, 0x0);
-}
-
-static ssize_t ad2s1210_store_softreset(struct device *dev,
-					struct device_attribute *attr,
-					const char *buf,
-					size_t len)
-{
-	struct ad2s1210_state *st = iio_priv(dev_to_iio_dev(dev));
-	int ret;
-
-	mutex_lock(&st->lock);
-	ret = ad2s1210_soft_reset(st);
-	mutex_unlock(&st->lock);
-
-	return ret < 0 ? ret : len;
 }
 
 static ssize_t ad2s1210_show_fclkin(struct device *dev,
@@ -539,8 +521,6 @@ error_ret:
 	return ret;
 }
 
-static IIO_DEVICE_ATTR(reset, S_IWUSR,
-		       NULL, ad2s1210_store_softreset, 0);
 static IIO_DEVICE_ATTR(fclkin, S_IRUGO | S_IWUSR,
 		       ad2s1210_show_fclkin, ad2s1210_store_fclkin, 0);
 static IIO_DEVICE_ATTR(fexcit, S_IRUGO | S_IWUSR,
@@ -580,17 +560,16 @@ static const struct iio_chan_spec ad2s1210_channels[] = {
 		.type = IIO_ANGL,
 		.indexed = 1,
 		.channel = 0,
-		.info_mask = IIO_CHAN_INFO_RAW_SEPARATE_BIT,
+		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),
 	}, {
 		.type = IIO_ANGL_VEL,
 		.indexed = 1,
 		.channel = 0,
-		.info_mask = IIO_CHAN_INFO_RAW_SEPARATE_BIT,
+		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),
 	}
 };
 
 static struct attribute *ad2s1210_attributes[] = {
-	&iio_dev_attr_reset.dev_attr.attr,
 	&iio_dev_attr_fclkin.dev_attr.attr,
 	&iio_dev_attr_fexcit.dev_attr.attr,
 	&iio_dev_attr_control.dev_attr.attr,

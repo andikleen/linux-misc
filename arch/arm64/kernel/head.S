@@ -26,6 +26,7 @@
 #include <asm/assembler.h>
 #include <asm/ptrace.h>
 #include <asm/asm-offsets.h>
+#include <asm/cputype.h>
 #include <asm/memory.h>
 #include <asm/thread_info.h>
 #include <asm/pgtable-hwdef.h>
@@ -82,10 +83,8 @@
 
 #ifdef CONFIG_ARM64_64K_PAGES
 #define MM_MMUFLAGS	PTE_ATTRINDX(MT_NORMAL) | PTE_FLAGS
-#define IO_MMUFLAGS	PTE_ATTRINDX(MT_DEVICE_nGnRE) | PTE_XN | PTE_FLAGS
 #else
 #define MM_MMUFLAGS	PMD_ATTRINDX(MT_NORMAL) | PMD_FLAGS
-#define IO_MMUFLAGS	PMD_ATTRINDX(MT_DEVICE_nGnRE) | PMD_SECT_XN | PMD_FLAGS
 #endif
 
 /*
@@ -113,6 +112,14 @@
 	.quad	TEXT_OFFSET			// Image load offset from start of RAM
 	.quad	0				// reserved
 	.quad	0				// reserved
+	.quad	0				// reserved
+	.quad	0				// reserved
+	.quad	0				// reserved
+	.byte	0x41				// Magic number, "ARM\x64"
+	.byte	0x52
+	.byte	0x4d
+	.byte	0x64
+	.word	0				// reserved
 
 ENTRY(stext)
 	mov	x21, x0				// x21=FDT
@@ -231,7 +238,8 @@ ENTRY(secondary_holding_pen)
 	bl	__calc_phys_offset		// x24=phys offset
 	bl	el2_setup			// Drop to EL1
 	mrs	x0, mpidr_el1
-	and	x0, x0, #15			// CPU number
+	ldr     x1, =MPIDR_HWID_BITMASK
+	and	x0, x0, x1
 	adr	x1, 1b
 	ldp	x2, x3, [x1]
 	sub	x1, x1, x2
@@ -368,6 +376,7 @@ ENDPROC(__calc_phys_offset)
  *   - identity mapping to enable the MMU (low address, TTBR0)
  *   - first few MB of the kernel linear mapping to jump to once the MMU has
  *     been enabled, including the FDT blob (TTBR1)
+ *   - UART mapping if CONFIG_EARLY_PRINTK is enabled (TTBR1)
  */
 __create_page_tables:
 	pgtbl	x25, x26, x24			// idmap_pg_dir and swapper_pg_dir addresses
@@ -420,6 +429,15 @@ __create_page_tables:
 	sub	x6, x6, #1			// inclusive range
 	create_block_map x0, x7, x3, x5, x6
 1:
+#ifdef CONFIG_EARLY_PRINTK
+	/*
+	 * Create the pgd entry for the UART mapping. The full mapping is done
+	 * later based earlyprintk kernel parameter.
+	 */
+	ldr	x5, =EARLYCON_IOBASE		// UART virtual address
+	add	x0, x26, #2 * PAGE_SIZE		// section table address
+	create_pgd_entry x26, x0, x5, x6, x7
+#endif
 	ret
 ENDPROC(__create_page_tables)
 	.ltorg

@@ -343,6 +343,7 @@ struct gsc_dev {
 	unsigned long			state;
 	struct vb2_alloc_ctx		*alloc_ctx;
 	struct video_device		vdev;
+	struct v4l2_device		v4l2_dev;
 };
 
 /**
@@ -425,6 +426,11 @@ static inline void gsc_ctx_state_lock_clear(u32 state, struct gsc_ctx *ctx)
 	spin_lock_irqsave(&ctx->gsc_dev->slock, flags);
 	ctx->state &= ~state;
 	spin_unlock_irqrestore(&ctx->gsc_dev->slock, flags);
+}
+
+static inline int is_tiled(const struct gsc_fmt *fmt)
+{
+	return fmt->pixelformat == V4L2_PIX_FMT_NV12MT_16X16;
 }
 
 static inline void gsc_hw_enable_control(struct gsc_dev *dev, bool on)

@@ -1487,7 +1487,7 @@ int uvc_ctrl_set(struct uvc_video_chain *chain,
 			step = mapping->get(mapping, UVC_GET_RES,
 					uvc_ctrl_data(ctrl, UVC_CTRL_DATA_RES));
 			if (!(step & value))
-				return -ERANGE;
+				return -EINVAL;
 		}
 
 		break;
@@ -1838,7 +1838,7 @@ static int uvc_ctrl_add_info(struct uvc_device *dev, struct uvc_control *ctrl,
 {
 	int ret = 0;
 
-	memcpy(&ctrl->info, info, sizeof(*info));
+	ctrl->info = *info;
 	INIT_LIST_HEAD(&ctrl->info.mappings);
 
 	/* Allocate an array to save control values (cur, def, max, etc.) */

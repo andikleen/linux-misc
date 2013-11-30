@@ -19,6 +19,7 @@ nfs4_file_open(struct inode *inode, struct file *filp)
 	struct inode *dir;
 	unsigned openflags = filp->f_flags;
 	struct iattr attr;
+	int opened = 0;
 	int err;
 
 	/*
@@ -55,7 +56,7 @@ nfs4_file_open(struct inode *inode, struct file *filp)
 		nfs_wb_all(inode);
 	}
 
-	inode = NFS_PROTO(dir)->open_context(dir, ctx, openflags, &attr);
+	inode = NFS_PROTO(dir)->open_context(dir, ctx, openflags, &attr, &opened);
 	if (IS_ERR(inode)) {
 		err = PTR_ERR(inode);
 		switch (err) {
@@ -69,7 +70,6 @@ nfs4_file_open(struct inode *inode, struct file *filp)
 			goto out_drop;
 		}
 	}
-	iput(inode);
 	if (inode != dentry->d_inode)
 		goto out_drop;
 
@@ -94,7 +94,7 @@ static int
 nfs4_file_fsync(struct file *file, loff_t start, loff_t end, int datasync)
 {
 	int ret;
-	struct inode *inode = file->f_path.dentry->d_inode;
+	struct inode *inode = file_inode(file);
 
 	do {
 		ret = filemap_write_and_wait_range(inode->i_mapping, start, end);

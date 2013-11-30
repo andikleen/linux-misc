@@ -87,12 +87,10 @@ static struct line6_pcm_properties toneport_pcm_properties = {
 static int led_red = 0x00;
 static int led_green = 0x26;
 
-struct ToneportSourceInfo {
+static const struct {
 	const char *name;
 	int code;
-};
-
-static const struct ToneportSourceInfo toneport_source_info[] = {
+} toneport_source_info[] = {
 	{"Microphone", 0x0a01},
 	{"Line", 0x0801},
 	{"Instrument", 0x0b01},
@@ -246,13 +244,17 @@ static int snd_toneport_source_put(struct snd_kcontrol *kcontrol,
 	struct snd_line6_pcm *line6pcm = snd_kcontrol_chip(kcontrol);
 	struct usb_line6_toneport *toneport =
 	    (struct usb_line6_toneport *)line6pcm->line6;
+	unsigned int source;
 
-	if (ucontrol->value.enumerated.item[0] == toneport->source)
+	source = ucontrol->value.enumerated.item[0];
+	if (source >= ARRAY_SIZE(toneport_source_info))
+		return -EINVAL;
+	if (source == toneport->source)
 		return 0;
 
-	toneport->source = ucontrol->value.enumerated.item[0];
+	toneport->source = source;
 	toneport_send_cmd(toneport->line6.usbdev,
-			  toneport_source_info[toneport->source].code, 0x0000);
+			  toneport_source_info[source].code, 0x0000);
 	return 1;
 }
 

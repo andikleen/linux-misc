@@ -21,6 +21,10 @@
  *    be triggered
  */
 
+#if defined(CONFIG_SERIAL_MFD_HSU_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
+#define SUPPORT_SYSRQ
+#endif
+
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/console.h>
@@ -382,16 +386,13 @@ static void serial_hsu_stop_tx(struct uart_port *port)
 
 /* This is always called in spinlock protected mode, so
  * modify timeout timer is safe here */
-void hsu_dma_rx(struct uart_hsu_port *up, u32 int_sts)
+void hsu_dma_rx(struct uart_hsu_port *up, u32 int_sts, unsigned long *flags)
 {
 	struct hsu_dma_buffer *dbuf = &up->rxbuf;
 	struct hsu_dma_chan *chan = up->rxc;
 	struct uart_port *port = &up->port;
-	struct tty_struct *tty = port->state->port.tty;
+	struct tty_port *tport = &port->state->port;
 	int count;
-
-	if (!tty)
-		return;
 
 	/*
 	 * First need to know how many is already transferred,
@@ -423,7 +424,7 @@ void hsu_dma_rx(struct uart_hsu_port *up, u32 int_sts)
 	 * explicitly set tail to 0. So head will
 	 * always be greater than tail.
 	 */
-	tty_insert_flip_string(tty, dbuf->buf, count);
+	tty_insert_flip_string(tport, dbuf->buf, count);
 	port->icount.rx += count;
 
 	dma_sync_single_for_device(up->port.dev, dbuf->dma_addr,
@@ -437,7 +438,9 @@ void hsu_dma_rx(struct uart_hsu_port *up, u32 int_sts)
 					 | (0x1 << 16)
 					 | (0x1 << 24)	/* timeout bit, see HSU Errata 1 */
 					 );
-	tty_flip_buffer_push(tty);
+	spin_unlock_irqrestore(&up->port.lock, *flags);
+	tty_flip_buffer_push(tport);
+	spin_lock_irqsave(&up->port.lock, *flags);
 
 	chan_writel(chan, HSU_CH_CR, 0x3);
 
@@ -458,14 +461,11 @@ static void serial_hsu_stop_rx(struct uart_port *port)
 	}
 }
 
-static inline void receive_chars(struct uart_hsu_port *up, int *status)
+static inline void receive_chars(struct uart_hsu_port *up, int *status,
+		unsigned long *flags)
 {
-	struct tty_struct *tty = up->port.state->port.tty;
 	unsigned int ch, flag;
 	unsigned int max_count = 256;
-
-	if (!tty)
-		return;
 
 	do {
 		ch = serial_in(up, UART_RX);
@@ -522,7 +522,10 @@ static inline void receive_chars(struct uart_hsu_port *up, int *status)
 	ignore_char:
 		*status = serial_in(up, UART_LSR);
 	} while ((*status & UART_LSR_DR) && max_count--);
-	tty_flip_buffer_push(tty);
+
+	spin_unlock_irqrestore(&up->port.lock, *flags);
+	tty_flip_buffer_push(&up->port.state->port);
+	spin_lock_irqsave(&up->port.lock, *flags);
 }
 
 static void transmit_chars(struct uart_hsu_port *up)
@@ -616,7 +619,7 @@ static irqreturn_t port_irq(int irq, void *dev_id)
 
 	lsr = serial_in(up, UART_LSR);
 	if (lsr & UART_LSR_DR)
-		receive_chars(up, &lsr);
+		receive_chars(up, &lsr, &flags);
 	check_modem_status(up);
 
 	/* lsr will be renewed during the receive_chars */
@@ -646,7 +649,7 @@ static inline void dma_chan_irq(struct hsu_dma_chan *chan)
 
 	/* Rx channel */
 	if (chan->dirt == DMA_FROM_DEVICE)
-		hsu_dma_rx(up, int_sts);
+		hsu_dma_rx(up, int_sts, &flags);
 
 	/* Tx channel */
 	if (chan->dirt == DMA_TO_DEVICE) {
@@ -1255,13 +1258,8 @@ static int serial_hsu_resume(struct pci_dev *pdev)
 #ifdef CONFIG_PM_RUNTIME
 static int serial_hsu_runtime_idle(struct device *dev)
 {
-	int err;
-
-	err = pm_schedule_suspend(dev, 500);
-	if (err)
-		return -EBUSY;
-
-	return 0;
+	pm_schedule_suspend(dev, 500);
+	return -EBUSY;
 }
 
 static int serial_hsu_runtime_suspend(struct device *dev)

@@ -34,6 +34,8 @@
 #define OP_31_XOP_MTSRIN	242
 #define OP_31_XOP_TLBIEL	274
 #define OP_31_XOP_TLBIE		306
+/* Opcode is officially reserved, reuse it as sc 1 when sc 1 doesn't trap */
+#define OP_31_XOP_FAKE_SC1	308
 #define OP_31_XOP_SLBMTE	402
 #define OP_31_XOP_SLBIE		434
 #define OP_31_XOP_SLBIA		498
@@ -170,6 +172,34 @@ int kvmppc_core_emulate_op(struct kvm_run *run, struct kvm_vcpu *vcpu,
 			vcpu->arch.mmu.tlbie(vcpu, addr, large);
 			break;
 		}
+#ifdef CONFIG_KVM_BOOK3S_64_PR
+		case OP_31_XOP_FAKE_SC1:
+		{
+			/* SC 1 papr hypercalls */
+			ulong cmd = kvmppc_get_gpr(vcpu, 3);
+			int i;
+
+		        if ((vcpu->arch.shared->msr & MSR_PR) ||
+			    !vcpu->arch.papr_enabled) {
+				emulated = EMULATE_FAIL;
+				break;
+			}
+
+			if (kvmppc_h_pr(vcpu, cmd) == EMULATE_DONE)
+				break;
+
+			run->papr_hcall.nr = cmd;
+			for (i = 0; i < 9; ++i) {
+				ulong gpr = kvmppc_get_gpr(vcpu, 4 + i);
+				run->papr_hcall.args[i] = gpr;
+			}
+
+			run->exit_reason = KVM_EXIT_PAPR_HCALL;
+			vcpu->arch.hcall_needed = 1;
+			emulated = EMULATE_EXIT_USER;
+			break;
+		}
+#endif
 		case OP_31_XOP_EIOIO:
 			break;
 		case OP_31_XOP_SLBMTE:
@@ -427,6 +457,8 @@ int kvmppc_core_emulate_mtspr(struct kvm_vcpu *vcpu, int sprn, ulong spr_val)
 	case SPRN_PMC3_GEKKO:
 	case SPRN_PMC4_GEKKO:
 	case SPRN_WPAR_GEKKO:
+	case SPRN_MSSSR0:
+	case SPRN_DABR:
 		break;
 unprivileged:
 	default:
@@ -523,6 +555,8 @@ int kvmppc_core_emulate_mfspr(struct kvm_vcpu *vcpu, int sprn, ulong *spr_val)
 	case SPRN_PMC3_GEKKO:
 	case SPRN_PMC4_GEKKO:
 	case SPRN_WPAR_GEKKO:
+	case SPRN_MSSSR0:
+	case SPRN_DABR:
 		*spr_val = 0;
 		break;
 	default:

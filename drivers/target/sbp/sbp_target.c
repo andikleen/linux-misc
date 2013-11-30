@@ -1719,7 +1719,7 @@ static struct se_node_acl *sbp_alloc_fabric_acl(struct se_portal_group *se_tpg)
 
 	nacl = kzalloc(sizeof(struct sbp_nacl), GFP_KERNEL);
 	if (!nacl) {
-		pr_err("Unable to alocate struct sbp_nacl\n");
+		pr_err("Unable to allocate struct sbp_nacl\n");
 		return NULL;
 	}
 
@@ -1842,9 +1842,8 @@ static int sbp_queue_status(struct se_cmd *se_cmd)
 	return sbp_send_sense(req);
 }
 
-static int sbp_queue_tm_rsp(struct se_cmd *se_cmd)
+static void sbp_queue_tm_rsp(struct se_cmd *se_cmd)
 {
-	return 0;
 }
 
 static int sbp_check_stop_free(struct se_cmd *se_cmd)
@@ -2598,7 +2597,7 @@ static int __init sbp_init(void)
 	return 0;
 };
 
-static void sbp_exit(void)
+static void __exit sbp_exit(void)
 {
 	sbp_deregister_configfs();
 };

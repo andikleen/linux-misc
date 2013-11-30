@@ -43,6 +43,7 @@
 #define PAGE_OFFSET		UL(0xffffffc000000000)
 #define MODULES_END		(PAGE_OFFSET)
 #define MODULES_VADDR		(MODULES_END - SZ_64M)
+#define EARLYCON_IOBASE		(MODULES_VADDR - SZ_4M)
 #define VA_BITS			(39)
 #define TASK_SIZE_64		(UL(1) << VA_BITS)
 
@@ -88,6 +89,12 @@
 #define MT_DEVICE_GRE		2
 #define MT_NORMAL_NC		3
 #define MT_NORMAL		4
+
+/*
+ * Memory types for Stage-2 translation
+ */
+#define MT_S2_NORMAL		0xf
+#define MT_S2_DEVICE_nGnRE	0x1
 
 #ifndef __ASSEMBLY__
 

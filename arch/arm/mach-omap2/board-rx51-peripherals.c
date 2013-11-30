@@ -40,10 +40,12 @@
 #include <sound/tpa6130a2-plat.h>
 #include <media/radio-si4713.h>
 #include <media/si4713.h>
-#include <linux/leds-lp5523.h>
+#include <linux/platform_data/leds-lp55xx.h>
 
-#include <../drivers/staging/iio/light/tsl2563.h>
+#include <linux/platform_data/tsl2563.h>
 #include <linux/lis3lv02d.h>
+
+#include <video/omap-panel-data.h>
 
 #if defined(CONFIG_IR_RX51) || defined(CONFIG_IR_RX51_MODULE)
 #include <media/ir-rx51.h>
@@ -73,11 +75,11 @@
 #define LIS302_IRQ1_GPIO 181
 #define LIS302_IRQ2_GPIO 180  /* Not yet in use */
 
-/* list all spi devices here */
+/* List all SPI devices here. Note that the list/probe order seems to matter! */
 enum {
 	RX51_SPI_WL1251,
-	RX51_SPI_MIPID,		/* LCD panel */
 	RX51_SPI_TSC2005,	/* Touch Controller */
+	RX51_SPI_MIPID,		/* LCD panel */
 };
 
 static struct wl12xx_platform_data wl1251_pdata;
@@ -160,34 +162,52 @@ static struct tsl2563_platform_data rx51_tsl2563_platform_data = {
 #endif
 
 #if defined(CONFIG_LEDS_LP5523) || defined(CONFIG_LEDS_LP5523_MODULE)
-static struct lp5523_led_config rx51_lp5523_led_config[] = {
+static struct lp55xx_led_config rx51_lp5523_led_config[] = {
 	{
+		.name		= "lp5523:kb1",
 		.chan_nr	= 0,
 		.led_current	= 50,
+		.max_current	= 100,
 	}, {
+		.name		= "lp5523:kb2",
 		.chan_nr	= 1,
 		.led_current	= 50,
+		.max_current	= 100,
 	}, {
+		.name		= "lp5523:kb3",
 		.chan_nr	= 2,
 		.led_current	= 50,
+		.max_current	= 100,
 	}, {
+		.name		= "lp5523:kb4",
 		.chan_nr	= 3,
 		.led_current	= 50,
+		.max_current	= 100,
 	}, {
+		.name		= "lp5523:b",
 		.chan_nr	= 4,
 		.led_current	= 50,
+		.max_current	= 100,
 	}, {
+		.name		= "lp5523:g",
 		.chan_nr	= 5,
 		.led_current	= 50,
+		.max_current	= 100,
 	}, {
+		.name		= "lp5523:r",
 		.chan_nr	= 6,
 		.led_current	= 50,
+		.max_current	= 100,
 	}, {
+		.name		= "lp5523:kb5",
 		.chan_nr	= 7,
 		.led_current	= 50,
+		.max_current	= 100,
 	}, {
+		.name		= "lp5523:kb6",
 		.chan_nr	= 8,
 		.led_current	= 50,
+		.max_current	= 100,
 	}
 };
 
@@ -207,15 +227,24 @@ static void rx51_lp5523_enable(bool state)
 	gpio_set_value(RX51_LP5523_CHIP_EN_GPIO, !!state);
 }
 
-static struct lp5523_platform_data rx51_lp5523_platform_data = {
+static struct lp55xx_platform_data rx51_lp5523_platform_data = {
 	.led_config		= rx51_lp5523_led_config,
 	.num_channels		= ARRAY_SIZE(rx51_lp5523_led_config),
-	.clock_mode		= LP5523_CLOCK_AUTO,
+	.clock_mode		= LP55XX_CLOCK_AUTO,
 	.setup_resources	= rx51_lp5523_setup,
 	.release_resources	= rx51_lp5523_release,
 	.enable			= rx51_lp5523_enable,
 };
 #endif
+
+#define RX51_LCD_RESET_GPIO	90
+
+static struct panel_acx565akm_platform_data acx_pdata = {
+	.name		= "lcd",
+	.source		= "sdi.0",
+	.reset_gpio	= RX51_LCD_RESET_GPIO,
+	.datapairs	= 2,
+};
 
 static struct omap2_mcspi_device_config wl1251_mcspi_config = {
 	.turbo_mode	= 0,
@@ -245,6 +274,7 @@ static struct spi_board_info rx51_peripherals_spi_board_info[] __initdata = {
 		.chip_select		= 2,
 		.max_speed_hz		= 6000000,
 		.controller_data	= &mipid_mcspi_config,
+		.platform_data		= &acx_pdata,
 	},
 	[RX51_SPI_TSC2005] = {
 		.modalias		= "tsc2005",
@@ -538,12 +568,17 @@ static struct regulator_consumer_supply rx51_vio_supplies[] = {
 	REGULATOR_SUPPLY("DVDD", "2-0019"),
 	/* Si4713 IO supply */
 	REGULATOR_SUPPLY("vio", "2-0063"),
+	/* lis3lv02d */
+	REGULATOR_SUPPLY("Vdd_IO", "3-001d"),
 };
 
 static struct regulator_consumer_supply rx51_vaux1_consumers[] = {
 	REGULATOR_SUPPLY("vdds_sdi", "omapdss"),
+	REGULATOR_SUPPLY("vdds_sdi", "omapdss_sdi.0"),
 	/* Si4713 supply */
 	REGULATOR_SUPPLY("vdd", "2-0063"),
+	/* lis3lv02d */
+	REGULATOR_SUPPLY("Vdd", "3-001d"),
 };
 
 static struct regulator_init_data rx51_vaux1 = {
@@ -1253,6 +1288,16 @@ static void __init rx51_init_lirc(void)
 }
 #endif
 
+static struct platform_device madc_hwmon = {
+	.name	= "twl4030_madc_hwmon",
+	.id	= -1,
+};
+
+static void __init rx51_init_twl4030_hwmon(void)
+{
+	platform_device_register(&madc_hwmon);
+}
+
 void __init rx51_peripherals_init(void)
 {
 	rx51_i2c_init();
@@ -1272,5 +1317,6 @@ void __init rx51_peripherals_init(void)
 		omap_hsmmc_init(mmc);
 
 	rx51_charger_init();
+	rx51_init_twl4030_hwmon();
 }
 

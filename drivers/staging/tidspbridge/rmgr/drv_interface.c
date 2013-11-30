@@ -65,7 +65,6 @@ static struct class *bridge_class;
 static u32 driver_context;
 static s32 driver_major;
 static char *base_img;
-char *iva_img;
 static s32 shm_size = 0x500000;	/* 5 MB */
 static int tc_wordswapon;	/* Default value is always false */
 #ifdef CONFIG_TIDSPBRIDGE_RECOVERY
@@ -422,12 +421,11 @@ static int omap3_bridge_startup(struct platform_device *pdev)
 	drv_datap->tc_wordswapon = tc_wordswapon;
 
 	if (base_img) {
-		drv_datap->base_img = kmalloc(strlen(base_img) + 1, GFP_KERNEL);
+		drv_datap->base_img = kstrdup(base_img, GFP_KERNEL);
 		if (!drv_datap->base_img) {
 			err = -ENOMEM;
 			goto err2;
 		}
-		strncpy(drv_datap->base_img, base_img, strlen(base_img) + 1);
 	}
 
 	dev_set_drvdata(bridge, drv_datap);
@@ -509,6 +507,7 @@ static int omap34_xx_bridge_probe(struct platform_device *pdev)
 	bridge_class = class_create(THIS_MODULE, "ti_bridge");
 	if (IS_ERR(bridge_class)) {
 		pr_err("%s: Error creating bridge class\n", __func__);
+		err = PTR_ERR(bridge_class);
 		goto err3;
 	}
 

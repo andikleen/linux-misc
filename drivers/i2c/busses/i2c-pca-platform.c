@@ -136,7 +136,7 @@ static int i2c_pca_pf_probe(struct platform_device *pdev)
 	struct i2c_pca_pf_data *i2c;
 	struct resource *res;
 	struct i2c_pca9564_pf_platform_data *platform_data =
-				pdev->dev.platform_data;
+				dev_get_platdata(&pdev->dev);
 	int ret = 0;
 	int irq;
 
@@ -260,7 +260,6 @@ e_print:
 static int i2c_pca_pf_remove(struct platform_device *pdev)
 {
 	struct i2c_pca_pf_data *i2c = platform_get_drvdata(pdev);
-	platform_set_drvdata(pdev, NULL);
 
 	i2c_del_adapter(&i2c->adap);
 

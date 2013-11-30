@@ -24,7 +24,6 @@
 
 #include <linux/kernel.h>
 #include <linux/bug.h>
-#include <linux/delay.h>
 #include <linux/err.h>
 #include <linux/gpio.h>
 #include <linux/slab.h>
@@ -75,16 +74,20 @@ static int max77686_buck_set_suspend_disable(struct regulator_dev *rdev)
 {
 	unsigned int val;
 	struct max77686_data *max77686 = rdev_get_drvdata(rdev);
+	int ret, id = rdev_get_id(rdev);
 
-	if (rdev->desc->id == MAX77686_BUCK1)
+	if (id == MAX77686_BUCK1)
 		val = 0x1;
 	else
 		val = 0x1 << MAX77686_OPMODE_BUCK234_SHIFT;
 
-	max77686->opmode[rdev->desc->id] = val;
-	return regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
-				  rdev->desc->enable_mask,
-				  val);
+	ret = regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
+				 rdev->desc->enable_mask, val);
+	if (ret)
+		return ret;
+
+	max77686->opmode[id] = val;
+	return 0;
 }
 
 /* Some LDOs supports [LPM/Normal]ON mode during suspend state */
@@ -93,9 +96,10 @@ static int max77686_set_suspend_mode(struct regulator_dev *rdev,
 {
 	struct max77686_data *max77686 = rdev_get_drvdata(rdev);
 	unsigned int val;
+	int ret, id = rdev_get_id(rdev);
 
 	/* BUCK[5-9] doesn't support this feature */
-	if (rdev->desc->id >= MAX77686_BUCK5)
+	if (id >= MAX77686_BUCK5)
 		return 0;
 
 	switch (mode) {
@@ -111,10 +115,13 @@ static int max77686_set_suspend_mode(struct regulator_dev *rdev,
 		return -EINVAL;
 	}
 
-	max77686->opmode[rdev->desc->id] = val;
-	return regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
-				  rdev->desc->enable_mask,
-				  val);
+	ret = regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
+				  rdev->desc->enable_mask, val);
+	if (ret)
+		return ret;
+
+	max77686->opmode[id] = val;
+	return 0;
 }
 
 /* Some LDOs supports LPM-ON/OFF/Normal-ON mode during suspend state */
@@ -123,6 +130,7 @@ static int max77686_ldo_set_suspend_mode(struct regulator_dev *rdev,
 {
 	unsigned int val;
 	struct max77686_data *max77686 = rdev_get_drvdata(rdev);
+	int ret;
 
 	switch (mode) {
 	case REGULATOR_MODE_STANDBY:			/* switch off */
@@ -140,10 +148,13 @@ static int max77686_ldo_set_suspend_mode(struct regulator_dev *rdev,
 		return -EINVAL;
 	}
 
-	max77686->opmode[rdev->desc->id] = val;
-	return regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
-				  rdev->desc->enable_mask,
-				  val);
+	ret = regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
+				 rdev->desc->enable_mask, val);
+	if (ret)
+		return ret;
+
+	max77686->opmode[rdev_get_id(rdev)] = val;
+	return 0;
 }
 
 static int max77686_enable(struct regulator_dev *rdev)
@@ -152,7 +163,7 @@ static int max77686_enable(struct regulator_dev *rdev)
 
 	return regmap_update_bits(rdev->regmap, rdev->desc->enable_reg,
 				  rdev->desc->enable_mask,
-				  max77686->opmode[rdev->desc->id]);
+				  max77686->opmode[rdev_get_id(rdev)]);
 }
 
 static int max77686_set_ramp_delay(struct regulator_dev *rdev, int ramp_delay)

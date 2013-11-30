@@ -65,6 +65,9 @@ struct nouveau_fifo_base {
 struct nouveau_fifo {
 	struct nouveau_engine base;
 
+	struct nouveau_event *cevent; /* channel creation event */
+	struct nouveau_event *uevent; /* async user trigger */
+
 	struct nouveau_object **channel;
 	spinlock_t lock;
 	u16 min;
@@ -92,6 +95,8 @@ int nouveau_fifo_create_(struct nouveau_object *, struct nouveau_object *,
 			 struct nouveau_oclass *, int min, int max,
 			 int size, void **);
 void nouveau_fifo_destroy(struct nouveau_fifo *);
+const char *
+nouveau_client_name_for_fifo_chid(struct nouveau_fifo *fifo, u32 chid);
 
 #define _nouveau_fifo_init _nouveau_engine_init
 #define _nouveau_fifo_fini _nouveau_engine_fini

@@ -637,8 +637,9 @@ static int omap2_onenand_probe(struct platform_device *pdev)
 	struct onenand_chip *this;
 	int r;
 	struct resource *res;
+	struct mtd_part_parser_data ppdata = {};
 
-	pdata = pdev->dev.platform_data;
+	pdata = dev_get_platdata(&pdev->dev);
 	if (pdata == NULL) {
 		dev_err(&pdev->dev, "platform data missing\n");
 		return -ENODEV;
@@ -767,7 +768,8 @@ static int omap2_onenand_probe(struct platform_device *pdev)
 	if ((r = onenand_scan(&c->mtd, 1)) < 0)
 		goto err_release_regulator;
 
-	r = mtd_device_parse_register(&c->mtd, NULL, NULL,
+	ppdata.of_node = pdata->of_node;
+	r = mtd_device_parse_register(&c->mtd, NULL, &ppdata,
 				      pdata ? pdata->parts : NULL,
 				      pdata ? pdata->nr_parts : 0);
 	if (r)
@@ -808,7 +810,6 @@ static int omap2_onenand_remove(struct platform_device *pdev)
 	if (c->dma_channel != -1)
 		omap_free_dma(c->dma_channel);
 	omap2_onenand_shutdown(pdev);
-	platform_set_drvdata(pdev, NULL);
 	if (c->gpio_irq) {
 		free_irq(gpio_to_irq(c->gpio_irq), c);
 		gpio_free(c->gpio_irq);
@@ -830,19 +831,7 @@ static struct platform_driver omap2_onenand_driver = {
 	},
 };
 
-static int __init omap2_onenand_init(void)
-{
-	printk(KERN_INFO "OneNAND driver initializing\n");
-	return platform_driver_register(&omap2_onenand_driver);
-}
-
-static void __exit omap2_onenand_exit(void)
-{
-	platform_driver_unregister(&omap2_onenand_driver);
-}
-
-module_init(omap2_onenand_init);
-module_exit(omap2_onenand_exit);
+module_platform_driver(omap2_onenand_driver);
 
 MODULE_ALIAS("platform:" DRIVER_NAME);
 MODULE_LICENSE("GPL");
