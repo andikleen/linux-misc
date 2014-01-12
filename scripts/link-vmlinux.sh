@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 #
 # link vmlinux
 #
@@ -82,13 +82,12 @@ kallsyms()
 		kallsymopt="${kallsymopt} --all-symbols"
 	fi
 
-	kallsymopt="${kallsymopt} $3 --page-offset=$CONFIG_PAGE_OFFSET"
+	kallsymopt="${kallsymopt} --page-offset=$CONFIG_PAGE_OFFSET"
 
 	local aflags="${KBUILD_AFLAGS} ${KBUILD_AFLAGS_KERNEL}               \
 		      ${NOSTDINC_FLAGS} ${LINUXINCLUDE} ${KBUILD_CPPFLAGS}"
 
 	${NM} -n ${1} | \
-		awk 'NF == 3 { print}' |
 		scripts/kallsyms ${kallsymopt} | \
 		${CC} ${aflags} -c -o ${2} -x assembler-with-cpp -
 }
@@ -165,36 +164,51 @@ ${MAKE} -f "${srctree}/scripts/Makefile.build" obj=init
 
 kallsymso=""
 kallsyms_vmlinux=""
+if [ -n "${CONFIG_KALLSYMS}" ]; then
 
-if [ -n "${CONFIG_KALLSYMS}" ] ; then
-	# Generate kallsyms from the top level object files
-	# this is slightly off, and has wrong addresses,
-	# but gives us the conservative max length of the kallsyms
-	# table to link in something with the size.
-	info KALLSYMS1 .tmp_kallsyms1.o
-	kallsyms "${KBUILD_VMLINUX_INIT} ${KBUILD_VMLINUX_MAIN}" \
-		 .tmp_kallsyms1.o \
-		 "--pad-file=.kallsyms_pad"
-	kallsymsso=.tmp_kallsyms1.o
+	# kallsyms support
+	# Generate section listing all symbols and add it into vmlinux
+	# It's a three step process:
+	# 1)  Link .tmp_vmlinux1 so it has all symbols and sections,
+	#     but __kallsyms is empty.
+	#     Running kallsyms on that gives us .tmp_kallsyms1.o with
+	#     the right size
+	# 2)  Link .tmp_vmlinux2 so it now has a __kallsyms section of
+	#     the right size, but due to the added section, some
+	#     addresses have shifted.
+	#     From here, we generate a correct .tmp_kallsyms2.o
+	# 2a) We may use an extra pass as this has been necessary to
+	#     woraround some alignment related bugs.
+	#     KALLSYMS_EXTRA_PASS=1 is used to trigger this.
+	# 3)  The correct ${kallsymso} is linked into the final vmlinux.
+	#
+	# a)  Verify that the System.map from vmlinux matches the map from
+	#     ${kallsymso}.
+
+	kallsymso=.tmp_kallsyms2.o
+	kallsyms_vmlinux=.tmp_vmlinux2
+
+	# step 1
+	vmlinux_link "" .tmp_vmlinux1
+	kallsyms .tmp_vmlinux1 .tmp_kallsyms1.o
+
+	# step 2
+	vmlinux_link .tmp_kallsyms1.o .tmp_vmlinux2
+	kallsyms .tmp_vmlinux2 .tmp_kallsyms2.o
+
+	# step 2a
+	if [ -n "${KALLSYMS_EXTRA_PASS}" ]; then
+		kallsymso=.tmp_kallsyms3.o
+		kallsyms_vmlinux=.tmp_vmlinux3
+
+		vmlinux_link .tmp_kallsyms2.o .tmp_vmlinux3
+
+		kallsyms .tmp_vmlinux3 .tmp_kallsyms3.o
+	fi
 fi
 
 info LDFINAL vmlinux
-vmlinux_link "${kallsymsso}" vmlinux
-if [ -n "${CONFIG_KALLSYMS}" ] ; then
-	# Now regenerate the kallsyms table and patch it into the
-	# previously linked file. We tell kallsyms to pad it
-	# to the previous length, so that no symbol changes.
-	info KALLSYMS2 .tmp_kallsyms2.o
-	kallsyms vmlinux .tmp_kallsyms2.o $(<.kallsyms_pad)
-
-	info OBJCOPY .tmp_kallsyms2.bin
-	${OBJCOPY} -O binary .tmp_kallsyms2.o .tmp_kallsyms2.bin
-
-	info PATCHFILE vmlinux
-	scripts/patchfile vmlinux \
-		$(./source/scripts/elf_file_offset vmlinux kallsyms_offset) \
-		.tmp_kallsyms2.bin
-fi
+vmlinux_link "${kallsymso}" vmlinux
 
 if [ -n "${CONFIG_BUILDTIME_EXTABLE_SORT}" ]; then
 	info SORTEX vmlinux
@@ -203,6 +217,18 @@ fi
 
 info SYSMAP System.map
 mksysmap vmlinux System.map
+
+# step a (see comment above)
+if [ -n "${CONFIG_KALLSYMS}" ]; then
+	mksysmap ${kallsyms_vmlinux} .tmp_System.map
+
+	if ! cmp -s System.map .tmp_System.map; then
+		echo >&2 Inconsistent kallsyms data
+		echo >&2 Try "make KALLSYMS_EXTRA_PASS=1" as a workaround
+		cleanup
+		exit 1
+	fi
+fi
 
 # We made a new kernel - delete old version file
 rm -f .old_version
