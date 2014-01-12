@@ -52,6 +52,11 @@ config IP_ADVANCED_ROUTER
 
 	  If unsure, say N here.
 
+config IP_PING
+	bool "IP: ping sockets"
+	---help---
+	  Enable ping sockets to enable suid-less ping.
+
 config IP_FIB_TRIE_STATS
 	bool "FIB TRIE statistics"
 	depends on IP_ADVANCED_ROUTER

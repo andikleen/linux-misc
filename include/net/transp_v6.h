@@ -19,8 +19,6 @@ int ipv6_frag_init(void);
 void ipv6_frag_exit(void);
 
 /* transport protocols */
-int pingv6_init(void);
-void pingv6_exit(void);
 int rawv6_init(void);
 void rawv6_exit(void);
 int udpv6_init(void);
