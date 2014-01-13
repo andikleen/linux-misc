@@ -306,6 +306,10 @@ config SYN_COOKIES
 
 	  If unsure, say N.
 
+config IP_OFFLOAD
+	bool "Support for IP GRO/offload"
+	default y
+
 config NET_IPVTI
 	tristate "Virtual (secure) IP: tunneling"
 	select INET_TUNNEL

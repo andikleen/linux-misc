@@ -8,8 +8,8 @@ obj-y     := route.o inetpeer.o protocol.o \
 	     inet_timewait_sock.o inet_connection_sock.o \
 	     tcp.o tcp_input.o tcp_output.o tcp_timer.o tcp_ipv4.o \
 	     tcp_minisocks.o tcp_cong.o tcp_fastopen.o \
-	     tcp_offload.o datagram.o raw.o udp.o udplite.o \
-	     udp_offload.o arp.o icmp.o devinet.o af_inet.o igmp.o \
+	     datagram.o raw.o udp.o udplite.o \
+	     arp.o icmp.o devinet.o af_inet.o igmp.o \
 	     fib_frontend.o fib_semantics.o fib_trie.o \
 	     inet_fragment.o ip_tunnel_core.o
 
@@ -26,6 +26,7 @@ obj-$(CONFIG_NET_IPGRE_DEMUX) += gre.o
 obj-$(CONFIG_NET_IPGRE) += ip_gre.o
 obj-$(CONFIG_NET_IPVTI) += ip_vti.o
 obj-$(CONFIG_SYN_COOKIES) += syncookies.o
+obj-$(CONFIG_IP_OFFLOAD) += tcp_offload.o udp_offload.o
 obj-$(CONFIG_INET_AH) += ah4.o
 obj-$(CONFIG_INET_ESP) += esp4.o
 obj-$(CONFIG_INET_IPCOMP) += ipcomp.o

@@ -1212,6 +1212,9 @@ int inet_sk_rebuild_header(struct sock *sk)
 }
 EXPORT_SYMBOL(inet_sk_rebuild_header);
 
+#ifdef CONFIG_IP_OFFLOAD
+/* Should move to a new file */
+
 static int inet_gso_send_check(struct sk_buff *skb)
 {
 	const struct net_offload *ops;
@@ -1436,6 +1439,8 @@ out_unlock:
 	return err;
 }
 
+#endif
+
 int inet_ctl_sock_create(struct sock **sk, unsigned short family,
 			 unsigned short type, unsigned char protocol,
 			 struct net *net)
@@ -1633,6 +1638,9 @@ static int __init init_ipv4_mibs(void)
 
 static int ipv4_proc_init(void);
 
+#ifdef CONFIG_IP_OFFLOAD
+/* Move elsewhere? */
+
 /*
  *	IP protocol layer initialiser
  */
@@ -1670,6 +1678,7 @@ static int __init ipv4_offload_init(void)
 }
 
 fs_initcall(ipv4_offload_init);
+#endif
 
 static struct packet_type ip_packet_type __read_mostly = {
 	.type = cpu_to_be16(ETH_P_IP),

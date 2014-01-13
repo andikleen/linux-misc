@@ -1573,7 +1573,12 @@ void tcp_v4_destroy_sock(struct sock *sk);
 struct sk_buff *tcp_gso_segment(struct sk_buff *skb,
 				netdev_features_t features);
 struct sk_buff **tcp_gro_receive(struct sk_buff **head, struct sk_buff *skb);
+#ifdef CONFIG_IP_OFFLOAD
 int tcp_gro_complete(struct sk_buff *skb);
+#else
+/* For the benefit of one driver who really shouldn't be using this. */
+static inline int tcp_gro_complete(struct sk_buff *skb) { return -EIO; }
+#endif
 
 void __tcp_v4_send_check(struct sk_buff *skb, __be32 saddr, __be32 daddr);
 
