@@ -24,6 +24,14 @@ menuconfig NET
 
 if NET
 
+config RTNETLINK
+       bool "rtnetlink"
+       default y
+       help
+         Enable rtnetlink to configure routing and related setups.
+	 This is needed for most modern configuration
+	 tools, but old ifconfig can do without it.
+
 config WANT_COMPAT_NETLINK_MESSAGES
 	bool
 	help

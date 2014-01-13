@@ -356,6 +356,7 @@ int ip_fib_check_default(__be32 gw, struct net_device *dev)
 	return -1;
 }
 
+#ifdef CONFIG_RTNETLINK
 static inline size_t fib_nlmsg_size(struct fib_info *fi)
 {
 	size_t payload = NLMSG_ALIGN(sizeof(struct rtmsg))
@@ -411,6 +412,7 @@ errout:
 	if (err < 0)
 		rtnl_set_sk_err(info->nl_net, RTNLGRP_IPV4_ROUTE, err);
 }
+#endif
 
 /* Return the first fib alias matching TOS with
  * priority less than or equal to PRIO.
@@ -996,6 +998,7 @@ failure:
 	return ERR_PTR(err);
 }
 
+#ifdef CONFIG_RTNETLINK
 int fib_dump_info(struct sk_buff *skb, u32 portid, u32 seq, int event,
 		  u32 tb_id, u8 type, __be32 dst, int dst_len, u8 tos,
 		  struct fib_info *fi, unsigned int flags)
@@ -1087,6 +1090,7 @@ nla_put_failure:
 	nlmsg_cancel(skb, nlh);
 	return -EMSGSIZE;
 }
+#endif
 
 /*
  * Update FIB if:
