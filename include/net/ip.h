@@ -195,6 +195,7 @@ extern struct ipv4_config ipv4_config;
 #define NET_ADD_STATS_BH(net, field, adnd) SNMP_ADD_STATS_BH((net)->mib.net_statistics, field, adnd)
 #define NET_ADD_STATS_USER(net, field, adnd) SNMP_ADD_STATS_USER((net)->mib.net_statistics, field, adnd)
 
+#ifdef CONFIG_PROC_FS
 unsigned long snmp_fold_field(void __percpu *mib[], int offt);
 #if BITS_PER_LONG==32
 u64 snmp_fold_field64(void __percpu *mib[], int offt, size_t sync_off);
@@ -216,6 +217,12 @@ static inline void snmp_mib_free(void __percpu *ptr[SNMP_ARRAY_SZ])
 		ptr[i] = NULL;
 	}
 }
+#else
+#define snmp_mib_init(a,b,c) ({ 0; })
+#define snmp_mib_free(x) do {} while (0)
+#define snmp_fold_field(a, b) ({ 0; })
+#define snmp_fold_field64(a, b, c) ({ 0; })
+#endif
 
 void inet_get_local_port_range(struct net *net, int *low, int *high);
 
@@ -481,6 +488,8 @@ void ip_local_error(struct sock *sk, int err, __be32 daddr, __be16 dport,
 
 #ifdef CONFIG_PROC_FS
 int ip_misc_proc_init(void);
+#else
+static inline int ip_misc_proc_init(void) { return 0; }
 #endif
 
 #endif	/* _IP_H */

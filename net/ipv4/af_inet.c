@@ -1463,6 +1463,8 @@ int inet_ctl_sock_create(struct sock **sk, unsigned short family,
 }
 EXPORT_SYMBOL_GPL(inet_ctl_sock_create);
 
+#ifdef CONFIG_PROC_FS
+
 unsigned long snmp_fold_field(void __percpu *mib[], int offt)
 {
 	unsigned long res = 0;
@@ -1522,6 +1524,8 @@ int snmp_mib_init(void __percpu *ptr[2], size_t mibsize, size_t align)
 }
 EXPORT_SYMBOL_GPL(snmp_mib_init);
 
+#endif
+
 #ifdef CONFIG_IP_MULTICAST
 static const struct net_protocol igmp_protocol = {
 	.handler =	igmp_rcv,
@@ -1552,6 +1556,7 @@ static const struct net_protocol icmp_protocol = {
 	.netns_ok =	1,
 };
 
+#ifdef CONFIG_PROC_FS
 static __net_init int ipv4_mib_init_net(struct net *net)
 {
 	int i;
@@ -1635,6 +1640,13 @@ static int __init init_ipv4_mibs(void)
 {
 	return register_pernet_subsys(&ipv4_mib_ops);
 }
+
+#else
+static int __init init_ipv4_mibs(void)
+{
+	return 0;
+}
+#endif
 
 static int ipv4_proc_init(void);
 

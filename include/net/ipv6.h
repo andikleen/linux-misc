@@ -821,11 +821,17 @@ int udp6_proc_init(struct net *net);
 void udp6_proc_exit(struct net *net);
 int udplite6_proc_init(void);
 void udplite6_proc_exit(void);
+#ifdef CONFIG_PROC_FS
 int ipv6_misc_proc_init(void);
 void ipv6_misc_proc_exit(void);
 int snmp6_register_dev(struct inet6_dev *idev);
 int snmp6_unregister_dev(struct inet6_dev *idev);
-
+#else
+static inline int ipv6_misc_proc_init(void) { return 0; }
+static inline void ipv6_misc_proc_exit(void) {}
+static inline int snmp6_register_dev(struct inet6_dev *idev) { return 0; }
+static inline int snmp6_unregister_dev(struct inet6_dev *idev) { return 0; }
+#endif
 #else
 static inline int ac6_proc_init(struct net *net) { return 0; }
 static inline void ac6_proc_exit(struct net *net) { }
