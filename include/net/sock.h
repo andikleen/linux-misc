@@ -1604,6 +1604,7 @@ void sk_common_release(struct sock *sk);
 /* Initialise core socket variables */
 void sock_init_data(struct socket *sock, struct sock *sk);
 
+#ifdef CONFIG_LPF_FILTER
 void sk_filter_release_rcu(struct rcu_head *rcu);
 
 /**
@@ -1630,6 +1631,12 @@ static inline void sk_filter_charge(struct sock *sk, struct sk_filter *fp)
 	atomic_inc(&fp->refcnt);
 	atomic_add(sk_filter_size(fp->len), &sk->sk_omem_alloc);
 }
+#else
+static inline void sk_filter_release_rcu(struct rcu_head *rcu) {}
+static inline void sk_filter_release(struct sk_filter *fp) {}
+static inline void sk_filter_uncharge(struct sock *sk, struct sk_filter *fp) {}
+static inline void sk_filter_charge(struct sock *sk, struct sk_filter *fp) {}
+#endif
 
 /*
  * Socket reference counting postulates.

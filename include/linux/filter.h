@@ -41,6 +41,7 @@ static inline unsigned int sk_filter_size(unsigned int proglen)
 		   offsetof(struct sk_filter, insns[proglen]));
 }
 
+#ifdef CONFIG_LPF_FILTER
 extern int sk_filter(struct sock *sk, struct sk_buff *skb);
 extern unsigned int sk_run_filter(const struct sk_buff *skb,
 				  const struct sock_filter *filter);
@@ -52,6 +53,29 @@ extern int sk_detach_filter(struct sock *sk);
 extern int sk_chk_filter(struct sock_filter *filter, unsigned int flen);
 extern int sk_get_filter(struct sock *sk, struct sock_filter __user *filter, unsigned len);
 extern void sk_decode_filter(struct sock_filter *filt, struct sock_filter *to);
+#else
+static inline int
+sk_filter(struct sock *sk, struct sk_buff *skb) { return -EINVAL; }
+static inline unsigned int sk_run_filter(const struct sk_buff *skb,
+				  const struct sock_filter *filter)
+{
+	/* XXX right return value? */
+	return 0;
+}
+static inline int sk_unattached_filter_create(struct sk_filter **pfp,
+				       struct sock_fprog *fprog)
+{ return -EINVAL; }
+static inline void sk_unattached_filter_destroy(struct sk_filter *fp) {}
+static inline int sk_attach_filter(struct sock_fprog *fprog, struct sock *sk)
+{ return -EINVAL; }
+static inline int sk_detach_filter(struct sock *sk) { return -EINVAL; }
+static inline int sk_chk_filter(struct sock_filter *filter, unsigned int flen)
+{ return 0; }
+static inline int sk_get_filter(struct sock *sk, struct sock_filter __user *filter, unsigned len)
+{ return -EINVAL; }
+static inline void
+sk_decode_filter(struct sock_filter *filt, struct sock_filter *to) {}
+#endif
 
 #ifdef CONFIG_BPF_JIT
 #include <stdarg.h>
