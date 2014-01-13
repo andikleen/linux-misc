@@ -82,6 +82,12 @@ source "net/netlabel/Kconfig"
 
 endif # if INET
 
+config NET_ETHTOOL
+	bool "Ethtool support"
+	default y
+	help
+	  Support changing ethernet driver parameters from user tools.
+
 config NETWORK_SECMARK
 	bool "Security Marking"
 	help

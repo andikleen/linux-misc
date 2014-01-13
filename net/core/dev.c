@@ -6209,6 +6209,7 @@ struct netdev_queue *dev_ingress_queue_create(struct net_device *dev)
 
 static const struct ethtool_ops default_ethtool_ops;
 
+#ifdef CONFIG_NET_ETHTOOL
 void netdev_set_default_ethtool_ops(struct net_device *dev,
 				    const struct ethtool_ops *ops)
 {
@@ -6216,6 +6217,7 @@ void netdev_set_default_ethtool_ops(struct net_device *dev,
 		dev->ethtool_ops = ops;
 }
 EXPORT_SYMBOL_GPL(netdev_set_default_ethtool_ops);
+#endif
 
 void netdev_freemem(struct net_device *dev)
 {
