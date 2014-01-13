@@ -417,14 +417,29 @@ int tcp_child_process(struct sock *parent, struct sock *child,
 		      struct sk_buff *skb);
 void tcp_enter_loss(struct sock *sk, int how);
 void tcp_clear_retrans(struct tcp_sock *tp);
+#ifdef CONFIG_TCP_METRICS
 void tcp_update_metrics(struct sock *sk);
 void tcp_init_metrics(struct sock *sk);
 void tcp_metrics_init(void);
+
 bool tcp_peer_is_proven(struct request_sock *req, struct dst_entry *dst,
 			bool paws_check);
 bool tcp_remember_stamp(struct sock *sk);
 bool tcp_tw_remember_stamp(struct inet_timewait_sock *tw);
 void tcp_fetch_timewait_stamp(struct sock *sk, struct dst_entry *dst);
+#else
+static inline void tcp_update_metrics(struct sock *sk) {}
+static inline void tcp_init_metrics(struct sock *sk) {}
+static inline void tcp_metrics_init(void) {}
+static inline bool tcp_peer_is_proven(struct request_sock *req,
+				      struct dst_entry *dst,
+				      bool paws_check) { return false; }
+static inline bool tcp_remember_stamp(struct sock *sk) { return false; }
+static inline bool
+tcp_tw_remember_stamp(struct inet_timewait_sock *tw) { return false; }
+static inline void
+tcp_fetch_timewait_stamp(struct sock *sk, struct dst_entry *dst) {}
+#endif
 void tcp_disable_fack(struct tcp_sock *tp);
 void tcp_close(struct sock *sk, long timeout);
 void tcp_init_sock(struct sock *sk);
@@ -1303,11 +1318,21 @@ int tcp_md5_hash_key(struct tcp_md5sig_pool *hp,
 		     const struct tcp_md5sig_key *key);
 
 /* From tcp_fastopen.c */
+#ifdef CONFIG_TCP_METRICS
 void tcp_fastopen_cache_get(struct sock *sk, u16 *mss,
 			    struct tcp_fastopen_cookie *cookie, int *syn_loss,
 			    unsigned long *last_syn_loss);
 void tcp_fastopen_cache_set(struct sock *sk, u16 mss,
 			    struct tcp_fastopen_cookie *cookie, bool syn_lost);
+#else
+static inline void
+tcp_fastopen_cache_get(struct sock *sk, u16 *mss,
+		       struct tcp_fastopen_cookie *cookie, int *syn_loss,
+		       unsigned long *last_syn_loss) {}
+static inline void
+tcp_fastopen_cache_set(struct sock *sk, u16 mss,
+		       struct tcp_fastopen_cookie *cookie, bool syn_lost) {}
+#endif
 struct tcp_fastopen_request {
 	/* Fast Open cookie. Size 0 means a cookie request */
 	struct tcp_fastopen_cookie	cookie;

@@ -264,6 +264,12 @@ config IP_PIMSM_V2
 	  gated-5). This routing protocol is not used widely, so say N unless
 	  you want to play with it.
 
+config TCP_METRICS
+	bool "Report TCP metrics over netlink"
+	---help---
+           Enable support in TCP to save host information between different
+	   connections.
+
 config SYN_COOKIES
 	bool "IP: TCP syncookie support"
 	---help---
