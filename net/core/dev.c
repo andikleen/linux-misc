@@ -173,7 +173,14 @@ EXPORT_SYMBOL(dev_base_lock);
 static DEFINE_SPINLOCK(napi_hash_lock);
 
 static unsigned int napi_gen_id;
-static DEFINE_HASHTABLE(napi_hash, 8);
+
+#ifdef CONFIG_BASE_SMALL
+#define NAPI_HASH_BITS 3
+#else
+#define NAPI_HASH_BITS 8
+#endif
+
+static DEFINE_HASHTABLE(napi_hash, NAPI_HASH_BITS);
 
 static seqcount_t devnet_rename_seq;
 
