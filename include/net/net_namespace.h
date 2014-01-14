@@ -35,7 +35,11 @@ struct sock;
 struct netns_ipvs;
 
 
+#ifdef CONFIG_BASE_SMALL
+#define NETDEV_HASHBITS    2
+#else
 #define NETDEV_HASHBITS    8
+#endif
 #define NETDEV_HASHENTRIES (1 << NETDEV_HASHBITS)
 
 struct net {
