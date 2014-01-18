@@ -3077,7 +3077,11 @@ EXPORT_SYMBOL_GPL(tcp_done);
 
 extern struct tcp_congestion_ops tcp_reno;
 
+#ifdef CONFIG_BASE_SMALL
+static __initdata unsigned long thash_entries = 16;
+#else
 static __initdata unsigned long thash_entries;
+#endif
 static int __init set_thash_entries(char *str)
 {
 	ssize_t ret;
