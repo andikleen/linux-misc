@@ -64,6 +64,10 @@ config IP_FIB_TRIE_STATS
 	  Keep track of statistics on structure of FIB TRIE table.
 	  Useful for testing and measuring TRIE performance.
 
+config INET_RAW
+       bool "IP: Support raw sockets"
+       default y
+
 config IP_MULTIPLE_TABLES
 	bool "IP: policy routing"
 	depends on IP_ADVANCED_ROUTER
@@ -220,6 +224,7 @@ config NET_IPGRE_BROADCAST
 config IP_MROUTE
 	bool "IP: multicast routing"
 	depends on IP_MULTICAST
+	select INET_RAW
 	help
 	  This is used if you want your machine to act as a router for IP
 	  packets that have several destination addresses. It is needed on the

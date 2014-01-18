@@ -404,7 +404,12 @@ static inline int sk_mc_loop(struct sock *sk)
 	return 1;
 }
 
+#ifdef CONFIG_INET_RAW
 bool ip_call_ra_chain(struct sk_buff *skb);
+#else
+static inline bool ip_call_ra_chain(struct sk_buff *skb)
+{ return false; }
+#endif
 
 /*
  *	Functions provided by ip_fragment.c

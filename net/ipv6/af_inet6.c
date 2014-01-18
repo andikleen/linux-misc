@@ -865,9 +865,11 @@ static int __init inet6_init(void)
 	if (err)
 		goto out_unregister_udp_proto;
 
+#ifdef CONFIG_INET_RAW
 	err = proto_register(&rawv6_prot, 1);
 	if (err)
 		goto out_unregister_udplite_proto;
+#endif
 
 #ifdef CONFIG_IP_PING
 	err = proto_register(&pingv6_prot, 1);

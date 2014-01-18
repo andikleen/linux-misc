@@ -813,8 +813,13 @@ int ip6_mc_msfget(struct sock *sk, struct group_filter *gsf,
 #ifdef CONFIG_PROC_FS
 int ac6_proc_init(struct net *net);
 void ac6_proc_exit(struct net *net);
+#ifdef CONFIG_INET_RAW
 int raw6_proc_init(void);
 void raw6_proc_exit(void);
+#else
+static inline int raw6_proc_init(void) { return 0; }
+static inline void raw6_proc_exit(void) {}
+#endif
 int tcp6_proc_init(struct net *net);
 void tcp6_proc_exit(struct net *net);
 int udp6_proc_init(struct net *net);

@@ -23,8 +23,13 @@
 
 extern struct proto raw_prot;
 
+#ifdef CONFIG_INET_RAW
 void raw_icmp_error(struct sk_buff *, int, u32);
 int raw_local_deliver(struct sk_buff *, int);
+#else
+static inline void raw_icmp_error(struct sk_buff *skb, int a, u32 b) {}
+static inline int raw_local_deliver(struct sk_buff *skb, int s) { return 0; }
+#endif
 
 int raw_rcv(struct sock *, struct sk_buff *);
 
