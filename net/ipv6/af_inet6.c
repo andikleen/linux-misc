@@ -854,6 +854,9 @@ static int __init inet6_init(void)
 	if (err)
 		goto out;
 
+	/* We MUST register UDP sockets before we create the ICMP6,
+	 * IGMP6, or NDISC control sockets.
+	 */
 	err = proto_register(&udpv6_prot, 1);
 	if (err)
 		goto out_unregister_tcp_proto;

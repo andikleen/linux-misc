@@ -1070,8 +1070,15 @@ static int __net_init icmp_sk_init(struct net *net)
 	for_each_possible_cpu(i) {
 		struct sock *sk;
 
+		/*
+		 * Use UDP here. We only use rudimentary
+		 * functionality of the socket, and UDP
+		 * provides it for us.
+		 * This avoids a dependency on the optional
+		 * RAW sockets
+		 */
 		err = inet_ctl_sock_create(&sk, PF_INET,
-					   SOCK_RAW, IPPROTO_ICMP, net);
+					   SOCK_DGRAM, 0, net);
 		if (err < 0)
 			goto fail;
 
