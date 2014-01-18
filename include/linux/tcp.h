@@ -356,6 +356,9 @@ static inline struct tcp_timewait_sock *tcp_twsk(const struct sock *sk)
 	return (struct tcp_timewait_sock *)sk;
 }
 
+extern void tcp_sock_destruct(struct sock *sk);
+
+#ifdef CONFIG_TCP_FASTOPEN
 static inline bool tcp_passive_fastopen(const struct sock *sk)
 {
 	return (sk->sk_state == TCP_SYN_RECV &&
@@ -366,8 +369,6 @@ static inline bool fastopen_cookie_present(struct tcp_fastopen_cookie *foc)
 {
 	return foc->len != -1;
 }
-
-extern void tcp_sock_destruct(struct sock *sk);
 
 static inline int fastopen_init_queue(struct sock *sk, int backlog)
 {
@@ -387,5 +388,14 @@ static inline int fastopen_init_queue(struct sock *sk, int backlog)
 	queue->fastopenq->max_qlen = backlog;
 	return 0;
 }
+
+#else
+static inline bool tcp_passive_fastopen(const struct sock *sk)
+{ return false; }
+static inline bool fastopen_cookie_present(struct tcp_fastopen_cookie *foc)
+{ return false; }
+static inline int fastopen_init_queue(struct sock *sk, int backlog)
+{ return 0; }
+#endif
 
 #endif	/* _LINUX_TCP_H */

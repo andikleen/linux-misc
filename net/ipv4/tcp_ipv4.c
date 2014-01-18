@@ -1260,6 +1260,7 @@ static const struct tcp_request_sock_ops tcp_request_sock_ipv4_ops = {
 };
 #endif
 
+#ifdef CONFIG_TCP_FASTOPEN
 static bool tcp_fastopen_check(struct sock *sk, struct sk_buff *skb,
 			       struct request_sock *req,
 			       struct tcp_fastopen_cookie *foc,
@@ -1440,6 +1441,23 @@ static int tcp_v4_conn_req_fastopen(struct sock *sk,
 	WARN_ON(req->sk == NULL);
 	return 0;
 }
+#else
+static bool tcp_fastopen_check(struct sock *sk, struct sk_buff *skb,
+			       struct request_sock *req,
+			       struct tcp_fastopen_cookie *foc,
+			       struct tcp_fastopen_cookie *valid_foc)
+{
+	return false;
+}
+
+static int tcp_v4_conn_req_fastopen(struct sock *sk,
+				    struct sk_buff *skb,
+				    struct sk_buff *skb_synack,
+				    struct request_sock *req)
+{
+	return 0;
+}
+#endif
 
 int tcp_v4_conn_request(struct sock *sk, struct sk_buff *skb)
 {

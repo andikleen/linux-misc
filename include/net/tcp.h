@@ -250,7 +250,11 @@ extern int sysctl_tcp_retries1;
 extern int sysctl_tcp_retries2;
 extern int sysctl_tcp_orphan_retries;
 extern int sysctl_tcp_syncookies;
+#ifdef CONFIG_TCP_FASTOPEN
 extern int sysctl_tcp_fastopen;
+#else
+#define sysctl_tcp_fastopen 0
+#endif
 extern int sysctl_tcp_retrans_collapse;
 extern int sysctl_tcp_stdurg;
 extern int sysctl_tcp_rfc1337;
@@ -1339,7 +1343,12 @@ struct tcp_fastopen_request {
 	struct msghdr			*data;  /* data in MSG_FASTOPEN */
 	u16				copied;	/* queued in tcp_connect() */
 };
+
+#ifdef CONFIG_TCP_FASTOPEN
 void tcp_free_fastopen_req(struct tcp_sock *tp);
+#else
+static inline void tcp_free_fastopen_req(struct tcp_sock *tp) {}
+#endif
 
 extern struct tcp_fastopen_context __rcu *tcp_fastopen_ctx;
 int tcp_fastopen_reset_cipher(void *key, unsigned int len);

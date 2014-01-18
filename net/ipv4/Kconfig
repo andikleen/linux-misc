@@ -322,6 +322,10 @@ config NET_IPVTI
 	  the notion of a secure tunnel for IPSEC and then use routing protocol
 	  on top.
 
+config TCP_FASTOPEN
+	bool "Enable TCP fastopen"
+	default y
+
 config INET_AH
 	tristate "IP: AH transformation"
 	select XFRM_ALGO
