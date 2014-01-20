@@ -255,7 +255,7 @@ config RFS_ACCEL
 	default y
 
 config XPS
-	boolean
+	bool "Support multiqueue transmit queues (XPS)"
 	depends on SMP
 	default y
 
