@@ -1038,8 +1038,10 @@ out_unregister_ping_proto:
 	proto_unregister(&pingv6_prot);
 out_unregister_raw_proto:
 #endif
+#ifdef CONFIG_INET_RAW
 	proto_unregister(&rawv6_prot);
 out_unregister_udplite_proto:
+#endif
 	proto_unregister(&udplitev6_prot);
 out_unregister_udp_proto:
 	proto_unregister(&udpv6_prot);
