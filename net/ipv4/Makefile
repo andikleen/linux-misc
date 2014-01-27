@@ -10,9 +10,11 @@ obj-y     := route.o inetpeer.o protocol.o \
 	     tcp_minisocks.o tcp_cong.o \
 	     datagram.o udp.o udplite.o \
 	     arp.o icmp.o devinet.o af_inet.o \
-	     fib_frontend.o fib_semantics.o fib_trie.o \
+	     fib_frontend.o fib_semantics.o \
 	     inet_fragment.o ip_tunnel_core.o
 
+obj-$(CONFIG_FIB_TRIE) += fib_trie.o
+obj-$(CONFIG_FIB_LIST) += fib_list.o
 obj-$(CONFIG_NET_IP_TUNNEL) += ip_tunnel.o
 obj-$(CONFIG_IP_PING) += ping.o
 obj-$(CONFIG_SYSCTL) += sysctl_net_ipv4.o
