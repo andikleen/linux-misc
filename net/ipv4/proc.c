@@ -69,8 +69,10 @@ static int sockstat_seq_show(struct seq_file *seq, void *v)
 		   proto_memory_allocated(&udp_prot));
 	seq_printf(seq, "UDPLITE: inuse %d\n",
 		   sock_prot_inuse_get(net, &udplite_prot));
+#ifdef CONFIG_INET_RAW
 	seq_printf(seq, "RAW: inuse %d\n",
 		   sock_prot_inuse_get(net, &raw_prot));
+#endif
 	seq_printf(seq,  "FRAG: inuse %d memory %d\n",
 			ip_frag_nqueues(net), ip_frag_mem(net));
 	return 0;

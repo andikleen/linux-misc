@@ -31,8 +31,8 @@ void raw_proc_exit(void);
 #else
 static inline void raw_icmp_error(struct sk_buff *skb, int a, u32 b) {}
 static inline int raw_local_deliver(struct sk_buff *skb, int s) { return 0; }
-static int raw_proc_init(void) { return 0; }
-static void raw_proc_exit(void) {}
+static inline int raw_proc_init(void) { return 0; }
+static inline void raw_proc_exit(void) {}
 #endif
 
 int raw_rcv(struct sock *, struct sk_buff *);
