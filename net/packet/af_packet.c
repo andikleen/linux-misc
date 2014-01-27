@@ -158,6 +158,8 @@ struct packet_mreq_max {
 	unsigned char	mr_address[MAX_ADDR_LEN];
 };
 
+#ifdef CONFIG_PACKET_MMAP
+
 union tpacket_uhdr {
 	struct tpacket_hdr  *h1;
 	struct tpacket2_hdr *h2;
@@ -165,8 +167,6 @@ union tpacket_uhdr {
 	void *raw;
 };
 
-static int packet_set_ring(struct sock *sk, union tpacket_req_u *req_u,
-		int closing, int tx_ring);
 
 #define V3_ALIGNMENT	(8)
 
@@ -213,6 +213,9 @@ static void prb_clear_rxhash(struct tpacket_kbdq_core *,
 		struct tpacket3_hdr *);
 static void prb_fill_vlan_info(struct tpacket_kbdq_core *,
 		struct tpacket3_hdr *);
+
+#endif
+
 static void packet_flush_mclist(struct sock *sk);
 
 struct packet_skb_cb {
@@ -314,6 +317,8 @@ static void unregister_prot_hook(struct sock *sk, bool sync)
 	if (po->running)
 		__unregister_prot_hook(sk, sync);
 }
+
+#ifdef CONFIG_PACKET_MMAP
 
 static inline __pure struct page *pgv_to_page(void *addr)
 {
@@ -1134,6 +1139,8 @@ static bool packet_rcv_has_room(struct packet_sock *po, struct sk_buff *skb)
 	return has_room;
 }
 
+#endif
+
 static void packet_sock_destruct(struct sock *sk)
 {
 	skb_queue_purge(&sk->sk_error_queue);
@@ -1148,6 +1155,8 @@ static void packet_sock_destruct(struct sock *sk)
 
 	sk_refcnt_debug_dec(sk);
 }
+
+#ifdef CONFIG_PACKET_MMAP
 
 static int fanout_rr_next(struct packet_fanout *f, unsigned int num)
 {
@@ -1404,6 +1413,12 @@ static void fanout_release(struct sock *sk)
 	}
 	mutex_unlock(&fanout_mutex);
 }
+
+#else
+static void __fanout_unlink(struct sock *sk, struct packet_sock *po) {}
+static void __fanout_link(struct sock *sk, struct packet_sock *po) {}
+static void fanout_release(struct sock *sk) {}
+#endif
 
 static const struct proto_ops packet_ops;
 
@@ -1741,6 +1756,11 @@ drop:
 	consume_skb(skb);
 	return 0;
 }
+
+#ifdef CONFIG_PACKET_MMAP
+
+static int packet_set_ring(struct sock *sk, union tpacket_req_u *req_u,
+		int closing, int tx_ring);
 
 static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,
 		       struct packet_type *pt, struct net_device *orig_dev)
@@ -2204,6 +2224,34 @@ out:
 	return err;
 }
 
+static inline bool use_tpacket(struct packet_sock *po)
+{
+	return po->tx_ring.pg_vec;
+}
+
+static void tpacket_release(struct packet_sock *po)
+{
+	union tpacket_req_u req_u;
+	if (po->rx_ring.pg_vec) {
+		memset(&req_u, 0, sizeof(req_u));
+		packet_set_ring(sk, &req_u, 1, 0);
+	}
+
+	if (po->tx_ring.pg_vec) {
+		memset(&req_u, 0, sizeof(req_u));
+		packet_set_ring(sk, &req_u, 1, 1);
+	}
+}
+
+#else
+static inline bool use_tpacket(struct packet_sock *po) { return false; }
+static inline void tpacket_release(struct packet_sock *po) {}
+static inline int tpacket_snd(struct packet_sock *po, struct msghdr *msg) { return 0; }
+static inline int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,
+			      struct packet_type *pt, struct net_device *orig_dev)
+{ return 0; }
+#endif
+
 static struct sk_buff *packet_alloc_skb(struct sock *sk, size_t prepad,
 				        size_t reserve, size_t len,
 				        size_t linear, int noblock,
@@ -2425,7 +2473,7 @@ static int packet_sendmsg(struct kiocb *iocb, struct socket *sock,
 {
 	struct sock *sk = sock->sk;
 	struct packet_sock *po = pkt_sk(sk);
-	if (po->tx_ring.pg_vec)
+	if (use_tpacket(po))
 		return tpacket_snd(po, msg);
 	else
 		return packet_snd(sock, msg, len);
@@ -2441,7 +2489,6 @@ static int packet_release(struct socket *sock)
 	struct sock *sk = sock->sk;
 	struct packet_sock *po;
 	struct net *net;
-	union tpacket_req_u req_u;
 
 	if (!sk)
 		return 0;
@@ -2469,15 +2516,7 @@ static int packet_release(struct socket *sock)
 
 	packet_flush_mclist(sk);
 
-	if (po->rx_ring.pg_vec) {
-		memset(&req_u, 0, sizeof(req_u));
-		packet_set_ring(sk, &req_u, 1, 0);
-	}
-
-	if (po->tx_ring.pg_vec) {
-		memset(&req_u, 0, sizeof(req_u));
-		packet_set_ring(sk, &req_u, 1, 1);
-	}
+	tpacket_release(po);
 
 	fanout_release(sk);
 
@@ -3031,7 +3070,7 @@ static int
 packet_setsockopt(struct socket *sock, int level, int optname, char __user *optval, unsigned int optlen)
 {
 	struct sock *sk = sock->sk;
-	struct packet_sock *po = pkt_sk(sk);
+	struct packet_sock *po __maybe_unused = pkt_sk(sk);
 	int ret;
 
 	if (level != SOL_PACKET)
@@ -3059,6 +3098,7 @@ packet_setsockopt(struct socket *sock, int level, int optname, char __user *optv
 		return ret;
 	}
 
+#ifdef CONFIG_PACKET_MMAP
 	case PACKET_RX_RING:
 	case PACKET_TX_RING:
 	{
@@ -3142,6 +3182,7 @@ packet_setsockopt(struct socket *sock, int level, int optname, char __user *optv
 		po->tp_loss = !!val;
 		return 0;
 	}
+#endif
 	case PACKET_AUXDATA:
 	{
 		int val;
@@ -3194,6 +3235,7 @@ packet_setsockopt(struct socket *sock, int level, int optname, char __user *optv
 		po->tp_tstamp = val;
 		return 0;
 	}
+#ifdef CONFIG_PACKET_MMAP
 	case PACKET_FANOUT:
 	{
 		int val;
@@ -3218,6 +3260,7 @@ packet_setsockopt(struct socket *sock, int level, int optname, char __user *optv
 		po->tp_tx_has_off = !!val;
 		return 0;
 	}
+#endif
 	default:
 		return -ENOPROTOOPT;
 	}
@@ -3428,6 +3471,7 @@ static int packet_ioctl(struct socket *sock, unsigned int cmd,
 	return 0;
 }
 
+#ifdef CONFIG_PACKET_MMAP
 static unsigned int packet_poll(struct file *file, struct socket *sock,
 				poll_table *wait)
 {
@@ -3676,7 +3720,7 @@ static int packet_set_ring(struct sock *sk, union tpacket_req_u *req_u,
 		swap(rb->pg_vec_len, req->tp_block_nr);
 
 		rb->pg_vec_pages = req->tp_block_size/PAGE_SIZE;
-		po->prot_hook.func = (po->rx_ring.pg_vec) ?
+		po->prot_hook.func = use_tpacket(po) ?
 						tpacket_rcv : packet_rcv;
 		skb_queue_purge(rb_queue);
 		if (atomic_read(&po->mapped))
@@ -3765,6 +3809,10 @@ out:
 	mutex_unlock(&po->pg_vec_lock);
 	return err;
 }
+#else
+#define packet_mmap sock_no_mmap
+#define packet_poll datagram_poll
+#endif
 
 static const struct proto_ops packet_ops_spkt = {
 	.family =	PF_PACKET,
