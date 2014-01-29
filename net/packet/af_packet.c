@@ -2229,9 +2229,10 @@ static inline bool use_tpacket(struct packet_sock *po)
 	return po->tx_ring.pg_vec;
 }
 
-static void tpacket_release(struct packet_sock *po)
+static void tpacket_release(struct sock *sk, struct packet_sock *po)
 {
 	union tpacket_req_u req_u;
+
 	if (po->rx_ring.pg_vec) {
 		memset(&req_u, 0, sizeof(req_u));
 		packet_set_ring(sk, &req_u, 1, 0);
@@ -2245,7 +2246,7 @@ static void tpacket_release(struct packet_sock *po)
 
 #else
 static inline bool use_tpacket(struct packet_sock *po) { return false; }
-static inline void tpacket_release(struct packet_sock *po) {}
+static inline void tpacket_release(struct sock *sk, struct packet_sock *po) {}
 static inline int tpacket_snd(struct packet_sock *po, struct msghdr *msg) { return 0; }
 static inline int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,
 			      struct packet_type *pt, struct net_device *orig_dev)
@@ -2516,7 +2517,7 @@ static int packet_release(struct socket *sock)
 
 	packet_flush_mclist(sk);
 
-	tpacket_release(po);
+	tpacket_release(sk, po);
 
 	fanout_release(sk);
 
