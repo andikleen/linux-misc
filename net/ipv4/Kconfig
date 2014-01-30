@@ -63,12 +63,13 @@ config FIB_TRIE
 	  number of routes. When in doubt say y.
 
 config FIB_LIST
-        bool "Use simple list based routing table"
+        bool
+	default y
 	depends on !FIB_TRIE
 	---help---
 	  This is a very simple linear routing table implementation that is only
 	  suitable for clients with a very small number of routes (<10). The only
-	  advantage over FIB_TRIE is smaller code size. When in doubt say N.
+	  advantage over FIB_TRIE is smaller code size.
 
 config IP_FIB_TRIE_STATS
 	bool "FIB TRIE statistics"
