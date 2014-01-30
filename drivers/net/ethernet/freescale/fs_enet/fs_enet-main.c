@@ -1101,7 +1101,7 @@ static int fs_enet_probe(struct platform_device *ofdev)
 		netif_napi_add(ndev, &fep->napi, fs_enet_rx_napi,
 		               fpi->napi_weight);
 
-	ndev->ethtool_ops = &fs_ethtool_ops;
+	SET_ETHTOOL_OPS(ndev, &fs_ethtool_ops);
 
 	init_timer(&fep->phy_timer_list);
 

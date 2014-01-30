@@ -1062,7 +1062,7 @@ static int gfar_probe(struct platform_device *ofdev)
 	dev->watchdog_timeo = TX_TIMEOUT;
 	dev->mtu = 1500;
 	dev->netdev_ops = &gfar_netdev_ops;
-	dev->ethtool_ops = &gfar_ethtool_ops;
+	SET_ETHTOOL_OPS(dev, &gfar_ethtool_ops);
 
 	/* Register for napi ...We are registering NAPI for each grp */
 	if (priv->mode == SQ_SG_MODE)

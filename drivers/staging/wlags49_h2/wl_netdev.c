@@ -1246,7 +1246,7 @@ struct net_device * wl_device_alloc( void )
 
     dev->watchdog_timeo     = TX_TIMEOUT;
 
-    dev->ethtool_ops	    = &wl_ethtool_ops;
+    SET_ETHTOOL_OPS(dev, &wl_ethtool_ops);
 
     netif_stop_queue( dev );
 

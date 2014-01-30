@@ -1675,7 +1675,7 @@ static int bfin_mac_probe(struct platform_device *pdev)
 	ether_setup(ndev);
 
 	ndev->netdev_ops = &bfin_mac_netdev_ops;
-	ndev->ethtool_ops = &bfin_mac_ethtool_ops;
+	SET_ETHTOOL_OPS(ndev, &bfin_mac_ethtool_ops);
 
 	init_timer(&lp->tx_reclaim_timer);
 	lp->tx_reclaim_timer.data = (unsigned long)lp;

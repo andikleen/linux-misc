@@ -765,7 +765,7 @@ static int ax_init_dev(struct net_device *dev)
 	ei_local->priv = 0;
 
 	dev->netdev_ops = &ax_netdev_ops;
-	dev->ethtool_ops = &ax_ethtool_ops;
+	SET_ETHTOOL_OPS(dev, &ax_ethtool_ops);
 
 	ret = ax_mii_init(dev);
 	if (ret)
