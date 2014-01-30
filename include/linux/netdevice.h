@@ -58,13 +58,13 @@ struct phy_device;
 struct wireless_dev;
 
 #ifdef CONFIG_NET_ETHTOOL
-/* TBD: Fix all drivers to use this, so that without ethtool the
- * all the ethtool code can be optimized out.
- * Job for cocci?
+
+/* When the driver uses this macro ethtool code can be optimized out
+ * when not needed. We still reference it to avoid unused static
+ * warnings.
  */
-					/* source back-compat hooks */
 #define SET_ETHTOOL_OPS(netdev,ops) \
-	( (netdev)->ethtool_ops = (ops) )
+	( (void)(ops), (netdev)->ethtool_ops = (ops) )
 
 void netdev_set_default_ethtool_ops(struct net_device *dev,
 				    const struct ethtool_ops *ops);
