@@ -73,7 +73,7 @@ config FIB_LIST
 
 config IP_FIB_TRIE_STATS
 	bool "FIB TRIE statistics"
-	depends on IP_ADVANCED_ROUTER
+	depends on IP_ADVANCED_ROUTER && FIB_TRIE
 	---help---
 	  Keep track of statistics on structure of FIB TRIE table.
 	  Useful for testing and measuring TRIE performance.
