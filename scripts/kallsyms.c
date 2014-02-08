@@ -158,6 +158,11 @@ static int read_symbol(FILE *in, struct sym_entry *s)
 	/* exclude debugging symbols */
 	else if (stype == 'N')
 		return -1;
+	/* Don't include const symbols in the text section
+	 * unless --all-symbols is specified.
+	 */
+	else if (toupper(stype) != 'T' && !all_symbols)
+		return -1;
 
 	/* include the type field in the symbol name, so that it gets
 	 * compressed together */
