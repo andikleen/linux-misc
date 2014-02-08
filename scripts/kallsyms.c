@@ -122,7 +122,7 @@ static int read_symbol_tr(const char *sym, unsigned long long addr)
 static int read_symbol(FILE *in, struct sym_entry *s)
 {
 	char str[500];
-	char *sym, stype;
+	char *sym, stype, *dot;
 	int rc;
 
 	rc = fscanf(in, "%llx %c %499s\n", &s->addr, &stype, str);
@@ -137,6 +137,11 @@ static int read_symbol(FILE *in, struct sym_entry *s)
 			str, strlen(str), KSYM_NAME_LEN);
 		return -1;
 	}
+
+	/* Drop static .XXXX postfixes */
+	dot = strchr(str, '.');
+	if (dot)
+		*dot = 0;
 
 	sym = str;
 	/* skip prefix char */
