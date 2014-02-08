@@ -144,6 +144,13 @@ static bool is_ignored_symbol(const char *name, char type)
 	if (type == 'N' || type == 'n')
 		return true;
 
+	/* Don't include const symbols in the text section
+	 * unless --all-symbols is specified.
+	 */
+	if (toupper(stype) != 'T' && !all_symbols)
+		return true;
+
+
 	if (toupper(type) == 'A') {
 		/* Keep these useful absolute symbols */
 		if (strcmp(name, "__kernel_syscall_via_break") &&
