@@ -90,10 +90,28 @@ kallsyms()
 	local aflags="${KBUILD_AFLAGS} ${KBUILD_AFLAGS_KERNEL}               \
 		      ${NOSTDINC_FLAGS} ${LINUXINCLUDE} ${KBUILD_CPPFLAGS}"
 
-	${NM} -n ${1} | \
-		awk 'NF == 3 { print}' |
-		scripts/kallsyms ${kallsymopt} | \
+	# workaround for slim LTO gcc-nm not outputing static symbols
+	# http://gcc.gnu.org/PR60016
+	# generate a fake symbol table based on the LTO function sections.
+	# This unfortunately "knows" about the internal LTO file format
+	# and only works for functions
+	# needs perl for now when building for LTO
+	(
+	if $OBJDUMP --section-headers ${1} | grep -q \.gnu\.lto_ ; then
+		${OBJDUMP} --section-headers ${1} |
+		perl -ne '
+@n = split;
+next unless $n[1] =~ /\.gnu\.lto_([_a-zA-Z][^.]+)/;
+next if $n[1] eq $prev;
+$prev = $n[1];
+print "0 T ",$1,"\n"'
+	fi
+	${NM} -n ${1} | awk 'NF == 3 { print }'
+	)  > ${2}_sym
+	# run without pipe to make kallsyms errors stop the script
+	./scripts/kallsyms ${kallsymopt} < ${2}_sym |
 		${CC} ${aflags} -c -o ${2} -x assembler-with-cpp -
+
 }
 
 # Create map file with all symbols from ${1}
