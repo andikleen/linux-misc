@@ -31,10 +31,10 @@ struct salsa20_ctx
 	u32 input[16];
 };
 
-asmlinkage void salsa20_keysetup(struct salsa20_ctx *ctx, const u8 *k,
+asmlinkage __visible void salsa20_keysetup(struct salsa20_ctx *ctx, const u8 *k,
 				 u32 keysize, u32 ivsize);
-asmlinkage void salsa20_ivsetup(struct salsa20_ctx *ctx, const u8 *iv);
-asmlinkage void salsa20_encrypt_bytes(struct salsa20_ctx *ctx,
+asmlinkage __visible void salsa20_ivsetup(struct salsa20_ctx *ctx, const u8 *iv);
+asmlinkage __visible void salsa20_encrypt_bytes(struct salsa20_ctx *ctx,
 				      const u8 *src, u8 *dst, u32 bytes);
 
 static int setkey(struct crypto_tfm *tfm, const u8 *key,

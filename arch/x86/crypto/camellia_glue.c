@@ -36,18 +36,18 @@
 #include <asm/crypto/glue_helper.h>
 
 /* regular block cipher functions */
-asmlinkage void __camellia_enc_blk(struct camellia_ctx *ctx, u8 *dst,
+asmlinkage __visible void __camellia_enc_blk(struct camellia_ctx *ctx, u8 *dst,
 				   const u8 *src, bool xor);
 EXPORT_SYMBOL_GPL(__camellia_enc_blk);
-asmlinkage void camellia_dec_blk(struct camellia_ctx *ctx, u8 *dst,
+asmlinkage __visible void camellia_dec_blk(struct camellia_ctx *ctx, u8 *dst,
 				 const u8 *src);
 EXPORT_SYMBOL_GPL(camellia_dec_blk);
 
 /* 2-way parallel cipher functions */
-asmlinkage void __camellia_enc_blk_2way(struct camellia_ctx *ctx, u8 *dst,
+asmlinkage __visible void __camellia_enc_blk_2way(struct camellia_ctx *ctx, u8 *dst,
 					const u8 *src, bool xor);
 EXPORT_SYMBOL_GPL(__camellia_enc_blk_2way);
-asmlinkage void camellia_dec_blk_2way(struct camellia_ctx *ctx, u8 *dst,
+asmlinkage __visible void camellia_dec_blk_2way(struct camellia_ctx *ctx, u8 *dst,
 				      const u8 *src);
 EXPORT_SYMBOL_GPL(camellia_dec_blk_2way);
 

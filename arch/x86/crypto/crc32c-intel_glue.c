@@ -56,7 +56,7 @@
 #define CRC32C_PCL_BREAKEVEN_EAGERFPU	512
 #define CRC32C_PCL_BREAKEVEN_NOEAGERFPU	1024
 
-asmlinkage unsigned int crc_pcl(const u8 *buffer, int len,
+asmlinkage __visible unsigned int crc_pcl(const u8 *buffer, int len,
 				unsigned int crc_init);
 static int crc32c_pcl_breakeven = CRC32C_PCL_BREAKEVEN_EAGERFPU;
 #if defined(X86_FEATURE_EAGER_FPU)

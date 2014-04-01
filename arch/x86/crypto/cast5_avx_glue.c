@@ -37,13 +37,13 @@
 
 #define CAST5_PARALLEL_BLOCKS 16
 
-asmlinkage void cast5_ecb_enc_16way(struct cast5_ctx *ctx, u8 *dst,
+asmlinkage __visible void cast5_ecb_enc_16way(struct cast5_ctx *ctx, u8 *dst,
 				    const u8 *src);
-asmlinkage void cast5_ecb_dec_16way(struct cast5_ctx *ctx, u8 *dst,
+asmlinkage __visible void cast5_ecb_dec_16way(struct cast5_ctx *ctx, u8 *dst,
 				    const u8 *src);
-asmlinkage void cast5_cbc_dec_16way(struct cast5_ctx *ctx, u8 *dst,
+asmlinkage __visible void cast5_cbc_dec_16way(struct cast5_ctx *ctx, u8 *dst,
 				    const u8 *src);
-asmlinkage void cast5_ctr_16way(struct cast5_ctx *ctx, u8 *dst, const u8 *src,
+asmlinkage __visible void cast5_ctr_16way(struct cast5_ctx *ctx, u8 *dst, const u8 *src,
 				__be64 *iv);
 
 static inline bool cast5_fpu_begin(bool fpu_enabled, unsigned int nbytes)

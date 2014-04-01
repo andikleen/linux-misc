@@ -17,15 +17,15 @@ struct twofish_xts_ctx {
 };
 
 /* regular block cipher functions from twofish_x86_64 module */
-asmlinkage void twofish_enc_blk(struct twofish_ctx *ctx, u8 *dst,
+asmlinkage __visible void twofish_enc_blk(struct twofish_ctx *ctx, u8 *dst,
 				const u8 *src);
-asmlinkage void twofish_dec_blk(struct twofish_ctx *ctx, u8 *dst,
+asmlinkage __visible void twofish_dec_blk(struct twofish_ctx *ctx, u8 *dst,
 				const u8 *src);
 
 /* 3-way parallel cipher functions */
-asmlinkage void __twofish_enc_blk_3way(struct twofish_ctx *ctx, u8 *dst,
+asmlinkage __visible void __twofish_enc_blk_3way(struct twofish_ctx *ctx, u8 *dst,
 				       const u8 *src, bool xor);
-asmlinkage void twofish_dec_blk_3way(struct twofish_ctx *ctx, u8 *dst,
+asmlinkage __visible void twofish_dec_blk_3way(struct twofish_ctx *ctx, u8 *dst,
 				     const u8 *src);
 
 /* helpers from twofish_x86_64-3way module */

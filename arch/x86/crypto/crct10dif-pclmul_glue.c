@@ -33,7 +33,7 @@
 #include <asm/cpufeature.h>
 #include <asm/cpu_device_id.h>
 
-asmlinkage __u16 crc_t10dif_pcl(__u16 crc, const unsigned char *buf,
+asmlinkage __visible __u16 crc_t10dif_pcl(__u16 crc, const unsigned char *buf,
 				size_t len);
 
 struct chksum_desc_ctx {

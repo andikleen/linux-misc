@@ -28,17 +28,17 @@
 #define SERPENT_AVX2_PARALLEL_BLOCKS 16
 
 /* 16-way AVX2 parallel cipher functions */
-asmlinkage void serpent_ecb_enc_16way(struct serpent_ctx *ctx, u8 *dst,
+asmlinkage __visible void serpent_ecb_enc_16way(struct serpent_ctx *ctx, u8 *dst,
 				      const u8 *src);
-asmlinkage void serpent_ecb_dec_16way(struct serpent_ctx *ctx, u8 *dst,
+asmlinkage __visible void serpent_ecb_dec_16way(struct serpent_ctx *ctx, u8 *dst,
 				      const u8 *src);
-asmlinkage void serpent_cbc_dec_16way(void *ctx, u128 *dst, const u128 *src);
+asmlinkage __visible void serpent_cbc_dec_16way(void *ctx, u128 *dst, const u128 *src);
 
-asmlinkage void serpent_ctr_16way(void *ctx, u128 *dst, const u128 *src,
+asmlinkage __visible void serpent_ctr_16way(void *ctx, u128 *dst, const u128 *src,
 				  le128 *iv);
-asmlinkage void serpent_xts_enc_16way(struct serpent_ctx *ctx, u8 *dst,
+asmlinkage __visible void serpent_xts_enc_16way(struct serpent_ctx *ctx, u8 *dst,
 				      const u8 *src, le128 *iv);
-asmlinkage void serpent_xts_dec_16way(struct serpent_ctx *ctx, u8 *dst,
+asmlinkage __visible void serpent_xts_dec_16way(struct serpent_ctx *ctx, u8 *dst,
 				      const u8 *src, le128 *iv);
 
 static const struct common_glue_ctx serpent_enc = {

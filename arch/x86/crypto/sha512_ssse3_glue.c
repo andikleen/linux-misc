@@ -41,14 +41,14 @@
 
 #include <linux/string.h>
 
-asmlinkage void sha512_transform_ssse3(const char *data, u64 *digest,
+asmlinkage __visible void sha512_transform_ssse3(const char *data, u64 *digest,
 				     u64 rounds);
 #ifdef CONFIG_AS_AVX
-asmlinkage void sha512_transform_avx(const char *data, u64 *digest,
+asmlinkage __visible void sha512_transform_avx(const char *data, u64 *digest,
 				     u64 rounds);
 #endif
 #ifdef CONFIG_AS_AVX2
-asmlinkage void sha512_transform_rorx(const char *data, u64 *digest,
+asmlinkage __visible void sha512_transform_rorx(const char *data, u64 *digest,
 				     u64 rounds);
 #endif
 

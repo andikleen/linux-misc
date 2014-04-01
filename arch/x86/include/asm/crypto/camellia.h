@@ -37,31 +37,31 @@ extern int xts_camellia_setkey(struct crypto_tfm *tfm, const u8 *key,
 			       unsigned int keylen);
 
 /* regular block cipher functions */
-asmlinkage void __camellia_enc_blk(struct camellia_ctx *ctx, u8 *dst,
+asmlinkage __visible void __camellia_enc_blk(struct camellia_ctx *ctx, u8 *dst,
 				   const u8 *src, bool xor);
-asmlinkage void camellia_dec_blk(struct camellia_ctx *ctx, u8 *dst,
+asmlinkage __visible void camellia_dec_blk(struct camellia_ctx *ctx, u8 *dst,
 				 const u8 *src);
 
 /* 2-way parallel cipher functions */
-asmlinkage void __camellia_enc_blk_2way(struct camellia_ctx *ctx, u8 *dst,
+asmlinkage __visible void __camellia_enc_blk_2way(struct camellia_ctx *ctx, u8 *dst,
 					const u8 *src, bool xor);
-asmlinkage void camellia_dec_blk_2way(struct camellia_ctx *ctx, u8 *dst,
+asmlinkage __visible void camellia_dec_blk_2way(struct camellia_ctx *ctx, u8 *dst,
 				      const u8 *src);
 
 /* 16-way parallel cipher functions (avx/aes-ni) */
-asmlinkage void camellia_ecb_enc_16way(struct camellia_ctx *ctx, u8 *dst,
+asmlinkage __visible void camellia_ecb_enc_16way(struct camellia_ctx *ctx, u8 *dst,
 				       const u8 *src);
-asmlinkage void camellia_ecb_dec_16way(struct camellia_ctx *ctx, u8 *dst,
+asmlinkage __visible void camellia_ecb_dec_16way(struct camellia_ctx *ctx, u8 *dst,
 				       const u8 *src);
 
-asmlinkage void camellia_cbc_dec_16way(struct camellia_ctx *ctx, u8 *dst,
+asmlinkage __visible void camellia_cbc_dec_16way(struct camellia_ctx *ctx, u8 *dst,
 				       const u8 *src);
-asmlinkage void camellia_ctr_16way(struct camellia_ctx *ctx, u8 *dst,
+asmlinkage __visible void camellia_ctr_16way(struct camellia_ctx *ctx, u8 *dst,
 				   const u8 *src, le128 *iv);
 
-asmlinkage void camellia_xts_enc_16way(struct camellia_ctx *ctx, u8 *dst,
+asmlinkage __visible void camellia_xts_enc_16way(struct camellia_ctx *ctx, u8 *dst,
 				       const u8 *src, le128 *iv);
-asmlinkage void camellia_xts_dec_16way(struct camellia_ctx *ctx, u8 *dst,
+asmlinkage __visible void camellia_xts_dec_16way(struct camellia_ctx *ctx, u8 *dst,
 				       const u8 *src, le128 *iv);
 
 static inline void camellia_enc_blk(struct camellia_ctx *ctx, u8 *dst,

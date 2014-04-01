@@ -44,10 +44,10 @@
 #include <linux/module.h>
 #include <linux/types.h>
 
-asmlinkage void twofish_enc_blk(struct twofish_ctx *ctx, u8 *dst,
+asmlinkage __visible void twofish_enc_blk(struct twofish_ctx *ctx, u8 *dst,
 				const u8 *src);
 EXPORT_SYMBOL_GPL(twofish_enc_blk);
-asmlinkage void twofish_dec_blk(struct twofish_ctx *ctx, u8 *dst,
+asmlinkage __visible void twofish_dec_blk(struct twofish_ctx *ctx, u8 *dst,
 				const u8 *src);
 EXPORT_SYMBOL_GPL(twofish_dec_blk);
 

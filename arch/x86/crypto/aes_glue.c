@@ -7,8 +7,8 @@
 #include <crypto/aes.h>
 #include <asm/crypto/aes.h>
 
-asmlinkage void aes_enc_blk(struct crypto_aes_ctx *ctx, u8 *out, const u8 *in);
-asmlinkage void aes_dec_blk(struct crypto_aes_ctx *ctx, u8 *out, const u8 *in);
+asmlinkage __visible void aes_enc_blk(struct crypto_aes_ctx *ctx, u8 *out, const u8 *in);
+asmlinkage __visible void aes_dec_blk(struct crypto_aes_ctx *ctx, u8 *out, const u8 *in);
 
 void crypto_aes_encrypt_x86(struct crypto_aes_ctx *ctx, u8 *dst, const u8 *src)
 {

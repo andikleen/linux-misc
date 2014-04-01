@@ -42,14 +42,14 @@
 #include <asm/xsave.h>
 #include <linux/string.h>
 
-asmlinkage void sha256_transform_ssse3(const char *data, u32 *digest,
+asmlinkage __visible void sha256_transform_ssse3(const char *data, u32 *digest,
 				     u64 rounds);
 #ifdef CONFIG_AS_AVX
-asmlinkage void sha256_transform_avx(const char *data, u32 *digest,
+asmlinkage __visible void sha256_transform_avx(const char *data, u32 *digest,
 				     u64 rounds);
 #endif
 #ifdef CONFIG_AS_AVX2
-asmlinkage void sha256_transform_rorx(const char *data, u32 *digest,
+asmlinkage __visible void sha256_transform_rorx(const char *data, u32 *digest,
 				     u64 rounds);
 #endif
 

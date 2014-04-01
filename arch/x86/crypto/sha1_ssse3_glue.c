@@ -33,10 +33,10 @@
 #include <asm/xsave.h>
 
 
-asmlinkage void sha1_transform_ssse3(u32 *digest, const char *data,
+asmlinkage __visible void sha1_transform_ssse3(u32 *digest, const char *data,
 				     unsigned int rounds);
 #ifdef CONFIG_AS_AVX
-asmlinkage void sha1_transform_avx(u32 *digest, const char *data,
+asmlinkage __visible void sha1_transform_avx(u32 *digest, const char *data,
 				   unsigned int rounds);
 #endif
 

@@ -28,19 +28,19 @@
 #define CAMELLIA_AESNI_AVX2_PARALLEL_BLOCKS 32
 
 /* 32-way AVX2/AES-NI parallel cipher functions */
-asmlinkage void camellia_ecb_enc_32way(struct camellia_ctx *ctx, u8 *dst,
+asmlinkage __visible void camellia_ecb_enc_32way(struct camellia_ctx *ctx, u8 *dst,
 				       const u8 *src);
-asmlinkage void camellia_ecb_dec_32way(struct camellia_ctx *ctx, u8 *dst,
+asmlinkage __visible void camellia_ecb_dec_32way(struct camellia_ctx *ctx, u8 *dst,
 				       const u8 *src);
 
-asmlinkage void camellia_cbc_dec_32way(struct camellia_ctx *ctx, u8 *dst,
+asmlinkage __visible void camellia_cbc_dec_32way(struct camellia_ctx *ctx, u8 *dst,
 				       const u8 *src);
-asmlinkage void camellia_ctr_32way(struct camellia_ctx *ctx, u8 *dst,
+asmlinkage __visible void camellia_ctr_32way(struct camellia_ctx *ctx, u8 *dst,
 				   const u8 *src, le128 *iv);
 
-asmlinkage void camellia_xts_enc_32way(struct camellia_ctx *ctx, u8 *dst,
+asmlinkage __visible void camellia_xts_enc_32way(struct camellia_ctx *ctx, u8 *dst,
 				       const u8 *src, le128 *iv);
-asmlinkage void camellia_xts_dec_32way(struct camellia_ctx *ctx, u8 *dst,
+asmlinkage __visible void camellia_xts_dec_32way(struct camellia_ctx *ctx, u8 *dst,
 				       const u8 *src, le128 *iv);
 
 static const struct common_glue_ctx camellia_enc = {

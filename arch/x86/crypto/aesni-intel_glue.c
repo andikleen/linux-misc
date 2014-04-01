@@ -83,19 +83,19 @@ struct aesni_xts_ctx {
 	u8 raw_crypt_ctx[sizeof(struct crypto_aes_ctx) + AESNI_ALIGN - 1];
 };
 
-asmlinkage int aesni_set_key(struct crypto_aes_ctx *ctx, const u8 *in_key,
+asmlinkage __visible int aesni_set_key(struct crypto_aes_ctx *ctx, const u8 *in_key,
 			     unsigned int key_len);
-asmlinkage void aesni_enc(struct crypto_aes_ctx *ctx, u8 *out,
+asmlinkage __visible void aesni_enc(struct crypto_aes_ctx *ctx, u8 *out,
 			  const u8 *in);
-asmlinkage void aesni_dec(struct crypto_aes_ctx *ctx, u8 *out,
+asmlinkage __visible void aesni_dec(struct crypto_aes_ctx *ctx, u8 *out,
 			  const u8 *in);
-asmlinkage void aesni_ecb_enc(struct crypto_aes_ctx *ctx, u8 *out,
+asmlinkage __visible void aesni_ecb_enc(struct crypto_aes_ctx *ctx, u8 *out,
 			      const u8 *in, unsigned int len);
-asmlinkage void aesni_ecb_dec(struct crypto_aes_ctx *ctx, u8 *out,
+asmlinkage __visible void aesni_ecb_dec(struct crypto_aes_ctx *ctx, u8 *out,
 			      const u8 *in, unsigned int len);
-asmlinkage void aesni_cbc_enc(struct crypto_aes_ctx *ctx, u8 *out,
+asmlinkage __visible void aesni_cbc_enc(struct crypto_aes_ctx *ctx, u8 *out,
 			      const u8 *in, unsigned int len, u8 *iv);
-asmlinkage void aesni_cbc_dec(struct crypto_aes_ctx *ctx, u8 *out,
+asmlinkage __visible void aesni_cbc_dec(struct crypto_aes_ctx *ctx, u8 *out,
 			      const u8 *in, unsigned int len, u8 *iv);
 
 int crypto_fpu_init(void);
@@ -105,10 +105,10 @@ void crypto_fpu_exit(void);
 #define AVX_GEN4_OPTSIZE 4096
 
 #ifdef CONFIG_X86_64
-asmlinkage void aesni_ctr_enc(struct crypto_aes_ctx *ctx, u8 *out,
+asmlinkage __visible void aesni_ctr_enc(struct crypto_aes_ctx *ctx, u8 *out,
 			      const u8 *in, unsigned int len, u8 *iv);
 
-asmlinkage void aesni_xts_crypt8(struct crypto_aes_ctx *ctx, u8 *out,
+asmlinkage __visible void aesni_xts_crypt8(struct crypto_aes_ctx *ctx, u8 *out,
 				 const u8 *in, bool enc, u8 *iv);
 
 /* asmlinkage void aesni_gcm_enc()
@@ -127,7 +127,7 @@ asmlinkage void aesni_xts_crypt8(struct crypto_aes_ctx *ctx, u8 *out,
  * unsigned long auth_tag_len), Authenticated Tag Length in bytes.
  *          Valid values are 16 (most likely), 12 or 8.
  */
-asmlinkage void aesni_gcm_enc(void *ctx, u8 *out,
+asmlinkage __visible void aesni_gcm_enc(void *ctx, u8 *out,
 			const u8 *in, unsigned long plaintext_len, u8 *iv,
 			u8 *hash_subkey, const u8 *aad, unsigned long aad_len,
 			u8 *auth_tag, unsigned long auth_tag_len);
@@ -148,7 +148,7 @@ asmlinkage void aesni_gcm_enc(void *ctx, u8 *out,
  * unsigned long auth_tag_len) Authenticated Tag Length in bytes.
  * Valid values are 16 (most likely), 12 or 8.
  */
-asmlinkage void aesni_gcm_dec(void *ctx, u8 *out,
+asmlinkage __visible void aesni_gcm_dec(void *ctx, u8 *out,
 			const u8 *in, unsigned long ciphertext_len, u8 *iv,
 			u8 *hash_subkey, const u8 *aad, unsigned long aad_len,
 			u8 *auth_tag, unsigned long auth_tag_len);
@@ -160,14 +160,14 @@ asmlinkage void aesni_gcm_dec(void *ctx, u8 *out,
  * gcm_data *my_ctx_data, context data
  * u8 *hash_subkey,  the Hash sub key input. Data starts on a 16-byte boundary.
  */
-asmlinkage void aesni_gcm_precomp_avx_gen2(void *my_ctx_data, u8 *hash_subkey);
+asmlinkage __visible void aesni_gcm_precomp_avx_gen2(void *my_ctx_data, u8 *hash_subkey);
 
-asmlinkage void aesni_gcm_enc_avx_gen2(void *ctx, u8 *out,
+asmlinkage __visible void aesni_gcm_enc_avx_gen2(void *ctx, u8 *out,
 			const u8 *in, unsigned long plaintext_len, u8 *iv,
 			const u8 *aad, unsigned long aad_len,
 			u8 *auth_tag, unsigned long auth_tag_len);
 
-asmlinkage void aesni_gcm_dec_avx_gen2(void *ctx, u8 *out,
+asmlinkage __visible void aesni_gcm_dec_avx_gen2(void *ctx, u8 *out,
 			const u8 *in, unsigned long ciphertext_len, u8 *iv,
 			const u8 *aad, unsigned long aad_len,
 			u8 *auth_tag, unsigned long auth_tag_len);
@@ -209,14 +209,14 @@ static void aesni_gcm_dec_avx(void *ctx, u8 *out,
  * gcm_data *my_ctx_data, context data
  * u8 *hash_subkey,  the Hash sub key input. Data starts on a 16-byte boundary.
  */
-asmlinkage void aesni_gcm_precomp_avx_gen4(void *my_ctx_data, u8 *hash_subkey);
+asmlinkage __visible void aesni_gcm_precomp_avx_gen4(void *my_ctx_data, u8 *hash_subkey);
 
-asmlinkage void aesni_gcm_enc_avx_gen4(void *ctx, u8 *out,
+asmlinkage __visible void aesni_gcm_enc_avx_gen4(void *ctx, u8 *out,
 			const u8 *in, unsigned long plaintext_len, u8 *iv,
 			const u8 *aad, unsigned long aad_len,
 			u8 *auth_tag, unsigned long auth_tag_len);
 
-asmlinkage void aesni_gcm_dec_avx_gen4(void *ctx, u8 *out,
+asmlinkage __visible void aesni_gcm_dec_avx_gen4(void *ctx, u8 *out,
 			const u8 *in, unsigned long ciphertext_len, u8 *iv,
 			const u8 *aad, unsigned long aad_len,
 			u8 *auth_tag, unsigned long auth_tag_len);

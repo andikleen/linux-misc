@@ -42,27 +42,27 @@
 #include <asm/crypto/glue_helper.h>
 
 /* 8-way parallel cipher functions */
-asmlinkage void serpent_ecb_enc_8way_avx(struct serpent_ctx *ctx, u8 *dst,
+asmlinkage __visible void serpent_ecb_enc_8way_avx(struct serpent_ctx *ctx, u8 *dst,
 					 const u8 *src);
 EXPORT_SYMBOL_GPL(serpent_ecb_enc_8way_avx);
 
-asmlinkage void serpent_ecb_dec_8way_avx(struct serpent_ctx *ctx, u8 *dst,
+asmlinkage __visible void serpent_ecb_dec_8way_avx(struct serpent_ctx *ctx, u8 *dst,
 					 const u8 *src);
 EXPORT_SYMBOL_GPL(serpent_ecb_dec_8way_avx);
 
-asmlinkage void serpent_cbc_dec_8way_avx(struct serpent_ctx *ctx, u8 *dst,
+asmlinkage __visible void serpent_cbc_dec_8way_avx(struct serpent_ctx *ctx, u8 *dst,
 					 const u8 *src);
 EXPORT_SYMBOL_GPL(serpent_cbc_dec_8way_avx);
 
-asmlinkage void serpent_ctr_8way_avx(struct serpent_ctx *ctx, u8 *dst,
+asmlinkage __visible void serpent_ctr_8way_avx(struct serpent_ctx *ctx, u8 *dst,
 				     const u8 *src, le128 *iv);
 EXPORT_SYMBOL_GPL(serpent_ctr_8way_avx);
 
-asmlinkage void serpent_xts_enc_8way_avx(struct serpent_ctx *ctx, u8 *dst,
+asmlinkage __visible void serpent_xts_enc_8way_avx(struct serpent_ctx *ctx, u8 *dst,
 					 const u8 *src, le128 *iv);
 EXPORT_SYMBOL_GPL(serpent_xts_enc_8way_avx);
 
-asmlinkage void serpent_xts_dec_8way_avx(struct serpent_ctx *ctx, u8 *dst,
+asmlinkage __visible void serpent_xts_dec_8way_avx(struct serpent_ctx *ctx, u8 *dst,
 					 const u8 *src, le128 *iv);
 EXPORT_SYMBOL_GPL(serpent_xts_dec_8way_avx);
 
