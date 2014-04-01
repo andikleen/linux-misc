@@ -8,37 +8,37 @@
 
 #define dotraplinkage __visible
 
-asmlinkage void divide_error(void);
-asmlinkage void debug(void);
-asmlinkage void nmi(void);
-asmlinkage void int3(void);
-asmlinkage void xen_debug(void);
-asmlinkage void xen_int3(void);
-asmlinkage void xen_stack_segment(void);
-asmlinkage void overflow(void);
-asmlinkage void bounds(void);
-asmlinkage void invalid_op(void);
-asmlinkage void device_not_available(void);
+asmlinkage __visible void divide_error(void);
+asmlinkage __visible void debug(void);
+asmlinkage __visible void nmi(void);
+asmlinkage __visible void int3(void);
+asmlinkage __visible void xen_debug(void);
+asmlinkage __visible void xen_int3(void);
+asmlinkage __visible void xen_stack_segment(void);
+asmlinkage __visible void overflow(void);
+asmlinkage __visible void bounds(void);
+asmlinkage __visible void invalid_op(void);
+asmlinkage __visible void device_not_available(void);
 #ifdef CONFIG_X86_64
-asmlinkage void double_fault(void);
+asmlinkage __visible void double_fault(void);
 #endif
-asmlinkage void coprocessor_segment_overrun(void);
-asmlinkage void invalid_TSS(void);
-asmlinkage void segment_not_present(void);
-asmlinkage void stack_segment(void);
-asmlinkage void general_protection(void);
-asmlinkage void page_fault(void);
-asmlinkage void async_page_fault(void);
-asmlinkage void spurious_interrupt_bug(void);
-asmlinkage void coprocessor_error(void);
-asmlinkage void alignment_check(void);
+asmlinkage __visible void coprocessor_segment_overrun(void);
+asmlinkage __visible void invalid_TSS(void);
+asmlinkage __visible void segment_not_present(void);
+asmlinkage __visible void stack_segment(void);
+asmlinkage __visible void general_protection(void);
+asmlinkage __visible void page_fault(void);
+asmlinkage __visible void async_page_fault(void);
+asmlinkage __visible void spurious_interrupt_bug(void);
+asmlinkage __visible void coprocessor_error(void);
+asmlinkage __visible void alignment_check(void);
 #ifdef CONFIG_X86_MCE
-asmlinkage void machine_check(void);
+asmlinkage __visible void machine_check(void);
 #endif /* CONFIG_X86_MCE */
-asmlinkage void simd_coprocessor_error(void);
+asmlinkage __visible void simd_coprocessor_error(void);
 
 #ifdef CONFIG_TRACING
-asmlinkage void trace_page_fault(void);
+asmlinkage __visible void trace_page_fault(void);
 #define trace_divide_error divide_error
 #define trace_bounds bounds
 #define trace_invalid_op invalid_op
@@ -68,7 +68,7 @@ dotraplinkage void do_segment_not_present(struct pt_regs *, long);
 dotraplinkage void do_stack_segment(struct pt_regs *, long);
 #ifdef CONFIG_X86_64
 dotraplinkage void do_double_fault(struct pt_regs *, long);
-asmlinkage __kprobes struct pt_regs *sync_regs(struct pt_regs *);
+asmlinkage __visible __kprobes struct pt_regs *sync_regs(struct pt_regs *);
 #endif
 dotraplinkage void do_general_protection(struct pt_regs *, long);
 dotraplinkage void do_page_fault(struct pt_regs *, unsigned long);
@@ -101,8 +101,8 @@ extern int panic_on_unrecovered_nmi;
 void math_error(struct pt_regs *, int, int);
 void math_emulate(struct math_emu_info *);
 #ifndef CONFIG_X86_32
-asmlinkage void smp_thermal_interrupt(void);
-asmlinkage void mce_threshold_interrupt(void);
+asmlinkage __visible void smp_thermal_interrupt(void);
+asmlinkage __visible void mce_threshold_interrupt(void);
 #endif
 
 /* Interrupts/Exceptions */

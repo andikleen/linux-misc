@@ -1009,7 +1009,7 @@ enum {
  * reboot turns off virtualization while processes are running.
  * Trap the fault and ignore the instruction if that happens.
  */
-asmlinkage void kvm_spurious_fault(void);
+asmlinkage __visible void kvm_spurious_fault(void);
 
 #define ____kvm_handle_fault_on_reboot(insn, cleanup_insn)	\
 	"666: " insn "\n\t" \

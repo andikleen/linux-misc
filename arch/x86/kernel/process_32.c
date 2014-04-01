@@ -55,8 +55,8 @@
 #include <asm/debugreg.h>
 #include <asm/switch_to.h>
 
-asmlinkage void ret_from_fork(void) __asm__("ret_from_fork");
-asmlinkage void ret_from_kernel_thread(void) __asm__("ret_from_kernel_thread");
+asmlinkage __visible void ret_from_fork(void) __asm__("ret_from_fork");
+asmlinkage __visible void ret_from_kernel_thread(void) __asm__("ret_from_kernel_thread");
 
 /*
  * Return saved PC of a blocked thread.
