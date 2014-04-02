@@ -171,18 +171,18 @@ extern atomic_t irq_mis_count;
 extern void eisa_set_level_irq(unsigned int irq);
 
 /* SMP */
-extern __visible void smp_apic_timer_interrupt(struct pt_regs *);
-extern __visible void smp_spurious_interrupt(struct pt_regs *);
-extern __visible void smp_x86_platform_ipi(struct pt_regs *);
-extern __visible void smp_error_interrupt(struct pt_regs *);
+extern void smp_apic_timer_interrupt(struct pt_regs *);
+extern void smp_spurious_interrupt(struct pt_regs *);
+extern void smp_x86_platform_ipi(struct pt_regs *);
+extern void smp_error_interrupt(struct pt_regs *);
 #ifdef CONFIG_X86_IO_APIC
 extern asmlinkage void smp_irq_move_cleanup_interrupt(void);
 #endif
 #ifdef CONFIG_SMP
-extern __visible void smp_reschedule_interrupt(struct pt_regs *);
-extern __visible void smp_call_function_interrupt(struct pt_regs *);
-extern __visible void smp_call_function_single_interrupt(struct pt_regs *);
-extern __visible void smp_invalidate_interrupt(struct pt_regs *);
+extern void smp_reschedule_interrupt(struct pt_regs *);
+extern void smp_call_function_interrupt(struct pt_regs *);
+extern void smp_call_function_single_interrupt(struct pt_regs *);
+extern void smp_invalidate_interrupt(struct pt_regs *);
 #endif
 
 extern void (*__initconst interrupt[NR_VECTORS-FIRST_EXTERNAL_VECTOR])(void);
