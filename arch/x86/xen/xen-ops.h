@@ -109,8 +109,8 @@ static inline void __init xen_init_apic(void)
    inlineable */
 #define DECL_ASM(ret, name, ...)		\
 	__visible ret name(__VA_ARGS__);	\
-	extern char name##_end[] __visible;	\
-	extern char name##_reloc[] __visible
+	extern char name##_end[];	\
+	extern char name##_reloc[]
 
 DECL_ASM(void, xen_irq_enable_direct, void);
 DECL_ASM(void, xen_irq_disable_direct, void);

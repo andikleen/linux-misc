@@ -43,7 +43,7 @@ extern struct module __this_module;
 /* Mark the CRC weak since genksyms apparently decides not to
  * generate a checksums for some symbols */
 #define __CRC_SYMBOL(sym, sec)					\
-	extern __visible void *__crc_##sym __attribute__((weak));		\
+	extern void *__crc_##sym __attribute__((weak));		\
 	static const unsigned long __kcrctab_##sym		\
 	__used							\
 	__attribute__((section("___kcrctab" sec "+" #sym), unused))	\
