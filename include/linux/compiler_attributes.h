@@ -259,4 +259,10 @@
  */
 #define __weak                          __attribute__((__weak__))
 
+#if __GNUC__ >= 5
+#define __noreorder			__attribute__((noreorder))
+#else
+#define __noreorder
+#endif
+
 #endif /* __LINUX_COMPILER_ATTRIBUTES_H */
