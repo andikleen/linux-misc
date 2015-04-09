@@ -1001,6 +1001,7 @@ config LOCKDEP
 	select STACKTRACE
 	select FRAME_POINTER if !MIPS && !PPC && !ARM_UNWIND && !S390 && !MICROBLAZE && !ARC && !SCORE
 	select KALLSYMS
+	select KALLSYMS_ALL
 
 config LOCK_STAT
 	bool "Lock usage statistics"
