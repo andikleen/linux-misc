@@ -333,11 +333,6 @@ static int expand_symbol(unsigned char *data, int len, char *result)
 	return total;
 }
 
-static int symbol_absolute(struct sym_entry *s)
-{
-	return toupper(s->sym[0]) == 'A';
-}
-
 static void bad_padding(char *msg, int diff)
 {
 	fprintf(stderr, "kallsyms: %s padding too short: %d missing\n",
@@ -375,16 +370,7 @@ static void write_src(int *pad, int *opad)
 	 */
 	output_label("kallsyms_offsets");
 	for (i = 0; i < table_cnt; i++) {
-		if (!symbol_absolute(&table[i])) {
-			if (_text <= table[i].addr)
-				printf("\tPTR\t_text + %#llx\n",
-					table[i].addr - _text);
-			else
-				printf("\tPTR\t_text - %#llx\n",
-					_text - table[i].addr);
-		} else {
-			printf("\tPTR\t%#llx\n", table[i].addr - _text);
-		}
+		printf("\tPTR\t%#llx\n", table[i].addr - _text);
 	}
 	if (pad) {
 		if (i > pad[PAD_OFF])
