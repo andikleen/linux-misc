@@ -36,6 +36,30 @@ ifneq ($(call ld-ifversion,-ge,22710001,y),y)
     $(warning "WARNING: You need Linux binutils. CONFIG_LTO disabled.")
 endif
 
+# Check for options that need specific compiler versions
+
+# needs -mrecord-mcount support
+ifeq (${CONFIG_FUNCTION_TRACER},y)
+ifneq ($(call cc-ifversion,-ge, 0500,y),y)
+    NO_LTO := 1
+    $(warning "WARNING: CONFIG_FUNCTION_TRACER needs at least gcc 5 for LTO. Disabling LTO.")
+endif
+endif
+
+ifeq (${CONFIG_MODVERSIONS},y)
+ifneq ($(call cc-ifversion,-ge, 0409,y),y)
+    NO_LTO := 1
+    $(warning "WARNING: CONFIG_MODVERSIONS needs at least gcc 4.9 for LTO. Disabling LTO.")
+endif
+endif
+
+# needs per file -pg
+ifeq (${CONFIG_GCOV_KERNEL},y)
+ifneq ($(call cc-ifversion,-ge, 0500,y),y)
+    NO_LTO := 1
+    $(warning "WARNING: CONFIG_GCOV_KERNEL needs at least gcc 5.0 for LTO. Disabling LTO.")
+endif
+endif
 
 # gcc 5.0 supports __attribute__((no_reorder)), so we don't
 # need to disable reordering globally, but can only use

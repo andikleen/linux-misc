@@ -1302,7 +1302,6 @@ config LTO_MENU
 	depends on X86
 	# lto does not support excluding flags for specific files
 	# right now. Can be removed if that is fixed.
-	depends on !FUNCTION_TRACER
 	help
 	  With this option gcc will do whole program optimizations for
 	  the whole kernel and module. This increases compile time, but can
