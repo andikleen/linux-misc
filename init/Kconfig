@@ -1358,14 +1358,6 @@ config LTO_DEBUG
 	  They however add some (single threaded) cost to the
 	  compilation.  When in doubt do not enable.
 
-config LTO_CP_CLONE
-	bool "Allow aggressive cloning for function specialization"
-	depends on LTO
-	help
-	  Allow the compiler to clone and specialize functions for specific
-	  arguments when it determines these arguments are very commonly
-	  called.  Experimential. Will increase text size.
-
 config SYSCTL
 	bool
 
