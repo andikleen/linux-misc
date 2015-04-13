@@ -25,6 +25,11 @@ ifneq ($(call cc-ifversion, -ge, 0408,y),y)
     $(warning "WARNING: GCC $(call cc-version) too old for LTO/WHOPR. CONFIG_LTO disabled")
 endif
 
+# Note that even 4.8 is deprecated, as it is much slower building
+# than newer compilers.
+ifneq ($(call cc-ifversion, -ge, 0409,y),y)
+    $(warning "WARNING: GCC $(call cc-version) builds slower and is deprecated for LTO.")
+endif
 
 # We need HJ Lu's Linux binutils because mainline binutils does not
 # support mixing assembler and LTO code in the same ld -r object.
@@ -64,6 +69,8 @@ endif
 # gcc 5.0 supports __attribute__((no_reorder)), so we don't
 # need to disable reordering globally, but can only use
 # it on init calls.
+# the -fno-toplevel-reorder is to preserve the order of initcalls
+# everything else should tolerate reordering
 ifeq ($(call cc-ifversion,-ge,0500,y),y)
     DISABLE_TL_REORDER :=
 else
@@ -73,8 +80,6 @@ endif
 LTO_CFLAGS := -flto $(DISABLE_TL_REORDER)
 LTO_FINAL_CFLAGS := -fuse-linker-plugin
 
-# the -fno-toplevel-reorder is to preserve the order of initcalls
-# everything else should tolerate reordering
 LTO_FINAL_CFLAGS += $(DISABLE_TL_REORDER)
 
 # enable LTO and set the jobs used by the LTO phase
@@ -86,12 +91,16 @@ LTO_FINAL_CFLAGS += $(DISABLE_TL_REORDER)
 LTO_FINAL_CFLAGS := -flto=$(shell getconf _NPROCESSORS_ONLN)
 #LTO_FINAL_CFLAGS := -flto=jobserver
 
-# requires plugin ar passed and very recent HJ binutils
+# Avoid backup code generation in LGEN. This dramatically
+# speeds up the build and avoids accidential non LTO use
+# requires plugin ar passed and Linux binutils
+# Without it it may be possible to use FSF binutils
 LTO_CFLAGS += -fno-fat-lto-objects
 
-LTO_FINAL_CFLAGS += ${LTO_CFLAGS} -fwhole-program
-
 ifdef CONFIG_LTO_DEBUG
+    # -dH makes the compiler dump core on crashes to make it easier to debug
+    # The ipa and inline graphs allow to understand the LTO code generation
+    # They also contain a call tree of the whole program
     LTO_FINAL_CFLAGS += -dH -fdump-ipa-cgraph -fdump-ipa-inline-details
     # -Wl,-plugin-save-temps -save-temps
     LTO_CFLAGS +=
@@ -99,11 +108,9 @@ endif
 
 # In principle gcc should pass through options in the object files,
 # but it doesn't always work. So do it here manually
-# Note that special options for individual files does not
-# work currently (except for some special cases that only
-# affect the compiler frontend)
-# The main offenders are FTRACE and GCOV -- we exclude
-# those in the config.
+# Note that special options for individual files do not work
+# before 5.0 (and also there only some limited ones)
+# (except for some special cases that only affect the compiler frontend)
 LTO_FINAL_CFLAGS += $(filter -g%,${KBUILD_CFLAGS})
 LTO_FINAL_CFLAGS += $(filter -O%,${KBUILD_CFLAGS})
 LTO_FINAL_CFLAGS += $(filter -f%,${KBUILD_CFLAGS})
@@ -120,8 +127,9 @@ endif
 ifeq (${NO_LTO},)
     # Used to disable LTO for specific files (e.g. vdso)
     DISABLE_LTO := -fno-lto
+    # generate LTO code at parsing time
     KBUILD_CFLAGS += ${LTO_CFLAGS}
-    # use a wrapper to turn ld arguments into gcc
+    # use a wrapper to turn ld arguments into gcc and finally do LTO
     LDFINAL := ${CONFIG_SHELL} ${srctree}/scripts/gcc-ld ${LTO_FINAL_CFLAGS}
 endif # !NO_LTO
 endif # CONFIG_LTO
