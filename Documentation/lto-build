@@ -4,8 +4,10 @@ This is an experimental feature.
 
 Link Time Optimization allows the compiler to optimize the complete program
 instead of just each file.  LTO requires at least gcc 4.8 (but
-works more efficiently with 4.9+) LTO requires Linux binutils (the normal FSF
-releases used in many distributions do not work at the moment)
+works more efficiently with 4.9+, or even better with 5.0)
+
+LTO requires Linux binutils (the normal FSF releases used in many
+distributions do not work at the moment)
 
 The compiler can inline functions between files and do various other global
 optimizations, like specializing functions for common parameters,
@@ -23,16 +25,20 @@ the code size.
 Build time and memory consumption at build time will increase, depending
 on the size of the largest binary. Modular kernels are less affected.
 With LTO incremental builds are less incremental, as always the whole
-binary needs to be re-optimized (but not re-parsed)
+binary needs to be re-optimized (but not re-parsed).
 
-Oops can be somewhat more difficult to read, due to the more aggressive
+Very modular kernels such as typical distribution kernels see less of a change,
+as they consist of many binaries (=modules) that are all LTO optimized on their own.
+
+Oopses can be somewhat more difficult to read, due to the more aggressive
 inlining.
 
 Normal "reasonable" builds work with less than 4GB of RAM, but very large
 configurations like allyesconfig may need more memory. The actual
 memory needed depends on the available memory (gcc sizes its garbage
 collector pools based on that or on the ulimit -m limits) and
-the compiler version.
+the compiler version. With a 5.0 compiler allyes builds in less than
+6GB.
 
 gcc 4.9+ has much better build performance and less memory consumption
 
@@ -63,6 +69,9 @@ Example build procedure:
 
 Simplified procedure for distributions that have gcc 4.8, but not
 the Linux binutils (for example openSUSE 13.1 or FC20):
+
+This assumes you want to rebuild gcc. If the distribution already
+has a suitable gcc many of these steps can be skipped.
 
 The LTO builds requires gcc-nm/gcc-ar. Some distributions ship
 those in separate packages, which may need to be explicitely installed.
@@ -108,6 +117,7 @@ If you don't have gcc 4.8+ as system compiler you would also need
 to install that compiler. In this case I recommend getting
 a gcc 4.9+ snapshot from http://gcc.gnu.org (or release when available),
 as it builds much faster for LTO than 4.8.
+Best is to get 5.0.
 
 Here's an example build procedure:
 
@@ -141,9 +151,10 @@ The Makefile tries to set those automatically, but it doesn't always
 work. Better to set it manually on the make command line.
 
 Q: It's quite slow / uses too much memory.
-A: Consider a gcc 4.9 snapshot/release (not released yet)
+A: 4.9 is much better than 4.8. 5.0 is even better.
 The main problem in 4.8 is the type merging in the single threaded WPA pass,
-which has been improved considerably in 4.9 by running it distributed.
+which has been improved considerably in 4.9 by running it distributed. 5.0
+ha further improvements.
 
 Q: It's still slow
 A: It'll always be somewhat slower than non LTO sorry.
