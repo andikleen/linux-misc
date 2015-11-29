@@ -497,7 +497,11 @@ static __always_inline int fls64(__u64 x)
 
 #include <asm-generic/bitops/sched.h>
 
+#ifdef CONFIG_LTO
+#include <asm-generic/bitops/hweight.h>
+#else
 #include <asm/arch_hweight.h>
+#endif
 
 #include <asm-generic/bitops/const_hweight.h>
 
