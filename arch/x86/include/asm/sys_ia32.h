@@ -49,6 +49,19 @@ asmlinkage long sys32_fallocate(int, int, unsigned,
 /* ia32/ia32_signal.c */
 asmlinkage long sys32_sigreturn(void);
 asmlinkage long sys32_rt_sigreturn(void);
+asmlinkage long stub32_rt_sigreturn(void);
+
+asmlinkage long stub32_sigreturn(void);
+asmlinkage long stub32_fork(void);
+asmlinkage long stub32_execve(const char __user *filename,
+		const char __user *const __user *argv,
+		const char __user *const __user *envp);
+asmlinkage long stub32_execveat(int dfd, const char __user *filename,
+			const char __user *const __user *argv,
+			const char __user *const __user *envp, int flags);
+asmlinkage long stub32_clone(unsigned long, unsigned long, int __user *,
+	       int __user *, int);
+asmlinkage long stub32_vfork(void);
 
 #endif /* CONFIG_COMPAT */
 

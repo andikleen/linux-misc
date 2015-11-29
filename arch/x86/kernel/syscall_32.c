@@ -3,9 +3,13 @@
 #include <linux/linkage.h>
 #include <linux/sys.h>
 #include <linux/cache.h>
+#include <linux/syscalls.h>
+#include <asm/syscalls.h>
 #include <asm/asm-offsets.h>
 
 #ifdef CONFIG_IA32_EMULATION
+#include <linux/compat.h>
+#include <asm/sys_ia32.h>
 #define SYM(sym, compat) compat
 #else
 #define SYM(sym, compat) sym
@@ -13,15 +17,11 @@
 #define __NR_ia32_syscall_max __NR_syscall_max
 #endif
 
-#define __SYSCALL_I386(nr, sym, compat) extern asmlinkage void SYM(sym, compat)(void) ;
-#include <asm/syscalls_32.h>
-#undef __SYSCALL_I386
+#define __SYSCALL_I386(nr, sym, compat) [nr] = (sys_call_ptr_t)SYM(sym, compat),
 
-#define __SYSCALL_I386(nr, sym, compat) [nr] = SYM(sym, compat),
+typedef asmlinkage long int (*sys_call_ptr_t)(void);
 
-typedef asmlinkage void (*sys_call_ptr_t)(void);
-
-extern asmlinkage void sys_ni_syscall(void);
+extern asmlinkage long int sys_ni_syscall(void);
 
 __visible const sys_call_ptr_t ia32_sys_call_table[__NR_ia32_syscall_max+1] = {
 	/*

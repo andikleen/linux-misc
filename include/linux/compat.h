@@ -590,6 +590,8 @@ asmlinkage long compat_sys_setrlimit(unsigned int resource,
 				     struct compat_rlimit __user *rlim);
 asmlinkage long compat_sys_getrlimit(unsigned int resource,
 				     struct compat_rlimit __user *rlim);
+asmlinkage long compat_sys_old_getrlimit(unsigned int resource,
+				     struct compat_rlimit __user *rlim);
 asmlinkage long compat_sys_getrusage(int who, struct compat_rusage __user *ru);
 asmlinkage long compat_sys_sched_setaffinity(compat_pid_t pid,
 				     unsigned int len,
