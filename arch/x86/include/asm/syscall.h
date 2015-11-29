@@ -20,7 +20,7 @@
 #include <asm/thread_info.h>	/* for TS_COMPAT */
 #include <asm/unistd.h>
 
-typedef void (*sys_call_ptr_t)(void);
+typedef long (*sys_call_ptr_t)(void);
 extern const sys_call_ptr_t sys_call_table[];
 
 /*

@@ -50,5 +50,17 @@ asmlinkage long sys_arch_prctl(int, unsigned long);
 asmlinkage long sys_mmap(unsigned long, unsigned long, unsigned long,
 			 unsigned long, unsigned long, unsigned long);
 
+asmlinkage long stub_clone(unsigned long, unsigned long, int __user *,
+	       int __user *, int);
+asmlinkage long stub_rt_sigreturn(void);
+asmlinkage long stub_fork(void);
+asmlinkage long stub_vfork(void);
+asmlinkage long stub_execve(const char __user *filename,
+		const char __user *const __user *argv,
+		const char __user *const __user *envp);
+asmlinkage long stub_execveat(int dfd, const char __user *filename,
+			const char __user *const __user *argv,
+			const char __user *const __user *envp, int flags);
+
 #endif /* CONFIG_X86_32 */
 #endif /* _ASM_X86_SYSCALLS_H */

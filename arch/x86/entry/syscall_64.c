@@ -5,6 +5,10 @@
 #include <linux/cache.h>
 #include <asm/asm-offsets.h>
 #include <asm/syscall.h>
+#include <asm/syscalls.h>
+#include <linux/syscalls.h>
+#include <linux/compat.h>
+#include <asm/sys_ia32.h>
 
 #define __SYSCALL_COMMON(nr, sym, compat) __SYSCALL_64(nr, sym, compat)
 
@@ -14,13 +18,9 @@
 # define __SYSCALL_X32(nr, sym, compat) /* nothing */
 #endif
 
-#define __SYSCALL_64(nr, sym, compat) extern asmlinkage void sym(void) ;
-#include <asm/syscalls_64.h>
-#undef __SYSCALL_64
+#define __SYSCALL_64(nr, sym, compat) [nr] = (sys_call_ptr_t)sym,
 
-#define __SYSCALL_64(nr, sym, compat) [nr] = sym,
-
-extern void sys_ni_syscall(void);
+extern long sys_ni_syscall(void);
 
 asmlinkage const sys_call_ptr_t sys_call_table[__NR_syscall_max+1] = {
 	/*

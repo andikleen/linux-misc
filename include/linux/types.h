@@ -35,11 +35,9 @@ typedef __kernel_gid16_t        gid16_t;
 
 typedef unsigned long		uintptr_t;
 
-#ifdef CONFIG_UID16
 /* This is defined by include/asm-{arch}/posix_types.h */
 typedef __kernel_old_uid_t	old_uid_t;
 typedef __kernel_old_gid_t	old_gid_t;
-#endif /* CONFIG_UID16 */
 
 #if defined(__GNUC__)
 typedef __kernel_loff_t		loff_t;
