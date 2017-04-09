@@ -20,6 +20,8 @@
 
 #include <linux/uaccess.h>
 
+#include "dm-table.h"
+
 #define DM_MSG_PREFIX "ioctl"
 #define DM_DRIVER_EMAIL "dm-devel@redhat.com"
 
@@ -35,14 +37,6 @@ struct hash_cell {
 	char *uuid;
 	struct mapped_device *md;
 	struct dm_table *new_map;
-};
-
-/*
- * A dummy definition to make RCU happy.
- * struct dm_table should never be dereferenced in this file.
- */
-struct dm_table {
-	int undefined__;
 };
 
 struct vers_iter {
