@@ -747,6 +747,7 @@ static __always_inline bool pv_vcpu_is_preempted(long cpu)
 #define PV_THUNK_NAME(func) "__raw_callee_save_" #func
 #define PV_CALLEE_SAVE_REGS_THUNK(func)					\
 	extern __visible typeof(func) __raw_callee_save_##func;		\
+	extern __visible typeof(func) func;				\
 									\
 	asm(".pushsection .text;"					\
 	    ".globl " PV_THUNK_NAME(func) ";"				\
