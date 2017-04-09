@@ -66,9 +66,9 @@ asmlinkage long ptregs_sys_clone(unsigned long, unsigned long, int __user *,
 	       int __user *, unsigned long);
 
 
-asmlinkage long compat_sys_pwritev64v2(unsigned long fd,
-		const struct compat_iovec __user *vec,
-		unsigned long vlen, loff_t pos);
+asmlinkage long compat_sys_pwritev64v2(compat_ulong_t fd,
+	       const struct compat_iovec __user *vec,
+	       compat_ulong_t vlen, u32 pos_low, u32 pos_high);
 asmlinkage long compat_sys_preadv64v2(unsigned long fd,
 		const struct compat_iovec __user *vec,
 		unsigned long vlen, loff_t pos);
