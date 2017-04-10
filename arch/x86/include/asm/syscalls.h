@@ -65,7 +65,7 @@ asmlinkage long ptregs_sys_execveat(int dfd, const char __user *filename,
 asmlinkage long ptregs_sys_clone(unsigned long, unsigned long, int __user *,
 	       int __user *, unsigned long);
 
-
+#ifdef CONFIG_COMPAT
 asmlinkage long compat_sys_pwritev64v2(compat_ulong_t fd,
 	       const struct compat_iovec __user *vec,
 	       compat_ulong_t vlen, u32 pos_low, u32 pos_high);
@@ -78,13 +78,13 @@ asmlinkage long ptregs_compat_sys_execve(int dfd, const char __user *filename,
 asmlinkage long ptregs_compat_sys_execveat(int dfd, const char __user *filename,
 		     const compat_uptr_t __user *argv,
 		     const compat_uptr_t __user *envp, int flags);
-asmlinkage long sys32_x32_rt_sigreturn(void);
-
 asmlinkage long compat_sys_old_getrlimit(unsigned int resource,
 	struct compat_rlimit __user *rlim);
-
 asmlinkage long stub32_clone(unsigned, unsigned, int __user *,
 	       compat_uptr_t __user *, unsigned);
+#endif
+
+asmlinkage long sys32_x32_rt_sigreturn(void);
 
 
 #endif /* !CONFIG_X86_32 */
