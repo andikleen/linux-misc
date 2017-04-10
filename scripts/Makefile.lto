@@ -16,7 +16,10 @@ ifdef CONFIG_LTO
 # 4.9 still had a few bugs that needed workarounds
 # make it 5.0+ only for now, which is also faster again
 ifeq ($(call cc-ifversion, -ge, 0500,y),y)
+# is the compiler compiled with LTO?
 ifneq ($(call cc-option,${LTO_CFLAGS},n),n)
+# binutils before 2.27 has various problems with plugins
+ifeq ($(call ld-ifversion,-ge,227000000,y),y)
 
        $(info Enabling LTO)
 
@@ -78,6 +81,9 @@ endif
 	# use plugin aware tools
 	AR = $(CROSS_COMPILE)gcc-ar
 	NM = $(CROSS_COMPILE)gcc-nm
+else
+        $(warning WARNING old binutils. LTO disabled)
+endif
 else
         $(warning "WARNING: Compiler/Linker does not support LTO/WHOPR with linker plugin. CONFIG_LTO disabled.")
 endif
