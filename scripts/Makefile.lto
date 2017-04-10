@@ -74,6 +74,10 @@ endif
 	TMPDIR ?= $(objtree)
 	export TMPDIR
         $(info setting TMPDIR to objdir for LTO build)
+
+	# use plugin aware tools
+	AR = $(CROSS_COMPILE)gcc-ar
+	NM = $(CROSS_COMPILE)gcc-nm
 else
         $(warning "WARNING: Compiler/Linker does not support LTO/WHOPR with linker plugin. CONFIG_LTO disabled.")
 endif
