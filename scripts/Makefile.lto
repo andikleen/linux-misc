@@ -61,7 +61,8 @@ ifeq ($(call ld-ifversion,-ge,227000000,y),y)
 
 ifdef CONFIG_LTO_DEBUG
 	LTO_FINAL_CFLAGS += -fdump-ipa-cgraph -fdump-ipa-inline-details
-# LTO_FINAL_CFLAGS += -dH -save-temps
+	# add for debugging compiler crashes:
+	# LTO_FINAL_CFLAGS += -dH -save-temps
 	LTO_CFLAGS +=
 endif
 ifdef CONFIG_LTO_CP_CLONE
@@ -79,7 +80,6 @@ endif
 	# instead.
 	TMPDIR ?= $(objtree)
 	export TMPDIR
-        $(info setting TMPDIR to objdir for LTO build)
 
 	# use plugin aware tools
 	AR = $(CROSS_COMPILE)gcc-ar
