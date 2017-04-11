@@ -2672,12 +2672,12 @@ enum kernel_read_file_id {
 	__kernel_read_file_id(__fid_enumify)
 };
 
-static const char * const kernel_read_file_str[] = {
-	__kernel_read_file_id(__fid_stringify)
-};
-
 static inline const char *kernel_read_file_id_str(enum kernel_read_file_id id)
 {
+	static const char * const kernel_read_file_str[] = {
+		__kernel_read_file_id(__fid_stringify)
+	};
+
 	if ((unsigned)id >= READING_MAX_ID)
 		return kernel_read_file_str[READING_UNKNOWN];
 
