@@ -145,7 +145,7 @@ static inline bool inet_frag_evicting(struct inet_frag_queue *q)
  * The mem size of a 64K fragment is approx:
  *  (44 fragments * 2944 truesize) + frag_queue struct(200) = 129736 bytes
  */
-static unsigned int frag_percpu_counter_batch = 130000;
+#define frag_percpu_counter_batch 130000
 
 static inline int frag_mem_limit(struct netns_frags *nf)
 {
