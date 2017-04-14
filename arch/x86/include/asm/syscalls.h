@@ -66,15 +66,16 @@ asmlinkage long ptregs_sys_clone(unsigned long, unsigned long, int __user *,
 	       int __user *, unsigned long);
 
 #ifdef CONFIG_COMPAT
-asmlinkage long compat_sys_pwritev64v2(compat_ulong_t fd,
+asmlinkage long compat_sys_pwritev64v2(unsigned long fd,
 	       const struct compat_iovec __user *vec,
 	       compat_ulong_t vlen, u32 pos_low, u32 pos_high);
 asmlinkage long compat_sys_preadv64v2(unsigned long fd,
-		const struct compat_iovec __user *vec,
-		unsigned long vlen, loff_t pos);
-asmlinkage long ptregs_compat_sys_execve(int dfd, const char __user *filename,
-		     const compat_uptr_t __user *argv,
-		     const compat_uptr_t __user *envp);
+	       const struct compat_iovec __user *vec,
+	       unsigned long vlen, loff_t pos, int flags);
+asmlinkage long ptregs_compat_sys_execve(unsigned long dfd,
+		 const char __user *filename,
+		 const compat_uptr_t __user *argv,
+		 const compat_uptr_t __user *envp);
 asmlinkage long ptregs_compat_sys_execveat(int dfd, const char __user *filename,
 		     const compat_uptr_t __user *argv,
 		     const compat_uptr_t __user *envp, int flags);
