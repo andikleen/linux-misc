@@ -46,7 +46,7 @@ const struct address_space_operations vxfs_aops = {
 	.bmap =			vxfs_bmap,
 };
 
-inline void
+void
 vxfs_put_page(struct page *pp)
 {
 	kunmap(pp);
