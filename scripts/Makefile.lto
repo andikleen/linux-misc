@@ -37,11 +37,11 @@ ifeq ($(call ld-ifversion,-ge,227000000,y),y)
 # need to disable reordering globally, but can only use
 # it on init calls.
 # Disabled for now because of some undebugged bug in 5.x
-#ifeq ($(call cc-ifversion,-ge,0500,y),y)
-#	DISABLE_TL_REORDER :=
-#else
+ifeq ($(call cc-ifversion,-ge,0500,y),y)
+	DISABLE_TL_REORDER :=
+else
 	DISABLE_TL_REORDER := -fno-toplevel-reorder
-#endif
+endif
 	LTO_CFLAGS := -flto $(DISABLE_TL_REORDER)
 	LTO_FINAL_CFLAGS := -fuse-linker-plugin
 
