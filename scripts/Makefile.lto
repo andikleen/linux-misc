@@ -30,7 +30,7 @@ ifeq ($(call cc-ifversion, -ge, 0500,y),y)
 # is the compiler compiled with LTO?
 ifneq ($(call cc-option,${LTO_CFLAGS},n),n)
 # binutils before 2.27 has various problems with plugins
-ifeq ($(call ld-ifversion,-ge,227000000,y),y)
+ifeq ($(call ld-ifversion,-ge,225000000,y),y)
 
        $(info Enabling LTO)
 
