@@ -23,8 +23,9 @@ ifdef CONFIG_LTO
 # This can be worked around by marking those symbols visible,
 # but that is fairly ugly and the problem is gone with 4.8
 # 4.8 was very slow
-# 4.9 still had a few bugs that needed workarounds
-# make it 5.0+ only for now, which is also faster again
+# 4.9 was missing __attribute__((noreorder)) for ordering initcalls,
+# and needed -fno-toplevel-reorder, which can lead to missing symbols
+# so only support 5.0+
 ifeq ($(call cc-ifversion, -ge, 0500,y),y)
 # is the compiler compiled with LTO?
 ifneq ($(call cc-option,${LTO_CFLAGS},n),n)
@@ -33,28 +34,19 @@ ifeq ($(call ld-ifversion,-ge,227000000,y),y)
 
        $(info Enabling LTO)
 
-# gcc 5.0 supports __attribute__((no_reorder)), so we don't
-# need to disable reordering globally, but can only use
-# it on init calls.
-# Disabled for now because of some undebugged bug in 5.x
-ifeq ($(call cc-ifversion,-ge,0500,y),y)
-	DISABLE_TL_REORDER :=
-else
-	DISABLE_TL_REORDER := -fno-toplevel-reorder
-endif
 	LTO_CFLAGS := -flto $(DISABLE_TL_REORDER)
 	LTO_FINAL_CFLAGS := -fuse-linker-plugin
 
-# the -fno-toplevel-reorder is to preserve the order of initcalls
-# everything else should tolerate reordering
-	LTO_FINAL_CFLAGS += $(DISABLE_TL_REORDER)
+# would be needed to support < 5.0
+#	LTO_FINAL_CFLAGS += -fno-toplevel-reorder
 
 	LTO_FINAL_CFLAGS += -flto=jobserver
 
+	# don't compile everything twice
 	# requires plugin ar
 	LTO_CFLAGS += -fno-fat-lto-objects
 
-# Used to disable LTO for specific files (e.g. vdso)
+	# Used to disable LTO for specific files (e.g. vdso)
 	DISABLE_LTO := -fno-lto
 
 	LTO_FINAL_CFLAGS += ${LTO_CFLAGS} -fwhole-program
@@ -63,7 +55,6 @@ ifdef CONFIG_LTO_DEBUG
 	LTO_FINAL_CFLAGS += -fdump-ipa-cgraph -fdump-ipa-inline-details
 	# add for debugging compiler crashes:
 	# LTO_FINAL_CFLAGS += -dH -save-temps
-	LTO_CFLAGS +=
 endif
 ifdef CONFIG_LTO_CP_CLONE
 	LTO_FINAL_CFLAGS += -fipa-cp-clone
