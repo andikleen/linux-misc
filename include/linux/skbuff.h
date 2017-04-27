@@ -933,11 +933,28 @@ static inline __alloc_size(1) struct sk_buff *alloc_skb(unsigned int size,
 	return __alloc_skb(size, priority, 0, NUMA_NO_NODE);
 }
 
-struct sk_buff *alloc_skb_with_frags(unsigned long header_len,
+/* Only used to get a alloc size warning */
+static void __always_inline __alloc_size(1) check_skb_size(unsigned long len)
+{
+}
+
+struct sk_buff *__alloc_skb_with_frags(unsigned long header_len,
 				     unsigned long data_len,
 				     int max_page_order,
 				     int *errcode,
 				     gfp_t gfp_mask);
+
+static __always_inline struct sk_buff *alloc_skb_with_frags(unsigned long header_len,
+				     unsigned long data_len,
+				     int max_page_order,
+				     int *errcode,
+				     gfp_t gfp_mask)
+{
+	check_skb_size(header_len + data_len);
+	check_skb_size(PAGE_SIZE << max_page_order);
+	return __alloc_skb_with_frags(header_len, data_len, max_page_order, errcode, gfp_mask);
+}
+
 
 /* Layout of fast clones : [skb1][skb2][fclone_ref] */
 struct sk_buff_fclones {
@@ -994,11 +1011,30 @@ static inline struct sk_buff *__pskb_copy(struct sk_buff *skb, int headroom,
 	return __pskb_copy_fclone(skb, headroom, gfp_mask, false);
 }
 
-int pskb_expand_head(struct sk_buff *skb, int nhead, int ntail, gfp_t gfp_mask);
+int __pskb_expand_head(struct sk_buff *skb, int nhead, int ntail, gfp_t gfp_mask);
+
+static __always_inline int
+pskb_expand_head(struct sk_buff *skb, int nhead, int ntail, gfp_t gfp_mask)
+{
+	check_skb_size(nhead + ntail);
+	return __pskb_expand_head(skb, nhead, ntail, gfp_mask);
+}
+
+__alloc_size(2)
 struct sk_buff *skb_realloc_headroom(struct sk_buff *skb,
 				     unsigned int headroom);
-struct sk_buff *skb_copy_expand(const struct sk_buff *skb, int newheadroom,
+struct sk_buff *__skb_copy_expand(const struct sk_buff *skb, int newheadroom,
 				int newtailroom, gfp_t priority);
+static __always_inline struct sk_buff *
+skb_copy_expand(const struct sk_buff *skb, int newheadroom,
+				int newtailroom, gfp_t priority)
+{
+	check_skb_size(newheadroom + newtailroom);
+	return __skb_copy_expand(skb, newheadroom, newtailroom, priority);
+}
+
+/* Could also add __alloc_size to the copies, if we knows it's always short enough? */
+
 int skb_to_sgvec_nomark(struct sk_buff *skb, struct scatterlist *sg,
 			int offset, int len);
 __alloc_size(3)

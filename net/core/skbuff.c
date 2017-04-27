@@ -1188,7 +1188,7 @@ EXPORT_SYMBOL(__pskb_copy_fclone);
  *	reloaded after call to this function.
  */
 
-int pskb_expand_head(struct sk_buff *skb, int nhead, int ntail,
+int __pskb_expand_head(struct sk_buff *skb, int nhead, int ntail,
 		     gfp_t gfp_mask)
 {
 	int i, osize = skb_end_offset(skb);
@@ -1271,7 +1271,7 @@ nofrags:
 nodata:
 	return -ENOMEM;
 }
-EXPORT_SYMBOL(pskb_expand_head);
+EXPORT_SYMBOL(__pskb_expand_head);
 
 /* Make private copy of skb with writable head and some headroom */
 
@@ -1312,7 +1312,7 @@ EXPORT_SYMBOL(skb_realloc_headroom);
  *	You must pass %GFP_ATOMIC as the allocation priority if this function
  *	is called from an interrupt.
  */
-struct sk_buff *skb_copy_expand(const struct sk_buff *skb,
+struct sk_buff *__skb_copy_expand(const struct sk_buff *skb,
 				int newheadroom, int newtailroom,
 				gfp_t gfp_mask)
 {
@@ -1351,7 +1351,7 @@ struct sk_buff *skb_copy_expand(const struct sk_buff *skb,
 
 	return n;
 }
-EXPORT_SYMBOL(skb_copy_expand);
+EXPORT_SYMBOL(__skb_copy_expand);
 
 /**
  *	skb_pad			-	zero pad the tail of an skb
@@ -4650,7 +4650,7 @@ EXPORT_SYMBOL(skb_vlan_push);
  *
  * This can be used to allocate a paged skb, given a maximal order for frags.
  */
-struct sk_buff *alloc_skb_with_frags(unsigned long header_len,
+struct sk_buff *__alloc_skb_with_frags(unsigned long header_len,
 				     unsigned long data_len,
 				     int max_page_order,
 				     int *errcode,
@@ -4715,7 +4715,7 @@ failure:
 	kfree_skb(skb);
 	return NULL;
 }
-EXPORT_SYMBOL(alloc_skb_with_frags);
+EXPORT_SYMBOL(__alloc_skb_with_frags);
 
 /* carve out the first off bytes from skb when off < headlen */
 static int pskb_carve_inside_header(struct sk_buff *skb, const u32 off,
