@@ -67,16 +67,16 @@ static inline void vmalloc_init(void)
 }
 #endif
 
-extern void *vmalloc(unsigned long size);
-extern void *vzalloc(unsigned long size);
-extern void *vmalloc_user(unsigned long size);
-extern void *vmalloc_node(unsigned long size, int node);
-extern void *vzalloc_node(unsigned long size, int node);
-extern void *vmalloc_exec(unsigned long size);
-extern void *vmalloc_32(unsigned long size);
-extern void *vmalloc_32_user(unsigned long size);
-extern void *__vmalloc(unsigned long size, gfp_t gfp_mask, pgprot_t prot);
-extern void *__vmalloc_node_range(unsigned long size, unsigned long align,
+extern void __alloc_size(1) *vmalloc(unsigned long size);
+extern void __alloc_size(1) *vzalloc(unsigned long size);
+extern void __alloc_size(1) *vmalloc_user(unsigned long size);
+extern void __alloc_size(1) *vmalloc_node(unsigned long size, int node);
+extern void __alloc_size(1) *vzalloc_node(unsigned long size, int node);
+extern void __alloc_size(1) *vmalloc_exec(unsigned long size);
+extern void __alloc_size(1) *vmalloc_32(unsigned long size);
+extern void __alloc_size(1) *vmalloc_32_user(unsigned long size);
+extern void __alloc_size(1) *__vmalloc(unsigned long size, gfp_t gfp_mask, pgprot_t prot);
+extern void __alloc_size(1) *__vmalloc_node_range(unsigned long size, unsigned long align,
 			unsigned long start, unsigned long end, gfp_t gfp_mask,
 			pgprot_t prot, unsigned long vm_flags, int node,
 			const void *caller);
@@ -88,7 +88,7 @@ extern void *vmap(struct page **pages, unsigned int count,
 			unsigned long flags, pgprot_t prot);
 extern void vunmap(const void *addr);
 
-extern int remap_vmalloc_range_partial(struct vm_area_struct *vma,
+extern int __alloc_size(4) remap_vmalloc_range_partial(struct vm_area_struct *vma,
 				       unsigned long uaddr, void *kaddr,
 				       unsigned long size);
 
