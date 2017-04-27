@@ -309,3 +309,11 @@
  * code
  */
 #define uninitialized_var(x) x = x
+
+/*
+ * Tell gcc about size arguments of allocation functions for extra warnings
+ */
+
+#if GCC_VERSION >= 70000
+#define __alloc_size(...) __attribute__((alloc_size(__VA_ARGS__)))
+#endif
