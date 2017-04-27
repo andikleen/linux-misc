@@ -1970,7 +1970,7 @@ static struct page *alloc_page_interleave(gfp_t gfp, unsigned order,
  *	NULL when no page can be allocated.
  */
 struct page *
-alloc_pages_vma(gfp_t gfp, int order, struct vm_area_struct *vma,
+__alloc_pages_vma(gfp_t gfp, int order, struct vm_area_struct *vma,
 		unsigned long addr, int node, bool hugepage)
 {
 	struct mempolicy *pol;
@@ -2047,7 +2047,7 @@ out:
  *	1) it's ok to take cpuset_sem (can WAIT), and
  *	2) allocating for current task (not interrupt).
  */
-struct page *alloc_pages_current(gfp_t gfp, unsigned order)
+struct page *__alloc_pages_current(gfp_t gfp, unsigned order)
 {
 	struct mempolicy *pol = &default_policy;
 	struct page *page;
@@ -2075,7 +2075,7 @@ retry_cpuset:
 
 	return page;
 }
-EXPORT_SYMBOL(alloc_pages_current);
+EXPORT_SYMBOL(__alloc_pages_current);
 
 int vma_dup_policy(struct vm_area_struct *src, struct vm_area_struct *dst)
 {

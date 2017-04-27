@@ -415,6 +415,14 @@ static inline void arch_free_page(struct page *page, int order) { }
 static inline void arch_alloc_page(struct page *page, int order) { }
 #endif
 
+/* Only used to get compiler warnings for bad sizes */
+static __alloc_size(1) __always_inline void check_alloc_size(unsigned alloc_size)
+{
+	/* Could also check against MAX_ORDER here, but this may be too fragile.
+	 * We mainly care about negative arguments.
+	 */
+}
+
 struct page *
 __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
 		       struct zonelist *zonelist, nodemask_t *nodemask);
@@ -423,6 +431,7 @@ static inline struct page *
 __alloc_pages(gfp_t gfp_mask, unsigned int order,
 		struct zonelist *zonelist)
 {
+	check_alloc_size(PAGE_SIZE << order);
 	return __alloc_pages_nodemask(gfp_mask, order, zonelist, NULL);
 }
 
@@ -436,6 +445,7 @@ __alloc_pages_node(int nid, gfp_t gfp_mask, unsigned int order)
 	VM_BUG_ON(nid < 0 || nid >= MAX_NUMNODES);
 	VM_WARN_ON(!node_online(nid));
 
+	check_alloc_size(PAGE_SIZE << order);
 	return __alloc_pages(gfp_mask, order, node_zonelist(nid, gfp_mask));
 }
 
@@ -450,20 +460,38 @@ static inline struct page *alloc_pages_node(int nid, gfp_t gfp_mask,
 	if (nid == NUMA_NO_NODE)
 		nid = numa_mem_id();
 
+	check_alloc_size(PAGE_SIZE << order);
 	return __alloc_pages_node(nid, gfp_mask, order);
 }
 
 #ifdef CONFIG_NUMA
-extern struct page *alloc_pages_current(gfp_t gfp_mask, unsigned order);
+extern struct page *__alloc_pages_current(gfp_t gfp_mask, unsigned order);
+static __always_inline struct page *
+alloc_pages_current(gfp_t gfp_mask, unsigned order)
+{
+	check_alloc_size(PAGE_SIZE << order);
+	return __alloc_pages_current(gfp_mask, order);
+}
 
 static inline struct page *
 alloc_pages(gfp_t gfp_mask, unsigned int order)
 {
+	check_alloc_size(PAGE_SIZE << order);
 	return alloc_pages_current(gfp_mask, order);
 }
-extern struct page *alloc_pages_vma(gfp_t gfp_mask, int order,
+extern struct page *__alloc_pages_vma(gfp_t gfp_mask, int order,
 			struct vm_area_struct *vma, unsigned long addr,
 			int node, bool hugepage);
+
+static __always_inline struct page *
+alloc_pages_vma(gfp_t gfp_mask, int order,
+			struct vm_area_struct *vma, unsigned long addr,
+			int node, bool hugepage)
+{
+	check_alloc_size(PAGE_SIZE << order);
+	return __alloc_pages_vma(gfp_mask, order, vma, addr, node, hugepage);
+}
+
 #define alloc_hugepage_vma(gfp_mask, vma, addr, order)	\
 	alloc_pages_vma(gfp_mask, order, vma, addr, numa_node_id(), true)
 #else
@@ -480,7 +508,14 @@ extern struct page *alloc_pages_vma(gfp_t gfp_mask, int order,
 #define alloc_page_vma_node(gfp_mask, vma, addr, node)		\
 	alloc_pages_vma(gfp_mask, 0, vma, addr, node, false)
 
-extern unsigned long __get_free_pages(gfp_t gfp_mask, unsigned int order);
+extern unsigned long ____get_free_pages(gfp_t gfp_mask, unsigned int order);
+static __always_inline unsigned long
+__get_free_pages(gfp_t gfp_mask, unsigned int order)
+{
+	check_alloc_size(PAGE_SIZE << order);
+	return ____get_free_pages(gfp_mask, order);
+}
+
 extern unsigned long get_zeroed_page(gfp_t gfp_mask);
 
 void *alloc_pages_exact(size_t size, gfp_t gfp_mask);
@@ -493,8 +528,18 @@ void * __meminit alloc_pages_exact_nid(int nid, size_t size, gfp_t gfp_mask);
 #define __get_dma_pages(gfp_mask, order) \
 		__get_free_pages((gfp_mask) | GFP_DMA, (order))
 
-extern void __free_pages(struct page *page, unsigned int order);
-extern void free_pages(unsigned long addr, unsigned int order);
+extern void ____free_pages(struct page *page, unsigned int order);
+static __always_inline void __free_pages(struct page *page, unsigned int order)
+{
+	check_alloc_size(PAGE_SIZE << order);
+	____free_pages(page, order);
+}
+extern void free_pages_outofline(unsigned long addr, unsigned int order);
+static __always_inline void free_pages(unsigned long addr, unsigned int order)
+{
+	check_alloc_size(PAGE_SIZE << order);
+	free_pages_outofline(addr, order);
+}
 extern void free_hot_cold_page(struct page *page, bool cold);
 extern void free_hot_cold_page_list(struct list_head *list, bool cold);
 
