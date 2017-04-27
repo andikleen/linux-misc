@@ -924,10 +924,10 @@ bool skb_try_coalesce(struct sk_buff *to, struct sk_buff *from,
 		      bool *fragstolen, int *delta_truesize);
 
 struct sk_buff *__alloc_skb(unsigned int size, gfp_t priority, int flags,
-			    int node);
+			    int node) __alloc_size(1);
 struct sk_buff *__build_skb(void *data, unsigned int frag_size);
 struct sk_buff *build_skb(void *data, unsigned int frag_size);
-static inline struct sk_buff *alloc_skb(unsigned int size,
+static inline __alloc_size(1) struct sk_buff *alloc_skb(unsigned int size,
 					gfp_t priority)
 {
 	return __alloc_skb(size, priority, 0, NUMA_NO_NODE);
@@ -969,6 +969,7 @@ static inline bool skb_fclone_busy(const struct sock *sk,
 	       fclones->skb2.sk == sk;
 }
 
+__alloc_size(1)
 static inline struct sk_buff *alloc_skb_fclone(unsigned int size,
 					       gfp_t priority)
 {
@@ -1000,17 +1001,20 @@ struct sk_buff *skb_copy_expand(const struct sk_buff *skb, int newheadroom,
 				int newtailroom, gfp_t priority);
 int skb_to_sgvec_nomark(struct sk_buff *skb, struct scatterlist *sg,
 			int offset, int len);
+__alloc_size(3)
 int skb_to_sgvec(struct sk_buff *skb, struct scatterlist *sg, int offset,
 		 int len);
 int skb_cow_data(struct sk_buff *skb, int tailbits, struct sk_buff **trailer);
 int skb_pad(struct sk_buff *skb, int pad);
 #define dev_kfree_skb(a)	consume_skb(a)
 
+__alloc_size(5)
 int skb_append_datato_frags(struct sock *sk, struct sk_buff *skb,
 			    int getfrag(void *from, char *to, int offset,
 					int len, int odd, struct sk_buff *skb),
 			    void *from, int length);
 
+__alloc_size(4)
 int skb_append_pagefrags(struct sk_buff *skb, struct page *page,
 			 int offset, size_t size);
 
@@ -2438,6 +2442,7 @@ void skb_rbtree_purge(struct rb_root *root);
 
 void *netdev_alloc_frag(unsigned int fragsz);
 
+__alloc_size(2)
 struct sk_buff *__netdev_alloc_skb(struct net_device *dev, unsigned int length,
 				   gfp_t gfp_mask);
 
@@ -2454,6 +2459,7 @@ struct sk_buff *__netdev_alloc_skb(struct net_device *dev, unsigned int length,
  *	%NULL is returned if there is no free memory. Although this function
  *	allocates memory it can be called from an interrupt.
  */
+__alloc_size(2)
 static inline struct sk_buff *netdev_alloc_skb(struct net_device *dev,
 					       unsigned int length)
 {
@@ -2461,6 +2467,7 @@ static inline struct sk_buff *netdev_alloc_skb(struct net_device *dev,
 }
 
 /* legacy helper around __netdev_alloc_skb() */
+__alloc_size(1)
 static inline struct sk_buff *__dev_alloc_skb(unsigned int length,
 					      gfp_t gfp_mask)
 {
@@ -2468,12 +2475,13 @@ static inline struct sk_buff *__dev_alloc_skb(unsigned int length,
 }
 
 /* legacy helper around netdev_alloc_skb() */
+__alloc_size(1)
 static inline struct sk_buff *dev_alloc_skb(unsigned int length)
 {
 	return netdev_alloc_skb(NULL, length);
 }
 
-
+__alloc_size(2)
 static inline struct sk_buff *__netdev_alloc_skb_ip_align(struct net_device *dev,
 		unsigned int length, gfp_t gfp)
 {
@@ -2484,6 +2492,7 @@ static inline struct sk_buff *__netdev_alloc_skb_ip_align(struct net_device *dev
 	return skb;
 }
 
+__alloc_size(2)
 static inline struct sk_buff *netdev_alloc_skb_ip_align(struct net_device *dev,
 		unsigned int length)
 {
@@ -2496,9 +2505,10 @@ static inline void skb_free_frag(void *addr)
 }
 
 void *napi_alloc_frag(unsigned int fragsz);
+__alloc_size(2)
 struct sk_buff *__napi_alloc_skb(struct napi_struct *napi,
 				 unsigned int length, gfp_t gfp_mask);
-static inline struct sk_buff *napi_alloc_skb(struct napi_struct *napi,
+static inline __alloc_size(2) struct sk_buff *napi_alloc_skb(struct napi_struct *napi,
 					     unsigned int length)
 {
 	return __napi_alloc_skb(napi, length, GFP_ATOMIC);
