@@ -208,7 +208,7 @@ config X86
 	select VIRT_TO_BUS
 	select X86_FEATURE_NAMES		if PROC_FS
         select THIN_ARCHIVES			if LTO
-
+	select ARCH_SUPPORTS_LTO
 
 config INSTRUCTION_DECODER
 	def_bool y
