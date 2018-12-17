@@ -120,6 +120,7 @@ static bool is_ignored_symbol(const char *name, char type)
 	};
 
 	const char * const *p;
+	char *p2;
 
 	/* Exclude symbols which vary between passes. */
 	for (p = ignored_symbols; *p; p++)
@@ -151,6 +152,18 @@ static bool is_ignored_symbol(const char *name, char type)
 		    strcmp(name, "__gp"))
 			return true;
 	}
+
+	/* gcc-nm produces extra weak symbols for C files
+	 * in the form
+	 * 000000000003aa8b W version.c.36323a88
+	 * ignore they are outside the supported range
+	 * and confuse the symbol generation, and they
+	 * are not useful for symbolization.
+	 */
+	if ((type = 'W' || type == 'w') &&
+		(p2 = strstr(name, ".c.")) &&
+		isxdigit(p2[3]))
+		return true;
 
 	return false;
 }
