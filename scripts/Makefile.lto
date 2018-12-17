@@ -22,7 +22,7 @@ endif
 # plugin and cause strange errors when it is too low.
 # XXX determine better threshold
 ifeq ($(shell if test `ulimit -n` -lt 4000 ; then echo yes ; fi),yes)
-        $(warning Disabling LTO. File descriptor limit too low. Increase with ulimit -n)
+        $(warning Disabling LTO. File descriptor limit too low. Increase with ulimit -n 4000)
         undefine CONFIG_LTO
 endif
 
