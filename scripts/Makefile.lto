@@ -9,6 +9,7 @@ export DISABLE_LTO
 export LTO_CFLAGS
 
 ifdef CONFIG_LTO
+
 ifdef CONFIG_UBSAN
 ifeq ($(call cc-ifversion,-lt,0600,y),y)
         # work around compiler asserts due to UBSAN
@@ -16,9 +17,15 @@ ifeq ($(call cc-ifversion,-lt,0600,y),y)
         undefine CONFIG_LTO
 endif
 endif
+
+# Some ar versions need a lot of file descriptors when using the LTO
+# plugin and cause strange errors when it is too low.
+# XXX determine better threshold
+ifeq ($(shell if test `ulimit -n` -lt 4000 ; then echo yes ; fi),yes)
+        $(warning Disabling LTO. File descriptor limit too low. Increase with ulimit -n)
+        undefine CONFIG_LTO
 endif
 
-ifdef CONFIG_LTO
 # 4.7 works mostly, but it sometimes loses symbols on large builds
 # This can be worked around by marking those symbols visible,
 # but that is fairly ugly and the problem is gone with 4.8
@@ -26,20 +33,32 @@ ifdef CONFIG_LTO
 # 4.9 was missing __attribute__((noreorder)) for ordering initcalls,
 # and needed -fno-toplevel-reorder, which can lead to missing symbols
 # so only support 5.0+
-ifeq ($(call cc-ifversion, -ge, 0500,y),y)
-# is the compiler compiled with LTO?
-ifneq ($(call cc-option,${LTO_CFLAGS},n),n)
-# binutils before 2.27 has various problems with plugins
-ifeq ($(call ld-ifversion,-ge,227000000,y),y)
+ifeq ($(call cc-ifversion, -lt, 0500,y),y)
+        $(warning Disabling LTO. Need gcc 5+)
+	undefine CONFIG_LTO
+endif
 
+# binutils before 2.27 has various problems with plugins
+ifeq ($(call ld-ifversion,-lt,227000000,y),y)
+        $(warning Disabling LTO. Too old bintuils (< 2.27))
+endif
+
+endif # CONFIG_LTO
+
+
+ifdef CONFIG_LTO
+	# print only once
 ifeq ($(LTO_MESSAGE),)
-$(info Enabling LTO)
-LTO_MESSAGE := 1
+        $(info Enabling LTO)
+        LTO_MESSAGE := 1
 endif
 
 	LTO_CFLAGS := -flto $(DISABLE_TL_REORDER)
 	LTO_FINAL_CFLAGS := -fuse-linker-plugin
-	LTO_CFLAGS += -fno-strict-aliasing
+
+	# gcc 8.x doesn't generate debuginfo if we don't
+	# specify -g on the final linking command line.
+	LTO_FINAL_CFLAGS += $(filter -g%, $(KBUILD_CFLAGS))
 
 # would be needed to support < 5.0
 #	LTO_FINAL_CFLAGS += -fno-toplevel-reorder
@@ -63,6 +82,7 @@ ifdef CONFIG_LTO_DEBUG
 	# add for debugging compiler crashes:
 	# LTO_FINAL_CFLAGS += -dH -save-temps
 endif
+
 ifdef CONFIG_LTO_CP_CLONE
 	LTO_FINAL_CFLAGS += -fipa-cp-clone
 	LTO_CFLAGS += -fipa-cp-clone
@@ -82,13 +102,4 @@ endif
 	# use plugin aware tools
 	AR = $(CROSS_COMPILE)gcc-ar
 	NM = $(CROSS_COMPILE)gcc-nm
-else
-        $(warning WARNING old binutils. LTO disabled)
-endif
-else
-        $(warning "WARNING: Compiler/Linker does not support LTO/WHOPR with linker plugin. CONFIG_LTO disabled.")
-endif
-else
-        $(warning "WARNING: GCC $(call cc-version) too old for LTO/WHOPR. CONFIG_LTO disabled")
-endif
-endif
+endif # CONFIG_LTO
