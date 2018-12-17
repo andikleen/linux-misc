@@ -844,6 +844,7 @@ static const char *const section_white_list[] =
 	".fmt_slot*",			/* EZchip */
 	".gnu.lto*",
 	".discard.*",
+	".gnu.debuglto_.*",
 	NULL
 };
 
