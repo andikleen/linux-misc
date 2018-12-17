@@ -11,6 +11,10 @@ extra-y	+= vmlinux.lds
 
 CPPFLAGS_vmlinux.lds += -U$(UTS_MACHINE)
 
+# something in the 5 level page early init code doesn't like LTO
+# disable for that file
+CFLAGS_head$(BITS).o += $(DISABLE_LTO)
+
 ifdef CONFIG_FUNCTION_TRACER
 # Do not profile debug and lowlevel utilities
 CFLAGS_REMOVE_tsc.o = -pg
