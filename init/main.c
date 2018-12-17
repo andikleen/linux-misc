@@ -897,6 +897,9 @@ int __init_or_module do_one_initcall(initcall_t fn)
 	if (initcall_blacklisted(fn))
 		return -EPERM;
 
+	if (initcall_debug)
+		printk("Calling %pF\n", fn);
+
 	do_trace_initcall_start(fn);
 	ret = fn();
 	do_trace_initcall_finish(fn, ret);
