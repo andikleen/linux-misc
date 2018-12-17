@@ -39,6 +39,7 @@
 # define __GCC4_has_attribute___noclone__             1
 # define __GCC4_has_attribute___optimize__            1
 # define __GCC4_has_attribute___nonstring__           0
+# define __GCC4_has_attribute___no_reorder__          0
 # define __GCC4_has_attribute___no_sanitize_address__ (__GNUC_MINOR__ >= 8)
 #endif
 
@@ -259,8 +260,12 @@
  */
 #define __weak                          __attribute__((__weak__))
 
-#if __GNUC__ >= 5
-#define __noreorder			__attribute__((noreorder))
+/*
+ * https://gcc.gnu.org/onlinedocs/gcc/Common-Function-Attributes.html#Common-Function-Attributes
+ */
+
+#if __has_attribute(__no_reorder__)
+#define __noreorder			__attribute__((no_reorder))
 #else
 #define __noreorder
 #endif
