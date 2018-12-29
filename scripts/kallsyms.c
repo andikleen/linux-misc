@@ -76,6 +76,7 @@ static unsigned int table_size, table_cnt;
 static int all_symbols = 0;
 static int absolute_percpu = 0;
 static int base_relative = 0;
+static int ignore_overflow;
 
 int token_profit[0x10000];
 
@@ -87,7 +88,7 @@ unsigned char best_table_len[256];
 static void usage(void)
 {
 	fprintf(stderr, "Usage: kallsyms [--all-symbols] "
-			"[--base-relative] "
+			"[--base-relative] [--ignore-overflow]"
 			"[--pad=A,B,C] [--pad-file=name] < in.map > out.S\n");
 	exit(1);
 }
@@ -141,14 +142,19 @@ static int read_symbol(FILE *in, struct sym_entry *s)
 		return -1;
 	}
 
+	/* Record if we've found __per_cpu_start/end. */
+	check_symbol_range(sym, s->addr, &percpu_range, 1);
+
 	/* Ignore most absolute/undefined (?) symbols. */
 	if (strcmp(sym, "_text") == 0)
 		_text = s->addr;
 	else if (check_symbol_range(sym, s->addr, text_ranges,
-				    ARRAY_SIZE(text_ranges)) == 0)
+				    ARRAY_SIZE(text_ranges)) == 0) 
 		/* nothing to do */;
 	else if (toupper(stype) == 'A')
 	{
+		if (!strcmp(sym, "phys_startup_64"))
+			return -1;
 		/* Keep these useful absolute symbols */
 		if (strcmp(sym, "__kernel_syscall_via_break") &&
 		    strcmp(sym, "__kernel_syscall_via_epc") &&
@@ -173,7 +179,7 @@ static int read_symbol(FILE *in, struct sym_entry *s)
 	 * and confuse the symbol generation, and they
 	 * are not useful for symbolization.
 	 */
-	else if ((stype = 'W' || stype == 'w') &&
+	else if ((stype == 'W' || stype == 'w') &&
 		(p = strstr(sym, ".c.")) &&
 		isxdigit(p[3]))
 		return -1;
@@ -197,9 +203,6 @@ static int read_symbol(FILE *in, struct sym_entry *s)
 
 	s->percpu_absolute = 0;
 
-	/* Record if we've found __per_cpu_start/end. */
-	check_symbol_range(sym, s->addr, &percpu_range, 1);
-
 	return 0;
 }
 
@@ -208,19 +211,15 @@ static int symbol_in_range(struct sym_entry *s, struct addr_range *ranges,
 {
 	size_t i;
 	struct addr_range *ar;
-	int valid = 0;
 
 	for (i = 0; i < entries; ++i) {
 		ar = &ranges[i];
-
-		if (ar->start && ar->end)
-			valid++;
 
 		if (s->addr >= ar->start && s->addr <= ar->end)
 			return 1;
 	}
 
-	return valid ? 0 : 1;
+	return 0;
 }
 
 static int symbol_valid(struct sym_entry *s)
@@ -424,7 +423,7 @@ static void write_src(int *pad, int *opad)
 				offset = relative_base - table[i].addr - 1;
 				overflow = (offset < INT_MIN || offset >= 0);
 			}
-			if (overflow) {
+			if (overflow && !ignore_overflow) {
 				fprintf(stderr, "kallsyms failure: "
 					"%s symbol value %#llx out of range in relative mode\n",
 					symbol_absolute(&table[i]) ? "absolute" : "relative",
@@ -825,6 +824,7 @@ static void record_relative_base(void)
 		if (!symbol_absolute(&table[i]) &&
 		    table[i].addr < relative_base)
 			relative_base = table[i].addr;
+	fprintf(stderr, "relbase %llx\n", relative_base);
 }
 
 int main(int argc, char **argv)
@@ -842,6 +842,8 @@ int main(int argc, char **argv)
 				absolute_percpu = 1;
 			else if (strcmp(argv[i], "--base-relative") == 0)
 				base_relative = 1;
+			else if (strcmp(argv[i], "--ignore-overflow") == 0)
+				ignore_overflow = 1;
 			else if (strncmp(argv[i], "--pad=", 6) == 0) {
 				inpadp = inpad;
 				if (sscanf(argv[i] + 6, "%d,%d,%d,%d",

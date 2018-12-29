@@ -115,11 +115,12 @@ vmlinux_link()
 }
 
 
-# Create ${2} .o file with all symbols from the ${1} object file
+# Create ${2} .o file with all symbols from the ${1} object file,
+# passing optional options in ${3}
 kallsyms()
 {
 	info KSYM ${2}
-	local kallsymopt;
+	local kallsymopt="${3}"
 
 	if [ -n "${CONFIG_KALLSYMS_ALL}" ]; then
 		kallsymopt="${kallsymopt} --all-symbols"
@@ -132,32 +133,18 @@ kallsyms()
 	if [ -n "${CONFIG_KALLSYMS_BASE_RELATIVE}" ]; then
 		kallsymopt="${kallsymopt} --base-relative"
 	fi
-	kallsymopt="${kallsymopt} $3"
 
 	local aflags="${KBUILD_AFLAGS} ${KBUILD_AFLAGS_KERNEL}               \
 		      ${NOSTDINC_FLAGS} ${LINUXINCLUDE} ${KBUILD_CPPFLAGS}"
 
-	# workaround for slim LTO gcc-nm not outputing static symbols
-	# http://gcc.gnu.org/PR60016
-	# generate a fake symbol table based on the LTO function sections.
-	# This unfortunately "knows" about the internal LTO file format
-	# and only works for functions
-	# needs perl for now when building for LTO
+	local afile="`basename ${2} .o`.S"
 	(
 	if $OBJDUMP --section-headers ${1} | grep -q \.gnu\.lto_ ; then
-		${OBJDUMP} --section-headers ${1} |
-		perl -ne '
-@n = split;
-next unless $n[1] =~ /\.gnu\.lto_([_a-zA-Z][^.]+)/;
-next if $n[1] eq $prev;
-$prev = $n[1];
-print "0 T ",$1,"\n"'
+		$(srctree)/scripts/lto-nm ${1} 
 	fi
 	${NM} -n ${1} | awk 'NF == 3 { print }'
-	)  > ${2}_sym
-	# run without pipe to make kallsyms errors stop the script
-	./scripts/kallsyms ${kallsymopt} < ${2}_sym |
-		${CC} ${aflags} -c -o ${2} -x assembler-with-cpp -
+	)  | tee ${2}.kallsyms | ./scripts/kallsyms ${kallsymopt} > ${afile}
+	${CC} ${aflags} -c -o ${2} ${afile}
 
 }
 
@@ -176,6 +163,7 @@ sortextable()
 # Delete output files in case of error
 cleanup()
 {
+	return 
 	rm -f .tmp_System.map
 	rm -f .tmp_kallsyms*
 	rm -f .tmp_vmlinux*
@@ -256,7 +244,7 @@ if [ -n "${CONFIG_KALLSYMS}" ] ; then
 	info KALLSYMS1 .tmp_kallsyms1.o
 	kallsyms "${KBUILD_VMLINUX_INIT} ${KBUILD_VMLINUX_MAIN}" \
 		 .tmp_kallsyms1.o \
-		 "--pad-file=.kallsyms_pad"
+		 "--pad-file=.kallsyms_pad --ignore-overflow"
 	kallsymsso=.tmp_kallsyms1.o
 fi
 
