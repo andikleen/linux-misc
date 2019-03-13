@@ -68,8 +68,15 @@ modpost_link()
 {
 	local objects
 
-	objects="--whole-archive				\
-		built-in.a					\
+	objects="--whole-archive"
+
+	if [ -n "${CONFIG_LTO}" -a -z "${CONFIG_LTO_DISABLE}" ]; then
+		objects="$objects -fno-lto ${KBUILD_VMLINUX_HEAD} -flto"
+	else
+		objects="$objects ${KBUILD_VMLINUX_HEAD}"
+	fi
+
+	objects="$objects built-in.a				\
 		--no-whole-archive				\
 		--start-group					\
 		${KBUILD_VMLINUX_LIBS}				\
@@ -87,8 +94,15 @@ vmlinux_link()
 	local objects
 
 	if [ "${SRCARCH}" != "um" ]; then
-		objects="--whole-archive			\
-			built-in.a				\
+		objects="--whole-archive "
+
+		if [ -n "${CONFIG_LTO}" -a -z "${CONFIG_LTO_DISABLE}" ]; then
+			objects="$objects -fno-lto ${KBUILD_VMLINUX_HEAD} -flto"
+		else
+			objects="$objects ${KBUILD_VMLINUX_HEAD}"
+		fi
+
+		objects="$objects built-in.a			\
 			--no-whole-archive			\
 			--start-group				\
 			${KBUILD_VMLINUX_LIBS}			\

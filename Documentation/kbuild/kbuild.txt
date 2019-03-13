@@ -232,10 +232,17 @@ KBUILD_LDS
 --------------------------------------------------
 The linker script with full path. Assigned by the top-level Makefile.
 
+KBUILD_VMLINUX_HEAD
+--------------------------------------------------
+All object files that must be at fixed addresses.
+Files specified with KBUILD_VMLINUX_HEAD are linked first, and not subject to
+link time optimization.
+
 KBUILD_VMLINUX_INIT
 --------------------------------------------------
 All object files for the init (first) part of vmlinux.
-Files specified with KBUILD_VMLINUX_INIT are linked first.
+Files specified with KBUILD_VMLINUX_INIT are linked after KBUILD_VMLINUX_HEAD,
+and are subject to link time optimization, if enabled.
 
 KBUILD_VMLINUX_MAIN
 --------------------------------------------------
