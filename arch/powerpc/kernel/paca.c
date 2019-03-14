@@ -170,7 +170,7 @@ void __init initialise_paca(struct paca_struct *new_paca, int cpu)
 void setup_paca(struct paca_struct *new_paca)
 {
 	/* Setup r13 */
-	local_paca = new_paca;
+	set_paca(new_paca);
 
 #ifdef CONFIG_PPC_BOOK3E
 	/* On Book3E, initialize the TLB miss exception frames */

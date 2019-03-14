@@ -34,18 +34,37 @@
 #include <asm/cpuidle.h>
 #include <asm/atomic.h>
 
-register struct paca_struct *local_paca asm("r13");
-
 #if defined(CONFIG_DEBUG_PREEMPT) && defined(CONFIG_SMP)
 extern unsigned int debug_smp_processor_id(void); /* from linux/smp.h */
-/*
- * Add standard checks that preemption cannot occur when using get_paca():
- * otherwise the paca_struct it points to may be the wrong one just after.
- */
-#define get_paca()	((void) debug_smp_processor_id(), local_paca)
-#else
-#define get_paca()	local_paca
 #endif
+
+static __always_inline struct paca_struct *get_paca_no_preempt_check(void)
+{
+	register struct paca_struct *paca asm("r13");
+
+	return paca;
+}
+
+static __always_inline struct paca_struct *get_paca(void)
+{
+#if defined(CONFIG_DEBUG_PREEMPT) && defined(CONFIG_SMP)
+	/*
+	 * Add standard checks that preemption cannot occur when using get_paca():
+	 * otherwise the paca_struct it points to may be the wrong one just after.
+	 */
+	debug_smp_processor_id();
+#endif
+	return get_paca_no_preempt_check();
+}
+
+#define local_paca	get_paca_no_preempt_check()
+
+static __always_inline void set_paca(struct paca_struct *new)
+{
+	register struct paca_struct *paca asm("r13");
+
+	paca = new;
+}
 
 #ifdef CONFIG_PPC_PSERIES
 #define get_lppaca()	(get_paca()->lppaca_ptr)
