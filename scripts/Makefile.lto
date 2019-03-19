@@ -21,9 +21,12 @@ endif
 # Some ar versions need a lot of file descriptors when using the LTO
 # plugin and cause strange errors when it is too low.
 # XXX determine better threshold
+# XXX narrow down versions
+ifeq ($(shell if ar --version | grep -q 2\.31 ; then echo bad ; fi),bad)
 ifeq ($(shell if test `ulimit -n` -lt 4000 ; then echo yes ; fi),yes)
-        $(warning Disabling LTO. File descriptor limit too low. Increase with ulimit -n 4000)
+        $(warning Disabling LTO. File descriptor limit too low. Increase with ulimit -n 4000 or upgrade binutils)
         undefine CONFIG_LTO
+endif
 endif
 
 # 4.7 works mostly, but it sometimes loses symbols on large builds
