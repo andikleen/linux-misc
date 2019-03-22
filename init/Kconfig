@@ -1171,49 +1171,36 @@ config LD_DEAD_CODE_DATA_ELIMINATION
 config ARCH_SUPPORTS_LTO
 	bool
 
-config LTO_MENU
+config LTO
 	bool "Enable gcc link time optimization (LTO)"
 	depends on ARCH_SUPPORTS_LTO
+	# 4.7 works mostly, but it sometimes loses symbols on large builds
+	# This can be worked around by marking those symbols visible,
+	# but that is fairly ugly and the problem is gone with 4.8
+	# 4.8 was very slow
+	# 4.9 was missing __attribute__((noreorder)) for ordering initcalls,
+	# and needed -fno-toplevel-reorder, which can lead to missing symbols
+	# so only support 5.0+
+	# 6.0 exploded with ubsan enabled
+	# now only 7.0+ but 5.0+ will likely still work except for ubsan
+	depends on CC_IS_GCC && GCC_VERSION >= 70000 && !COMPILE_TEST
 	help
 	  With this option gcc will do whole program optimizations for
 	  the whole kernel and module. This increases compile time, but can
-	  lead to better code. It allows gcc to inline functions between
-	  different files and do other optimization.  It might also trigger
-	  bugs due to more aggressive optimization. It allows gcc to drop unused
-	  code. On smaller monolithic kernel configurations
-	  it usually leads to smaller kernels, especially when modules
-	  are disabled.
+	  lead to smaller kernels and potentially better code.  It also
+	  allows gcc to detect some problems, such as type mismatches
+	  between files and some other global analysis.
+	  It allows gcc to inline functions between different files and do
+	  other global optimizations.
 
-	  With this option gcc will also do some global checking over
-	  different source files. It also disables a number of kernel
-	  features.
-
-	  This option is recommended for release builds. With LTO
-	  the kernel always has to be re-optimized (but not re-parsed)
-	  on each build.
-
-	  This requires a gcc 6.0 or later compiler.
+	  This requires a gcc 7.0 or later compiler. gcc 8+ is recommended
+	  for better build performance.
 
 	  On larger configurations this may need more than 4GB of RAM.
-	  It will likely not work on those with a 32bit compiler.
+	  It will likely not work well with a 32bit compiler.
 
-	  When the toolchain support is not available this will (hopefully)
+	  When the toolchain support is not available this will
 	  be automatically disabled.
-
-	  For more information see Documentation/lto-build
-
-config LTO_DISABLE
-         bool "Disable LTO again"
-         depends on LTO_MENU
-         default n
-         help
-           This option is merely here so that allyesconfig or allmodconfig do
-           not enable LTO. If you want to actually use LTO do not enable.
-
-config LTO
-	bool
-	default y
-	depends on LTO_MENU && !LTO_DISABLE
 
 config LTO_CP_CLONE
 	bool "Allow aggressive cloning for function specialization"
