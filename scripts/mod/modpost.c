@@ -532,6 +532,12 @@ static int parse_elf(struct elf_info *info, const char *filename)
 			info->export_unused_gpl_sec = i;
 		else if (strcmp(secname, "__ksymtab_gpl_future") == 0)
 			info->export_gpl_future_sec = i;
+		else if (strstarts(secname, ".gnu.lto_.symtab")) {
+			info->lto_symtab_start = (void *)hdr +
+				sechdrs[i].sh_offset;
+			info->lto_symtab_end = (void *)hdr +
+				sechdrs[i].sh_offset + sechdrs[i].sh_size;
+		}
 
 		if (sechdrs[i].sh_type == SHT_SYMTAB) {
 			unsigned int sh_link_idx;
