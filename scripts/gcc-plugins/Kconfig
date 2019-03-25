@@ -133,6 +133,7 @@ config GCC_PLUGIN_STRUCTLEAK_VERBOSE
 
 config GCC_PLUGIN_RANDSTRUCT
 	bool "Randomize layout of sensitive kernel structures"
+	depends on !LTO # incompatible with modversions currently
 	select MODVERSIONS if MODULES
 	help
 	  If you say Y here, the layouts of structures that are entirely
