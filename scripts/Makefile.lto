@@ -32,12 +32,6 @@ endif
 endif # CONFIG_LTO
 
 ifdef CONFIG_LTO
-ifeq ($(LTO_MESSAGE),)
-        $(info Enabling LTO)
-        LTO_MESSAGE := 1
-	export LTO_MESSAGE
-endif
-
 	LTO_CFLAGS := -flto
 
 	# gcc 8.x doesn't generate debuginfo if we don't
