@@ -57,7 +57,9 @@
 	asmlinkage long __x64_sys_##sname(void)
 
 #define COND_SYSCALL(name)						\
+	asmlinkage long __x64_sys_##sname(void);			\
 	cond_syscall(__x64_sys_##name);					\
+	asmlinkage long __ia32_sys_##sname(void);			\
 	cond_syscall(__ia32_sys_##name)
 
 #define SYS_NI(name)							\
