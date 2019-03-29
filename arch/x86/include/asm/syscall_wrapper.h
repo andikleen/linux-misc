@@ -57,11 +57,15 @@
 	asmlinkage long __x64_sys_##sname(void)
 
 #define COND_SYSCALL(name)						\
+	asmlinkage long __x64_sys_##sname(void);			\
 	cond_syscall(__x64_sys_##name);					\
+	asmlinkage long __ia32_sys_##sname(void);			\
 	cond_syscall(__ia32_sys_##name)
 
 #define SYS_NI(name)							\
+	asmlinkage long __x64_sys_##sname(void);			\
 	SYSCALL_ALIAS(__x64_sys_##name, sys_ni_posix_timers);		\
+	asmlinkage long __ia32_sys_##sname(void);			\
 	SYSCALL_ALIAS(__ia32_sys_##name, sys_ni_posix_timers)
 
 #else /* CONFIG_IA32_EMULATION */
@@ -194,7 +198,9 @@
 #endif
 
 #ifndef SYS_NI
-#define SYS_NI(name) SYSCALL_ALIAS(__x64_sys_##name, sys_ni_posix_timers);
+#define SYS_NI(name) \
+	typeof(sys_##sname) __x64_sys_##sname;	\
+	SYSCALL_ALIAS(__x64_sys_##name, sys_ni_posix_timers);
 #endif
 
 
