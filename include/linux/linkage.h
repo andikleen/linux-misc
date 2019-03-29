@@ -23,8 +23,10 @@
 #endif
 
 #ifndef cond_syscall
-#define cond_syscall(x)	\
-	__visible typeof(x) x __attribute__((alias("sys_ni_syscall")))
+#define cond_syscall(x)	asm(				\
+	".weak " __stringify(x) "\n\t"			\
+	".set  " __stringify(x) ","			\
+		 __stringify(sys_ni_syscall))
 #endif
 
 #ifndef SYSCALL_ALIAS
