@@ -244,6 +244,7 @@ config X86
 	select PCI_DOMAINS			if PCI
 	select PCI_LOCKLESS_CONFIG		if PCI
 	select PERF_EVENTS
+	select ARCH_SUPPORTS_GCC_LTO
 	select RTC_LIB
 	select RTC_MC146818_LIB
 	select SPARSE_IRQ
