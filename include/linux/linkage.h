@@ -29,7 +29,7 @@
 
 #ifndef SYSCALL_ALIAS
 #define SYSCALL_ALIAS(a, name) \
-	typeof(a) a __attribute__((alias(__stringify(name))))
+	long a(void) __attribute__((alias(__stringify(name))))
 #endif
 
 #define __page_aligned_data	__section(.data..page_aligned) __aligned(PAGE_SIZE)
