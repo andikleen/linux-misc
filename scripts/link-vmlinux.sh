@@ -251,7 +251,7 @@ fi;
 ${MAKE} -f "${srctree}/scripts/Makefile.build" obj=init need-builtin=1
 
 #link vmlinux.o
-info LD vmlinux.o
+info LDFINAL vmlinux.o
 modpost_link vmlinux.o
 
 # modpost vmlinux.o to check for section mismatches

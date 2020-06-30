@@ -277,7 +277,8 @@ $(obj)/%.mod: $(obj)/%.o FORCE
 targets += $(mod-targets)
 
 quiet_cmd_cc_lst_c = MKLST   $@
-      cmd_cc_lst_c = $(CC) $(c_flags) -g -c -o $*.o $< && \
+      cmd_cc_lst_c = $(if $(CONFIG_LTO),y,$(warning Listing in LTO mode not same as final binary)) \
+		     $(CC) $(c_flags) -g -c -o $*.o $< && \
 		     $(CONFIG_SHELL) $(srctree)/scripts/makelst $*.o \
 				     System.map $(OBJDUMP) > $@
 
@@ -415,7 +416,7 @@ endif
 # Do not replace $(filter %.o,^) with $(real-prereqs). When a single object
 # module is turned into a multi object module, $^ will contain header file
 # dependencies recorded in the .*.cmd file.
-quiet_cmd_link_multi-m = LD [M]  $@
+quiet_cmd_link_multi-m = LDFINAL [M]  $@
       cmd_link_multi-m = $(LDFINAL) $(ld_flags) -r $(KBUILD_MOD_LDFLAGS) \
 				-o $@ $(filter %.o,$^)
 
