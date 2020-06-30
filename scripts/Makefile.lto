@@ -4,9 +4,13 @@
 
 DISABLE_LTO :=
 LTO_CFLAGS :=
+KBUILD_MOD_LDFLAGS :=
+KBUILD_MODPOST_LDFLAGS :=
 
 export DISABLE_LTO
 export LTO_CFLAGS
+export KBUILD_MOD_LDFLAGS
+export KBUILD_MODPOST_LDFLAGS
 
 ifdef CONFIG_LTO
 
@@ -65,6 +69,13 @@ endif
 #	LTO_FINAL_CFLAGS += -fno-toplevel-reorder
 
 	LTO_FINAL_CFLAGS += -flto=jobserver
+
+	KBUILD_MOD_LDFLAGS += -flinker-output=nolto-rel
+
+	# do full LTO before main kernel modpost
+	# XXX should switch to running modpost on the final executable
+	# to avoid the time overhead
+	KBUILD_MODPOST_LDFLAGS += -flinker-output=nolto-rel
 
 	# don't compile everything twice
 	# requires plugin ar

@@ -338,7 +338,7 @@ cmd_modversions_S =								\
 		$(call cmd_gensymtypes_S,$(KBUILD_SYMTYPES),$(@:.o=.symtypes))	\
 		    > $(@D)/.tmp_$(@F:.o=.ver);					\
 										\
-		$(LD) $(KBUILD_LDFLAGS) -r -o $(@D)/.tmp_$(@F) $@ 		\
+		$(LDFINAL) $(KBUILD_LDFLAGS) -r $(KBUILD_MOD_LDFLAGS) -o $(@D)/.tmp_$(@F) $@	\
 			-T $(@D)/.tmp_$(@F:.o=.ver);				\
 		mv -f $(@D)/.tmp_$(@F) $@;					\
 		rm -f $(@D)/.tmp_$(@F:.o=.ver);					\
@@ -416,7 +416,8 @@ endif
 # module is turned into a multi object module, $^ will contain header file
 # dependencies recorded in the .*.cmd file.
 quiet_cmd_link_multi-m = LD [M]  $@
-      cmd_link_multi-m = $(LD) $(ld_flags) -r -o $@ $(filter %.o,$^)
+      cmd_link_multi-m = $(LDFINAL) $(ld_flags) -r $(KBUILD_MOD_LDFLAGS) \
+				-o $@ $(filter %.o,$^)
 
 $(multi-used-m): FORCE
 	$(call if_changed,link_multi-m)
