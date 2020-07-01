@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: GPL-2.0
+#
+# include after auto.conf
+
+ifdef CONFIG_MODVERSIONS
+# collect all the CRCs for kernel symbols in a single vermerged.o
+# $1: postfix of target
+# $2: input files
+# produces merged object in $$TO shell variable in same recipe
+merge_ksyms = \
+	TC=$(@D)/.tmp_$(@F:$(1)=_vermerged.c); \
+	TO=$(@D)/.tmp_$(@F:$(1)=_vermerged.o); \
+	cat $(patsubst %.o,%.ver.c,$(filter %.o,$(2))) /dev/null > $$TC; \
+	$(CC) -c -o $$TO $$TC; \
+        rm -f $$TC
+
+# after immediate linking generate a dummy .ver.c for the next step
+# it's not needed anymore becauses the CRCs are already linked in
+# $1: target
+update-ksyms = echo > $(1:.o=.ver.c)
+else
+merge_ksyms = true
+update-ksyms = true
+endif
