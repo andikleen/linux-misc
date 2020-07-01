@@ -1285,37 +1285,54 @@ config LD_DEAD_CODE_DATA_ELIMINATION
 config ARCH_SUPPORTS_LTO
 	bool
 
+config FILE_DESCRIPTORS
+	int
+	default $(shell,ulimit -n)
+
+# Some ar versions leak file descriptors when using the LTO
+# plugin and cause strange errors when ulimit -n is too low.
+# Pick an arbitrary threshold, which should be enough for most
+# kernel configs. This was regression that is only
+# in some transient binutils version, so either older or
+# new enough is ok.
+# This might not be the exact range with this bug.
+config BAD_AR
+	depends on LD_VERSION = 230000000
+	depends on FILE_DESCRIPTORS < 4000
+	def_bool y
+
 config LTO_MENU
 	bool "Enable gcc link time optimization (LTO)"
 	depends on ARCH_SUPPORTS_LTO
-	# lto does not support excluding flags for specific files
-	# right now. Can be removed if that is fixed.
-	#depends on !FUNCTION_TRACER
+# for now. Does LLVM need the gcc infrastructure at all?
+	depends on CC_IS_GCC
+# 4.7 works mostly, but it sometimes loses symbols on large builds
+# This can be worked around by marking those symbols visible,
+# but that is fairly ugly and the problem is gone with 4.8
+# 4.8 was very slow
+# 4.9 was missing __attribute__((noreorder)) for ordering initcalls,
+# and needed -fno-toplevel-reorder, which can lead to missing symbols
+# 5.0 ICEs with newer kernels
+# so only support 6.0+
+	depends on GCC_VERSION >= 60000
+# binutils before 2.27 has various problems with plugins
+	depends on LD_VERSION >= 227000000
+	depends on !BAD_AR
 	help
-	  With this option gcc will do whole program optimizations for
-	  the whole kernel and module. This increases compile time, but can
-	  lead to better code. It allows gcc to inline functions between
-	  different files and do other optimization.  It might also trigger
-	  bugs due to more aggressive optimization. It allows gcc to drop unused
-	  code. On smaller monolithic kernel configurations
-	  it usually leads to smaller kernels, especially when modules
+	  Enable whole program optimizations for the the whole kernel and each module.
+	  This increases compile time, but can lead to better code. It allows the compiler
+	  to inline functions between different files and do other optimization.
+	  It allows the compilerc to drop unused code. On smaller monolithic kernel
+	  configurations it usually leads to smaller kernels, especially when modules
 	  are disabled.
 
-	  With this option gcc will also do some global checking over
-	  different source files. It also disables a number of kernel
-	  features.
-
-	  This option is recommended for release builds. With LTO
-	  the kernel always has to be re-optimized (but not re-parsed)
-	  on each build.
+	  With this option the compiler will also do some global checking over
+	  different source files.
 
 	  This requires a gcc 6.0 or later compiler.
 
 	  On larger configurations this may need more than 4GB of RAM.
 	  It will likely not work on those with a 32bit compiler.
-
-	  When the toolchain support is not available this will (hopefully)
-	  be automatically disabled.
 
 	  For more information see Documentation/lto-build
 
@@ -1331,17 +1348,6 @@ config LTO
 	bool
 	default y
 	depends on LTO_MENU && !LTO_DISABLE
-
-config LTO_DEBUG
-	bool "Enable LTO compile time debugging"
-	depends on LTO
-	help
-	  Enable LTO debugging in the compiler. The compiler dumps
-	  some log files that make it easier to figure out LTO
-	  behavior. The log files also allow to reconstruct
-	  the global inlining and a global callgraph.
-	  They however add some (single threaded) cost to the
-	  compilation.  When in doubt do not enable.
 
 config LTO_CP_CLONE
 	bool "Allow aggressive cloning for function specialization"
