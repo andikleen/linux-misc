@@ -291,7 +291,7 @@ $(obj)/%.mod: $(obj)/%.o FORCE
 targets += $(mod-targets)
 
 quiet_cmd_cc_lst_c = MKLST   $@
-      cmd_cc_lst_c = $(if $(CONFIG_LTO),y,$(warning Listing in LTO mode not same as final binary)) \
+      cmd_cc_lst_c = $(if $(CONFIG_LTO),$(warning Listing in LTO mode does not match final binary)) \
 		     $(CC) $(c_flags) -g -c -o $*.o $< && \
 		     $(CONFIG_SHELL) $(srctree)/scripts/makelst $*.o \
 				     System.map $(OBJDUMP) > $@
