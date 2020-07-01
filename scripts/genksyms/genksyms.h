@@ -53,7 +53,7 @@ extern int in_source_file;
 struct symbol *find_symbol(const char *name, enum symbol_type ns, int exact);
 struct symbol *add_symbol(const char *name, enum symbol_type type,
 			  struct string_list *defn, int is_extern);
-void export_symbol(const char *);
+void export_symbol(const char *, const char *);
 
 void free_node(struct string_list *list);
 void free_list(struct string_list *s, struct string_list *e);
