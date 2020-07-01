@@ -2,6 +2,7 @@
 /*
  * Copyright (C) 2002 Roman Zippel <zippel@linux-m68k.org>
  */
+%define parse.error detailed
 %{
 
 #include <ctype.h>
