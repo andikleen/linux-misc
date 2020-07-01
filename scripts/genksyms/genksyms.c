@@ -33,7 +33,7 @@ char *cur_filename, *source_file;
 int in_source_file;
 
 static int flag_debug, flag_dump_defs, flag_reference, flag_dump_types,
-	   flag_preserve, flag_warnings, flag_rel_crcs;
+	   flag_preserve, flag_warnings, flag_rel_crcs, flag_c_output;
 
 static int errors;
 static int nsyms;
@@ -681,10 +681,14 @@ void export_symbol(const char *name)
 			fputs(">\n", debugfile);
 
 		/* Used as a linker script. */
-		printf(!flag_rel_crcs ? "__crc_%s = 0x%08lx;\n" :
-		       "SECTIONS { .rodata : ALIGN(4) { "
-		       "__crc_%s = .; LONG(0x%08lx); } }\n",
-		       name, crc);
+		if (flag_c_output)
+			printf("asm(\".globl %s ; .set __crc_%s,0x%08lx\");\n",
+					name, name, crc);
+		else
+			printf(!flag_rel_crcs ? "__crc_%s = 0x%08lx;\n" :
+				"SECTIONS { .rodata : ALIGN(4) { "
+				"__crc_%s = .; LONG(0x%08lx); } }\n",
+				name, crc);
 	}
 }
 
@@ -734,6 +738,7 @@ static void genksyms_usage(void)
 	      "  -h, --help            Print this message\n"
 	      "  -V, --version         Print the release version\n"
 	      "  -R, --relative-crc    Emit section relative symbol CRCs\n"
+	      "  -c, --c-output	       Generate C output\n"
 #else				/* __GNU_LIBRARY__ */
 	      "  -s                    Select symbol prefix\n"
 	      "  -d                    Increment the debug level (repeatable)\n"
@@ -746,6 +751,7 @@ static void genksyms_usage(void)
 	      "  -h                    Print this message\n"
 	      "  -V                    Print the release version\n"
 	      "  -R                    Emit section relative symbol CRCs\n"
+	      "  -c		       Generate C output\n"
 #endif				/* __GNU_LIBRARY__ */
 	      , stderr);
 }
@@ -767,13 +773,14 @@ int main(int argc, char **argv)
 		{"version", 0, 0, 'V'},
 		{"help", 0, 0, 'h'},
 		{"relative-crc", 0, 0, 'R'},
+		{"c-output", 0, 0, 'c'},
 		{0, 0, 0, 0}
 	};
 
-	while ((o = getopt_long(argc, argv, "s:dwqVDr:T:phR",
+	while ((o = getopt_long(argc, argv, "s:dwqVDr:T:phRc",
 				&long_opts[0], NULL)) != EOF)
 #else				/* __GNU_LIBRARY__ */
-	while ((o = getopt(argc, argv, "s:dwqVDr:T:phR")) != EOF)
+	while ((o = getopt(argc, argv, "s:dwqVDr:T:phRc")) != EOF)
 #endif				/* __GNU_LIBRARY__ */
 		switch (o) {
 		case 'd':
@@ -798,6 +805,9 @@ int main(int argc, char **argv)
 				perror(optarg);
 				return 1;
 			}
+			break;
+		case 'c':
+			flag_c_output = 1;
 			break;
 		case 'T':
 			flag_dump_types = 1;
