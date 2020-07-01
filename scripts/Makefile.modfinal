@@ -8,6 +8,7 @@ __modfinal:
 
 include include/config/auto.conf
 include $(srctree)/scripts/Kbuild.include
+include $(srctree)/scripts/Makefile.crc
 
 # for c_flags
 include $(srctree)/scripts/Makefile.lib
@@ -32,9 +33,10 @@ ARCH_POSTLINK := $(wildcard $(srctree)/arch/$(SRCARCH)/Makefile.postlink)
 
 quiet_cmd_ld_ko_o = LDFINAL [M]  $@
       cmd_ld_ko_o =                                                     \
+	$(call merge_ksyms,.ko,$(filter-out %.mod.o,$(filter %.o,$^)));	\
 	$(LDFINAL) -r $(KBUILD_MOD_LDFLAGS) $(KBUILD_LDFLAGS)		\
 		$(KBUILD_LDFLAGS_MODULE) $(LDFLAGS_MODULE)		\
-		-T scripts/module.lds -o $@ $(filter %.o, $^);		\
+		-T scripts/module.lds -o $@ $(filter %.o, $^) $$TO;	\
 	$(if $(ARCH_POSTLINK), $(MAKE) -f $(ARCH_POSTLINK) $@, true)
 
 quiet_cmd_btf_ko = BTF [M] $@
