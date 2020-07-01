@@ -56,6 +56,7 @@ efi-deps-y := fdt_rw.c fdt_ro.c fdt_wip.c fdt.c fdt_empty_tree.c fdt_sw.c
 
 $(obj)/lib-%.o: $(srctree)/lib/%.c FORCE
 	$(call if_changed_rule,cc_o_c)
+	$(if $(CONFIG_MODVERSIONS),touch $(@:.o=.ver.c))
 
 lib-$(CONFIG_EFI_GENERIC_STUB)	+= efi-stub.o fdt.o string.o \
 				   $(patsubst %.c,lib-%.o,$(efi-deps-y))
@@ -122,4 +123,5 @@ quiet_cmd_stubcopy = STUBCPY $@
 		echo "$@: absolute symbol references not allowed in the EFI stub" >&2; \
 		/bin/false;						\
 	fi;								\
-	$(OBJCOPY) $(STUBCOPY_FLAGS-y) $< $@
+	$(OBJCOPY) $(STUBCOPY_FLAGS-y) $< $@;				\
+	$(if $(CONFIG_MODVERSIONS),touch $(@:.o=.ver.c),true)
