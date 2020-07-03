@@ -19,7 +19,7 @@ extern struct module __this_module;
 #define THIS_MODULE ((struct module *)0)
 #endif
 
-#ifdef CONFIG_MODVERSIONS
+#if defined(CONFIG_MODVERSIONS) && !defined(CONFIG_LTO)
 /* Mark the CRC weak since genksyms apparently decides not to
  * generate a checksums for some symbols */
 #if defined(CONFIG_MODULE_REL_CRCS)
@@ -78,7 +78,7 @@ struct kernel_symbol {
 
 #ifdef __GENKSYMS__
 
-#define ___EXPORT_SYMBOL(sym, sec, ns)	__GENKSYMS_EXPORT_SYMBOL(sym)
+#define ___EXPORT_SYMBOL(sym, sec, ns)	__GENKSYMS_EXPORT_SYMBOL(ns, sym)
 
 #else
 

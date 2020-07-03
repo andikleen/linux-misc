@@ -631,7 +631,7 @@ static unsigned long expand_and_crc_sym(struct symbol *sym, unsigned long crc)
 	return crc;
 }
 
-void export_symbol(const char *name)
+void export_symbol(const char *ns, const char *name)
 {
 	struct symbol *sym;
 
@@ -682,8 +682,8 @@ void export_symbol(const char *name)
 
 		/* Used as a linker script. */
 		if (flag_c_output)
-			printf("asm(\".globl %s ; .set __crc_%s,0x%08lx\");\n",
-					name, name, crc);
+			printf("int __attribute__((section(\".kcrctab%s%s\"))) __crc_%s = %#lx;\n",
+					name, name, name, crc);
 		else
 			printf(!flag_rel_crcs ? "__crc_%s = 0x%08lx;\n" :
 				"SECTIONS { .rodata : ALIGN(4) { "
