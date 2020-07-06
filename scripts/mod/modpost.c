@@ -1992,6 +1992,25 @@ static char *remove_dot(char *s)
 	return s;
 }
 
+static bool open_ver_o(const char *name, struct elf_info *info)
+{
+	int nlen = strlen(name);
+	char *n = NOFAIL(malloc(nlen + 10));
+	char *p;
+	bool ret;
+
+	if (nlen > 6 && !strcmp(name + nlen - 6, ".ver.o"))
+		return false;
+	strcpy(n, name);
+	p = strrchr(n, '.');
+	if (p)
+		*p = 0;
+	strcat(n, ".ver.o");
+	ret = !access(n, R_OK) && parse_elf(info, n);
+	free(n);
+	return ret;
+}
+
 static void read_symbols(const char *modname)
 {
 	const char *symname;
@@ -1999,11 +2018,14 @@ static void read_symbols(const char *modname)
 	char *license;
 	char *namespace;
 	struct module *mod;
-	struct elf_info info = { };
+	struct elf_info info = { }, vinfo = { };
 	Elf_Sym *sym;
+	bool have_ver_o;
 
 	if (!parse_elf(&info, modname))
 		return;
+
+	have_ver_o = open_ver_o(modname, &vinfo);
 
 	mod = new_module(modname);
 
@@ -2056,6 +2078,20 @@ static void read_symbols(const char *modname)
 					  symname + strlen("__crc_"));
 	}
 
+	if (have_ver_o) {
+		/*
+		 * Also read CRCs from a .ver.o if available. They will be linked
+		 * into the module after modpost.
+		 */
+		for (sym = vinfo.symtab_start; sym < vinfo.symtab_stop; sym++) {
+			symname = remove_dot(vinfo.strtab + sym->st_name);
+			if (strstarts(symname, "__crc_")) {
+				handle_modversion(mod, &vinfo, sym,
+						  symname + strlen("__crc_"));
+			}
+		}
+	}
+
 	// check for static EXPORT_SYMBOL_* functions && global vars
 	for (sym = info.symtab_start; sym < info.symtab_stop; sym++) {
 		unsigned char bind = ELF_ST_BIND(sym->st_info);
@@ -2082,6 +2118,8 @@ static void read_symbols(const char *modname)
 				sizeof(mod->srcversion)-1);
 
 	parse_elf_finish(&info);
+	if (have_ver_o)
+		parse_elf_finish(&vinfo);
 
 	/* Our trick to get versioning for module struct etc. - it's
 	 * never passed as an argument to an exported function, so
