@@ -468,10 +468,10 @@ static void write_src(int *pad, int *opad)
 		if (i > pad[PAD_OFF])
 			bad_padding("address pointers", i - pad[PAD_OFF]);
 		for (; i < pad[PAD_OFF]; i++)
-			printf("\tPTR\t0\n");
+			printf("\t%s\t0\n", base_relative ? ".long" : "PTR");
 	} else {
 		for (i = 0; i < table_cnt / PAD_RATIO; i++)
-			printf("\tPTR\t0\n");
+			printf("\t%s\t0\n", base_relative ? ".long" : "PTR");
 		opad[PAD_OFF] = table_cnt + table_cnt/PAD_RATIO;
 	}
 	printf("\n");
