@@ -350,6 +350,7 @@ if [ -n "${CONFIG_KALLSYMS}" -a -n "${CONFIG_KALLSYMS_SINGLE}" ] ; then
 		exit 1
 	fi
 	scripts/patchfile vmlinux $OFF .tmp_kallsyms2.bin
+	kallsyms_vmlinux=vmlinux
 fi
 
 if [ -n "${CONFIG_BUILDTIME_TABLE_SORT}" ]; then
