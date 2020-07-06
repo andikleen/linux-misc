@@ -232,8 +232,7 @@ quiet_cmd_ld = LD      $@
 
 quiet_cmd_ar = AR      $@
       cmd_ar = $(call merge_ksyms,.a,$(real-prereqs)); \
-               rm -f $@; $(AR) cDPrsT $@ $(real-prereqs) $$TO; \
-               $(call remove-ksyms-o)
+               rm -f $@; $(AR) cDPrsT $@ $(real-prereqs) $$TO
 
 # Objcopy
 # ---------------------------------------------------------------------------

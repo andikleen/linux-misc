@@ -162,7 +162,7 @@ static bool is_ignored_symbol(const char *name, char type)
 	/* Don't include const symbols in the text section
 	 * unless --all-symbols is specified.
 	 */
-	if (toupper(stype) != 'T' && !all_symbols)
+	if (toupper(type) != 'T' && !all_symbols)
 		return true;
 
 
@@ -838,7 +838,7 @@ int main(int argc, char **argv)
 				absolute_percpu = 1;
 			else if (strcmp(argv[i], "--base-relative") == 0)
 				base_relative = 1;
-			} else if (strncmp(argv[i], "--pad=", 6) == 0) {
+			else if (strncmp(argv[i], "--pad=", 6) == 0) {
 				inpadp = inpad;
 				if (sscanf(argv[i] + 6, "%d,%d,%d,%d",
 					   inpad + 0,

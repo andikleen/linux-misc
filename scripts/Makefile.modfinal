@@ -38,7 +38,6 @@ quiet_cmd_ld_ko_o = LDFINAL [M]  $@
 		$(KBUILD_LDFLAGS_MODULE) $(LDFLAGS_MODULE)		\
 		$(addprefix -T , $(KBUILD_LDS_MODULE))			\
 		-o $@ $(filter %.o, $^) $$TO;				\
-	$(call remove-ksyms-o);						\
 	$(if $(ARCH_POSTLINK), $(MAKE) -f $(ARCH_POSTLINK) $@, true)
 
 $(modules): %.ko: %.o %.mod.o $(KBUILD_LDS_MODULE) FORCE

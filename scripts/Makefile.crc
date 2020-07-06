@@ -14,15 +14,11 @@ merge_ksyms = \
 	$(CC) -c -o $$TO $$TC; \
         rm -f $$TC
 
-# call in same recipe as merge_ksyms after consuming merged object
-remove-ksyms-o = rm -f $$TO
-
 # after immediate linking generate a dummy .ver.c for the next step
 # it's not needed anymore becauses the CRCs are already linked in
 # $1: target
 update-ksyms = echo > $(1:.o=.ver.c)
 else
 merge_ksyms = true
-remove-ksyms-o = true
 update-ksyms = true
 endif
