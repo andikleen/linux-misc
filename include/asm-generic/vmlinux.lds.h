@@ -438,7 +438,9 @@
 	TRACEDATA							\
 									\
 	.kallsyms          : AT(ADDR(.kallsyms) - LOAD_OFFSET) {	\
+		__start_kallsyms = .;					\
 		*(.kallsyms)						\
+		__end_kallsyms = .;					\
 	}								\
 									\
 	/* Kernel symbol table: Normal symbols */			\
