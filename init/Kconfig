@@ -1285,20 +1285,16 @@ config LD_DEAD_CODE_DATA_ELIMINATION
 config ARCH_SUPPORTS_LTO
 	bool
 
-config FILE_DESCRIPTORS
-	int
-	default $(shell,ulimit -n)
-
 # Some ar versions leak file descriptors when using the LTO
 # plugin and cause strange errors when ulimit -n is too low.
 # Pick an arbitrary threshold, which should be enough for most
-# kernel configs. This was regression that is only
+# kernel configs. This was a regression that is only
 # in some transient binutils version, so either older or
 # new enough is ok.
 # This might not be the exact range with this bug.
 config BAD_AR
 	depends on LD_VERSION = 230000000
-	depends on FILE_DESCRIPTORS < 4000
+	depends on $(shell,ulimit -n) < 4000
 	def_bool y
 
 config LTO_MENU
