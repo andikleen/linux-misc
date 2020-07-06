@@ -1751,7 +1751,8 @@ clean: $(clean-dirs)
 		-o -name '*.asn1.[ch]' \
 		-o -name '*.symtypes' -o -name 'modules.order' \
 		-o -name '.tmp_*.o.*' \
-		-o -name '.tmp_*_ver.c' \
+		-o -name '*.ver.[co]' \
+		-o -name '.tmp_*_vermerged.[co]' \
 		-o -name '*.c.[012]*.*' \
 		-o -name '*.ll' \
 		-o -name '*.gcno' \) -type f -print | xargs rm -f
