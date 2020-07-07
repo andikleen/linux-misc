@@ -1315,22 +1315,22 @@ config LTO_MENU
 	depends on LD_VERSION >= 227000000
 	depends on !BAD_AR
 	help
-	  Enable whole program optimizations for the the whole kernel and each module.
-	  This increases compile time, but can lead to better code. It allows the compiler
-	  to inline functions between different files and do other optimization.
-	  It allows the compilerc to drop unused code. On smaller monolithic kernel
-	  configurations it usually leads to smaller kernels, especially when modules
-	  are disabled.
+	  Enable whole program (link time) optimizations (LTO) for the the
+	  whole kernel and each module.  This usually increases compile time,
+	  but can lead to better code. It allows the compiler to inline
+	  functions between different files and do other global optimization.
+	  It allows the compiler to drop unused code.
 
 	  With this option the compiler will also do some global checking over
 	  different source files.
 
-	  This requires a gcc 6.0 or later compiler.
+	  This requires a gcc 6.0 or later compiler and not too old binutils.
 
-	  On larger configurations this may need more than 4GB of RAM.
-	  It will likely not work on those with a 32bit compiler.
+	  On larger non modular configurations this may need more than 4GB of
+	  RAM for the link phase. It will likely not work on those with a
+	  32bit hosted compiler.
 
-	  For more information see Documentation/lto-build
+	  For more information see Documentation/kbild/lto-build.rst
 
 config LTO_DISABLE
          bool "Disable LTO again"
