@@ -420,6 +420,7 @@ static void write_src(int *pad, int *opad)
 	printf("#define ALGN .balign 4\n");
 	printf("#endif\n");
 
+	printf("#ifndef NO_SYMS\n");
 	printf("\t.section .kallsyms, \"a\"\n");
 
 	if (!base_relative)
@@ -474,13 +475,19 @@ static void write_src(int *pad, int *opad)
 		opad[PAD_OFF] = table_cnt + table_cnt/PAD_RATIO;
 	}
 	printf("\n");
+	printf("#endif\n");
 
 	if (base_relative) {
+		printf("#ifndef NO_REL\n");
+		printf("\t.section .rodata, \"a\"\n");
 		output_label("kallsyms_relative_base");
 		output_address(relative_base);
 		printf("\n");
+		printf("\t.previous\n");
+		printf("#endif\n");
 	}
 
+	printf("#ifndef NO_SYMS\n");
 	output_label("kallsyms_num_syms");
 	printf("\t.long\t%u\n", table_cnt);
 	printf("\n");
@@ -560,6 +567,7 @@ static void write_src(int *pad, int *opad)
 	for (i = 0; i < 256; i++)
 		printf("\t.short\t%d\n", best_idx[i]);
 	printf("\n");
+	printf("#endif\n");
 }
 
 
