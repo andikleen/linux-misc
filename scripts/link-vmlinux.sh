@@ -168,7 +168,30 @@ kallsyms()
 
 	local afile="`basename ${2} .o`.S"
 
-	${NM} -n ${1} | awk 'NF == 3 { print }' > ${afile/.S/.sym}
+	if [ -n "$CONFIG_LTO" -a -n "$CONFIG_KALLSYMS_SINGLE" -a -n "$CONFIG_CC_IS_GCC" ] &&
+		( ${OBJDUMP} -h ${1} | grep -q gnu\.lto) ; then
+	(
+        # workaround for slim LTO gcc-nm not outputing static symbols
+        # http://gcc.gnu.org/PR60016
+        # generate a fake symbol table based on the LTO function sections.
+        # This unfortunately "knows" about the internal LTO file format
+        # and only works for functions
+
+	# read the function names directly from the LTO object
+	objdump -h ${1} |
+		awk '/gnu\.lto_[a-z]/ { gsub(/\.gnu\.lto_/,""); gsub(/\..*/, ""); print "0 t " $2 } '
+	# read the non LTO symbols with readelf (which doesn't use the LTO plugin,
+	# so we only get pure ELF symbols)
+	# readelf doesn't handle ar, so we have to expand the objects
+	echo ${1} | sed 's/ /\n/g' | grep built-in.a | while read i ; do
+		${AR} t $i | while read j ; do readelf -s $j ; done
+	done | awk 'NF >= 8 { print "0 t " $8 } '
+	# now handle the objects
+	readelf -s `echo ${1} | sed 's/ /\n/g' | grep '\.o$'` | awk 'NF >= 8 { print "0 t " $8 }'
+	) > ${afile/.S/.sym}
+	else
+		${NM} -n ${1} | awk 'NF == 3 { print }' > ${afile/.S/.sym}
+	fi
 	scripts/kallsyms ${kallsymopt} > ${afile} < ${afile/.S/.sym}
 	${CC} ${aflags} -c -o ${2} ${afile}
 }
