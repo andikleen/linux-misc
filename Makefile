@@ -1776,10 +1776,15 @@ clean: $(clean-dirs)
 		-o -name '*.lex.c' -o -name '*.tab.[ch]' \
 		-o -name '*.asn1.[ch]' \
 		-o -name '*.symtypes' -o -name 'modules.order' \
-		-o -name '.tmp_*.o.*' \
+		-o -name '.tmp_*.o' \
+		-o -name '.tmp_*.sym' \
+		-o -name '.tmp_*.S' \
+		-o -name '.tmp_System.map' \
+		-o -name '*.ver.[co]' \
+		-o -name '.tmp_*_vermerged.[co]' \
 		-o -name '*.c.[012]*.*' \
 		-o -name '*.ll' \
-		-o -name '*.gcno' \) -type f -print | xargs rm -f
+		-o -name '*.gcno' -o -name '.kallsyms.pad' \) -type f -print | xargs rm -f
 
 # Generate tags for editors
 # ---------------------------------------------------------------------------
