@@ -144,8 +144,8 @@ gen_btf()
 	printf '\1' | dd of=${2} conv=notrunc bs=1 seek=16 status=none
 }
 
-# Create ${2} .o file with all symbols from the ${1} object file
-kallsyms()
+# Create ${2} .S file with all symbols from the ${1} object file
+kallsyms_s()
 {
 	info KSYM ${2}
 	local kallsymopt;
@@ -163,10 +163,7 @@ kallsyms()
 	fi
 	kallsymopt="${kallsymopt} $3 $4 $5"
 
-	local aflags="${KBUILD_AFLAGS} ${KBUILD_AFLAGS_KERNEL}               \
-		      ${NOSTDINC_FLAGS} ${LINUXINCLUDE} ${KBUILD_CPPFLAGS}"
-
-	local afile="`basename ${2} .o`.S"
+	local afile="${2}"
 
 	(
 	if [ -n "$CONFIG_LTO" -a -n "$CONFIG_KALLSYMS_SINGLE" -a -n "$CONFIG_CC_IS_GCC" ] &&
@@ -194,7 +191,22 @@ kallsyms()
 		${NM} -n ${1}
 	fi
 	) | scripts/kallsyms ${kallsymopt} > ${afile}
-	${CC} ${aflags} -c -o ${2} ${afile}
+}
+
+kallsyms_o()
+{
+	local aflags="${KBUILD_AFLAGS} ${KBUILD_AFLAGS_KERNEL}               \
+		      ${NOSTDINC_FLAGS} ${LINUXINCLUDE} ${KBUILD_CPPFLAGS}"
+
+	${CC} $3 $4 $5 ${aflags} -c -o ${2} ${1}
+}
+
+# Create ${2} .o file with all symbols from the ${1} object file
+kallsyms()
+{
+	local s=`basename $2 .o`.S
+	kallsyms_s "$1" $s $3 $4 $5 $6 $7
+	kallsyms_o $s $2
 }
 
 # Perform one step in kallsyms generation, including temporary linking of
@@ -308,16 +320,23 @@ fi
 kallsymso=""
 kallsymso_prev=""
 kallsyms_vmlinux=""
+kallsymsorel=""
 if [ -n "${CONFIG_KALLSYMS}" -a -n "${CONFIG_KALLSYMS_SINGLE}" ]; then
 	# Generate kallsyms from the top level object files
 	# this is slightly off, and has wrong addresses,
 	# but gives us the conservative max length of the kallsyms
 	# table to link in something with the right size.
 	info KALLSYMS1 .tmp_kallsyms1.o
-	kallsyms "${KBUILD_VMLINUX_OBJS} ${KBUILD_VMLINUX_LIBS}" .tmp_kallsyms1.o \
+	kallsyms_s "${KBUILD_VMLINUX_OBJS} ${KBUILD_VMLINUX_LIBS}" \
+		.tmp_kallsyms1.S \
 		--all-symbols \
 		"--pad-file=.kallsyms_pad"
+	# split the object into kallsyms with relocations and no relocations
+	# the relocations part does not change in step 2
+	kallsyms_o .tmp_kallsyms1.S .tmp_kallsyms1.o -DNO_REL
+	kallsyms_o .tmp_kallsyms1.S .tmp_kallsyms1rel.o -DNO_SYMS
 	kallsymso=.tmp_kallsyms1.o
+	kallsymsorel=.tmp_kallsyms1rel.o
 elif [ -n "${CONFIG_KALLSYMS}" ]; then
 
 	# kallsyms support
@@ -356,14 +375,15 @@ elif [ -n "${CONFIG_KALLSYMS}" ]; then
 fi
 
 info LDFINAL vmlinux
-vmlinux_link vmlinux "${kallsymso}" ${btf_vmlinux_bin_o}
+vmlinux_link vmlinux "${kallsymso} ${kallsymsorel}" ${btf_vmlinux_bin_o}
 
 if [ -n "${CONFIG_KALLSYMS}" -a -n "${CONFIG_KALLSYMS_SINGLE}" ] ; then
 	# Now regenerate the kallsyms table and patch it into the
 	# previously linked file. We tell kallsyms to pad it
 	# to the previous length, so that no symbol changes.
 	info KALLSYMS2 .tmp_kallsyms2.o
-	kallsyms vmlinux .tmp_kallsyms2.o `cat .kallsyms_pad`
+	kallsyms_s vmlinux .tmp_kallsyms2.S `cat .kallsyms_pad`
+	kallsyms_o .tmp_kallsyms2.S .tmp_kallsyms2.o -DNO_REL
 
 	info OBJCOPY .tmp_kallsyms2.bin
 	${OBJCOPY} -O binary .tmp_kallsyms2.o .tmp_kallsyms2.bin
