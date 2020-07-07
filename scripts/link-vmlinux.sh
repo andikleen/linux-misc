@@ -385,6 +385,12 @@ if [ -n "${CONFIG_KALLSYMS}" -a -n "${CONFIG_KALLSYMS_SINGLE}" ] ; then
 	kallsyms_s vmlinux .tmp_kallsyms2.S `cat .kallsyms_pad`
 	kallsyms_o .tmp_kallsyms2.S .tmp_kallsyms2.o -DNO_REL
 
+	# sanity check the offsets
+	${NM} .tmp_kallsyms1.o >.tmp_kallsyms1.nm
+	${NM} .tmp_kallsyms2.o >.tmp_kallsyms2.nm
+	cmp .tmp_kallsyms1.nm .tmp_kallsyms2.nm
+	rm .tmp_kallsyms[12].nm
+
 	info OBJCOPY .tmp_kallsyms2.bin
 	${OBJCOPY} -O binary .tmp_kallsyms2.o .tmp_kallsyms2.bin
 
