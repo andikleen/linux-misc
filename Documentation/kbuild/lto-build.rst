@@ -1,4 +1,6 @@
+=====================================================
 gcc link time optimization (LTO) for the Linux kernel
+=====================================================
 
 Link Time Optimization allows the compiler to optimize the complete program
 instead of just each file.
@@ -31,10 +33,12 @@ collector pools based on that or on the ulimit -m limits) and
 the compiler version.
 
 Configuration:
+--------------
 - Enable CONFIG_LTO_MENU and then disable CONFIG_LTO_DISABLE.
 This is mainly to not have allyesconfig default to LTO.
 
 Requirements:
+-------------
 - Enough memory: 4GB for a standard build, more for allyesconfig
 The peak memory usage happens single threaded (when lto-wpa merges types),
 so dialing back -j options will not help much.
@@ -43,13 +47,14 @@ A 32bit compiler is unlikely to work due to the memory requirements.
 You can however build a kernel targeted at 32bit on a 64bit host.
 
 FAQs:
-
+-----
 Q: I get a section type attribute conflict
 A: Usually because of someone doing
 const __initdata (should be const __initconst) or const __read_mostly
 (should be just const). Check both symbols reported by gcc.
 
 References:
+-----------
 
 Presentation on Kernel LTO
 (note, performance numbers/details outdated.  In particular gcc 4.9 fixed
