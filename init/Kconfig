@@ -1678,10 +1678,10 @@ config KALLSYMS_BASE_RELATIVE
 	  up the entries based on the runtime load address of the kernel.
 
 config KALLSYMS_SINGLE
-       bool
+       bool "Single pass kallsyms"
        default y if LTO
        # For now. Needs to be tested on other architectures.
-       depends on ARCH_SUPPORTS_LTO
+       depends on X86
        depends on !(KALLSYMS_ALL && LTO)
        help
          Use a single pass to generate kallsyms. This will speed up the build,
