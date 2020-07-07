@@ -187,7 +187,9 @@ kallsyms()
 		${AR} t $i | while read j ; do readelf -s $j ; done
 	done | awk 'NF >= 8 { print "0 t " $8 } '
 	# now handle the objects
-	readelf -s `echo ${1} | sed 's/ /\n/g' | grep '\.o$'` | awk 'NF >= 8 { print "0 t " $8 }'
+	readelf -s `echo ${1} | sed 's/ /\n/g' | grep '\.o$'` | awk 'NF >= 8 {
+	if ($8 !~ /Name|__gnu_lto_slim|\.c(\.[0-9a-f]+)?/) { print "0 t " $8 }
+	}'
 	) > ${afile/.S/.sym}
 	else
 		${NM} -n ${1} | awk 'NF == 3 { print }' > ${afile/.S/.sym}
