@@ -7,10 +7,14 @@ ifdef CONFIG_MODVERSIONS
 # $1: postfix of target
 # $2: input files
 # produces merged object in $$TO shell variable in same recipe
+#
+# The strange shell use is to keep the recipe inside shell argument limits.
+# We filter out all files that do not contain crcs.
 merge_ksyms = \
 	TC=$(@D)/.tmp_$(@F:$(1)=_vermerged.c); \
 	TO=$(@D)/.tmp_$(@F:$(1)=_vermerged.o); \
-	cat $(patsubst %.o,%.ver.c,$(filter %.o,$(2))) /dev/null > $$TC; \
+	cat $(shell find $(patsubst %.o,%.ver.c,$(filter %.o,$(2))) \
+		/dev/null -type f -size +2) /dev/null > $$TC; \
 	$(CC) -c -o $$TO $$TC; \
         rm -f $$TC
 
