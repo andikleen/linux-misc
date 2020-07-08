@@ -398,8 +398,22 @@ elif [ -n "${CONFIG_KALLSYMS}" ]; then
 	fi
 fi
 
+if [ -z "${CONFIG_SINGLE_LINK}" ] ; then
+
 info LDFINAL vmlinux
 vmlinux_link vmlinux "${kallsymso} ${kallsymsorel}" ${btf_vmlinux_bin_o}
+
+else
+
+# Reuse the partial linking from the modpost vmlinux.o earlier
+
+info LD vmlinux
+${LD} ${KBUILD_LDFLAGS} ${LDFLAGS_vmlinux}	\
+			-o vmlinux		\
+			-T ${objtree}/${KBUILD_LDS} \
+			vmlinux.o ${kallsymso} ${kallsymsorel} ${btf_vmlinux_bin_o}
+
+fi
 
 if [ -n "${CONFIG_KALLSYMS}" -a -n "${CONFIG_KALLSYMS_SINGLE}" ] ; then
 	# Now regenerate the kallsyms table and patch it into the
