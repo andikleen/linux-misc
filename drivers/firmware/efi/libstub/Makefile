@@ -125,4 +125,4 @@ quiet_cmd_stubcopy = STUBCPY $@
 		/bin/false;						\
 	fi;								\
 	$(OBJCOPY) $(STUBCOPY_FLAGS-y) $< $@;				\
-	$(if $(CONFIG_MODVERSIONS),touch $(@:.o=.ver.c))
+	$(if $(CONFIG_MODVERSIONS),touch $(@:.o=.ver.c),true)
