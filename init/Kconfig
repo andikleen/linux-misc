@@ -1436,6 +1436,16 @@ config LTO_CP_CLONE
 	  arguments when it determines these arguments are very commonly
 	  called.  Experimential. Will increase text size.
 
+config SINGLE_LINK
+	bool
+	default y
+	depends on KALLSYMS_SINGLE
+	# for now. In theory should work everywhere except for um
+	depends on X86
+	help
+	  Use only a single linking step for the final vmlinux, making
+	  the build faster.
+
 config SYSCTL
 	bool
 
