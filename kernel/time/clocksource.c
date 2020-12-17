@@ -14,6 +14,7 @@
 #include <linux/sched.h> /* for spin_unlock_irq() using preempt_count() m68k */
 #include <linux/tick.h>
 #include <linux/kthread.h>
+#include <linux/delay.h>
 
 #include "tick-internal.h"
 #include "timekeeping_internal.h"
@@ -184,6 +185,27 @@ void clocksource_mark_unstable(struct clocksource *cs)
 	spin_unlock_irqrestore(&watchdog_lock, flags);
 }
 
+static ulong inject_delay_period;
+module_param(inject_delay_period, ulong, 0644);
+static ulong inject_delay_repeat = 1;
+module_param(inject_delay_repeat, ulong, 0644);
+
+static void clocksource_watchdog_inject_delay(void)
+{
+	static unsigned int invocations = 1, injections;
+
+	if (!inject_delay_period || !inject_delay_repeat)
+		return;
+	if (!(invocations % inject_delay_period)) {
+		pr_warn("%s(): Injecting delay.\n", __func__);
+		mdelay(2 * WATCHDOG_THRESHOLD / NSEC_PER_MSEC);
+		if (++injections < inject_delay_repeat)
+			return;
+		injections = 0;
+	}
+	invocations++;
+}
+
 static void clocksource_watchdog(struct timer_list *unused)
 {
 	struct clocksource *cs;
@@ -208,6 +230,7 @@ static void clocksource_watchdog(struct timer_list *unused)
 
 		local_irq_disable();
 		csnow = cs->read(cs);
+		clocksource_watchdog_inject_delay();
 		wdnow = watchdog->read(watchdog);
 		local_irq_enable();
 
