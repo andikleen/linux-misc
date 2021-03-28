@@ -440,7 +440,7 @@ early_initcall(static_call_init);
 
 #ifdef CONFIG_STATIC_CALL_SELFTEST
 
-static int func_a(int x)
+int __visible sc_func_a(int x)
 {
 	return x+1;
 }
@@ -450,7 +450,7 @@ static int func_b(int x)
 	return x+2;
 }
 
-DEFINE_STATIC_CALL(sc_selftest, func_a);
+DEFINE_STATIC_CALL(sc_selftest, sc_func_a);
 
 static struct static_call_data {
       int (*func)(int);
@@ -459,7 +459,7 @@ static struct static_call_data {
 } static_call_data [] __initdata = {
       { NULL,   2, 3 },
       { func_b, 2, 4 },
-      { func_a, 2, 3 }
+      { sc_func_a, 2, 3 }
 };
 
 static int __init test_static_call_init(void)
