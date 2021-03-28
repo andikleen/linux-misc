@@ -700,16 +700,16 @@ static bool __init sgx_page_cache_init(void)
 	return true;
 }
 
-static void __init sgx_init(void)
+static int __init sgx_init(void)
 {
 	int ret;
 	int i;
 
 	if (!cpu_feature_enabled(X86_FEATURE_SGX))
-		return;
+		return 0;
 
 	if (!sgx_page_cache_init())
-		return;
+		return 0;
 
 	if (!sgx_page_reclaimer_init())
 		goto err_page_cache;
@@ -718,7 +718,7 @@ static void __init sgx_init(void)
 	if (ret)
 		goto err_kthread;
 
-	return;
+	return 0;
 
 err_kthread:
 	kthread_stop(ksgxd_tsk);
@@ -728,6 +728,7 @@ err_page_cache:
 		vfree(sgx_epc_sections[i].pages);
 		memunmap(sgx_epc_sections[i].virt_addr);
 	}
+	return -EIO;
 }
 
 device_initcall(sgx_init);
