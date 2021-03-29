@@ -1374,14 +1374,13 @@ config ARCH_SUPPORTS_LTO
 # new enough is ok.
 # This might not be the exact range with this bug.
 config BAD_AR
-	depends on LD_VERSION = 230000000
+	depends on LD_VERSION = 23000
 	depends on $(shell,ulimit -n) < 4000
 	def_bool y
 
 config LTO_MENU
 	bool "Enable gcc link time optimization (LTO)"
 	depends on ARCH_SUPPORTS_LTO
-# for now. Does LLVM need the gcc infrastructure at all?
 	depends on CC_IS_GCC
 # 4.7 works mostly, but it sometimes loses symbols on large builds
 # This can be worked around by marking those symbols visible,
@@ -1393,7 +1392,7 @@ config LTO_MENU
 # we now rely on -flinker-output=nolto-rel, which requires gcc 9
 	depends on GCC_VERSION >= 90000
 # binutils before 2.27 has various problems with plugins
-	depends on LD_VERSION >= 227000000
+	depends on LD_VERSION >= 22700
 	depends on !BAD_AR
 	help
 	  Enable whole program (link time) optimizations (LTO) for the the
