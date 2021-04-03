@@ -218,6 +218,11 @@ overflow:
 	return -ENOEXEC;
 }
 
+static void *copy_write(void *dest, const void *src, size_t len)
+{
+	return memcpy(dest, src, len);
+}
+
 int apply_relocate_add(Elf64_Shdr *sechdrs,
 		   const char *strtab,
 		   unsigned int symindex,
@@ -226,7 +231,7 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 {
 	int ret;
 	bool early = me->state == MODULE_STATE_UNFORMED;
-	void *(*write)(void *, const void *, size_t) = memcpy;
+	void *(*write)(void *, const void *, size_t) = copy_write;
 
 	if (!early) {
 		write = text_poke;
