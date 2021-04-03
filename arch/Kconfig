@@ -713,6 +713,7 @@ config LTO_GCC
 	depends on LD_VERSION >= 22700
 	depends on !BAD_AR
 	select LTO
+	select CC_NEEDS_FRE_WA if GCC_VERSION < 100300
 	help
 	  Enable whole program (link time) optimizations (LTO) for the the
 	  whole kernel and each module.  This usually increases compile time,

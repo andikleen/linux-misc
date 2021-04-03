@@ -252,6 +252,16 @@ struct ftrace_likely_data {
 #define asm_inline asm
 #endif
 
+/*
+ * Work around compiler crash in some gcc versions by disabling
+ * FRE pass for a function.
+ */
+#ifdef CONFIG_CC_NEEDS_FRE_WA
+#define __no_fre __attribute__((optimize("-fno-tree-fre")))
+#else
+#define __no_fre
+#endif
+
 /* Are two types/vars the same type (ignoring qualifiers)? */
 #define __same_type(a, b) __builtin_types_compatible_p(typeof(a), typeof(b))
 
