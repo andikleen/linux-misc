@@ -429,7 +429,7 @@ static inline void __irq_exit_rcu(void)
  *
  * Also processes softirqs if needed and possible.
  */
-void irq_exit_rcu(void)
+__visible void irq_exit_rcu(void)
 {
 	__irq_exit_rcu();
 	 /* must be last! */
