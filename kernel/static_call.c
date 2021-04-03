@@ -500,7 +500,7 @@ early_initcall(static_call_init);
 
 #endif /* HAVE_STATIC_CALL_INLINE */
 
-long __static_call_return0(void)
+__visible long __static_call_return0(void)
 {
 	return 0;
 }
