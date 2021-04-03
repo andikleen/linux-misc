@@ -152,7 +152,7 @@ extern long __static_call_return0(void);
 
 #define __DEFINE_STATIC_CALL(name, _func, _func_init)			\
 	DECLARE_STATIC_CALL(name, _func);				\
-	struct static_call_key STATIC_CALL_KEY(name) = {		\
+	__visible struct static_call_key STATIC_CALL_KEY(name) = {	\
 		.func = _func_init,					\
 		.type = 1,						\
 	};								\
@@ -160,7 +160,7 @@ extern long __static_call_return0(void);
 
 #define DEFINE_STATIC_CALL_NULL(name, _func)				\
 	DECLARE_STATIC_CALL(name, _func);				\
-	struct static_call_key STATIC_CALL_KEY(name) = {		\
+	__visible struct static_call_key STATIC_CALL_KEY(name) = {	\
 		.func = NULL,						\
 		.type = 1,						\
 	};								\
@@ -193,14 +193,14 @@ struct static_call_key {
 
 #define __DEFINE_STATIC_CALL(name, _func, _func_init)			\
 	DECLARE_STATIC_CALL(name, _func);				\
-	struct static_call_key STATIC_CALL_KEY(name) = {		\
+	__visible struct static_call_key STATIC_CALL_KEY(name) = {	\
 		.func = _func_init,					\
 	};								\
 	ARCH_DEFINE_STATIC_CALL_TRAMP(name, _func_init)
 
 #define DEFINE_STATIC_CALL_NULL(name, _func)				\
 	DECLARE_STATIC_CALL(name, _func);				\
-	struct static_call_key STATIC_CALL_KEY(name) = {		\
+	__visible struct static_call_key STATIC_CALL_KEY(name) = {	\
 		.func = NULL,						\
 	};								\
 	ARCH_DEFINE_STATIC_CALL_NULL_TRAMP(name)
@@ -254,13 +254,13 @@ static inline long __static_call_return0(void)
 
 #define __DEFINE_STATIC_CALL(name, _func, _func_init)			\
 	DECLARE_STATIC_CALL(name, _func);				\
-	struct static_call_key STATIC_CALL_KEY(name) = {		\
+	__visible struct static_call_key STATIC_CALL_KEY(name) = {	\
 		.func = _func_init,					\
 	}
 
 #define DEFINE_STATIC_CALL_NULL(name, _func)				\
 	DECLARE_STATIC_CALL(name, _func);				\
-	struct static_call_key STATIC_CALL_KEY(name) = {		\
+	__visible struct static_call_key STATIC_CALL_KEY(name) = {	\
 		.func = NULL,						\
 	}
 
