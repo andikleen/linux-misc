@@ -503,6 +503,8 @@ long __static_call_return0(void)
 
 #ifdef CONFIG_STATIC_CALL_SELFTEST
 
+int __visible sc_func_a(int x); /* Avoid warning */
+
 int __visible sc_func_a(int x)
 {
 	return x+1;
