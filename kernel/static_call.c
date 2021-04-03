@@ -496,7 +496,7 @@ int __init static_call_init(void)
 }
 early_initcall(static_call_init);
 
-long __static_call_return0(void)
+__visible long __static_call_return0(void)
 {
 	return 0;
 }
