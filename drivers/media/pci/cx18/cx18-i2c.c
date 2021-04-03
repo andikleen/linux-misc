@@ -214,7 +214,7 @@ static const struct i2c_algo_bit_data cx18_i2c_algo_template = {
 };
 
 /* init + register i2c adapter */
-int init_cx18_i2c(struct cx18 *cx)
+__no_fre int init_cx18_i2c(struct cx18 *cx)
 {
 	int i, err;
 	CX18_DEBUG_I2C("i2c init\n");

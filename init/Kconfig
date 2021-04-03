@@ -1339,6 +1339,12 @@ config HAVE_LD_DEAD_CODE_DATA_ELIMINATION
 	  sections (e.g., '.text.init'). Typically '.' in section names
 	  is used to distinguish them from label names / C identifiers.
 
+config CC_NEEDS_FRE_WA
+	bool
+	help
+	  Disable FRE compiler pass in some functions to work around
+	  gcc segfault.
+
 config LD_DEAD_CODE_DATA_ELIMINATION
 	bool "Dead code and data elimination (EXPERIMENTAL)"
 	depends on HAVE_LD_DEAD_CODE_DATA_ELIMINATION

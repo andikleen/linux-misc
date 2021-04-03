@@ -302,7 +302,7 @@ static const struct i2c_algorithm cobalt_algo = {
 };
 
 /* init + register i2c algo-bit adapter */
-int cobalt_i2c_init(struct cobalt *cobalt)
+__no_fre int cobalt_i2c_init(struct cobalt *cobalt)
 {
 	int i, err;
 	int status;
