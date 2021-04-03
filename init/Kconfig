@@ -1382,14 +1382,6 @@ config LTO_MENU
 	bool "Enable gcc link time optimization (LTO)"
 	depends on ARCH_SUPPORTS_LTO
 	depends on CC_IS_GCC
-# 4.7 works mostly, but it sometimes loses symbols on large builds
-# This can be worked around by marking those symbols visible,
-# but that is fairly ugly and the problem is gone with 4.8
-# 4.8 was very slow
-# 4.9 was missing __attribute__((noreorder)) for ordering initcalls,
-# and needed -fno-toplevel-reorder, which can lead to missing symbols
-# 5.0 segfaults with newer kernels
-# we now rely on -flinker-output=nolto-rel, which requires gcc 9
 	depends on GCC_VERSION >= 90000
 # binutils before 2.27 has various problems with plugins
 	depends on LD_VERSION >= 22700

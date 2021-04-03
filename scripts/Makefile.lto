@@ -14,16 +14,8 @@ export KBUILD_MODPOST_LDFLAGS
 
 ifdef CONFIG_LTO
 	LTO_CFLAGS := -flto
-	LTO_FINAL_CFLAGS := -fuse-linker-plugin
 
-	# gcc 8.x doesn't generate debuginfo if we don't
-	# specify -g on the final linking command line.
-	LTO_FINAL_CFLAGS += $(filter -g%, $(KBUILD_CFLAGS))
-
-# would be needed to support < 5.0
-#	LTO_FINAL_CFLAGS += -fno-toplevel-reorder
-
-	LTO_FINAL_CFLAGS += -flto=jobserver
+	LTO_FINAL_CFLAGS := -flto=jobserver
 
 	KBUILD_MOD_LDFLAGS += -flinker-output=nolto-rel
 
@@ -31,10 +23,6 @@ ifdef CONFIG_LTO
 	# XXX should switch to running modpost on the final executable
 	# to avoid the time overhead
 	KBUILD_MODPOST_LDFLAGS += -flinker-output=nolto-rel
-
-	# don't compile everything twice
-	# requires plugin ar
-	LTO_CFLAGS += -fno-fat-lto-objects
 
 	# Used to disable LTO for specific files (e.g. vdso)
 	DISABLE_LTO := -fno-lto
