@@ -2,8 +2,6 @@
 
 #include <linux/linkage.h>
 #include <linux/errno.h>
-#include <linux/syscalls.h>
-#include <linux/compat.h>
 
 #include <asm/unistd.h>
 
