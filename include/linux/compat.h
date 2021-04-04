@@ -498,6 +498,49 @@ int __compat_save_altstack(compat_stack_t __user *, unsigned long);
 		sas_ss_reset(t); \
 } while (0);
 
+#else /* CONFIG_COMPAT */
+
+/* Incomplete types for the prototypes below. */
+struct compat_statfs64;
+struct __compat_aio_sigset;
+struct compat_sigset_t;
+typedef int compat_pid_t;
+struct compat_robust_list_head;
+struct compat_siginfo_t;
+struct compat_rusage_t;
+struct compat_sigevent;
+struct compat_rlimit;
+struct compat_statfs;
+struct compat_linux_dirent;
+struct compat_stat;
+struct old_itimerval32;
+struct compat_kexec_segment;
+struct compat_sigaction;
+struct old_timeval32;
+struct compat_ustat;
+struct compat_old_linux_dirent;
+struct compat_sel_arg_struct;
+struct compat_old_sigset;
+typedef struct compat_old_sigset compat_old_sigset_t;
+struct compat_sigset;
+typedef struct compat_sigset compat_sigset_t;
+struct compat_old_sigaction;
+struct compat_mmsghdr;
+struct compat_rusage;
+struct compat_siginfo;
+struct compat_msghdr;
+struct compat_mq_attr;
+typedef unsigned short compat_mode_t;
+struct compat_sysinfo;
+struct compat_tms;
+struct compat_siginfo;
+struct compat_stack;
+typedef struct compat_stack compat_stack_t;
+struct epoll_event;
+struct __aio_sigset;
+
+#endif /* !CONFIG_COMPAT */
+
 /*
  * These syscall function prototypes are kept in the same order as
  * include/uapi/asm-generic/unistd.h. Deprecated or obsolete system calls
@@ -527,6 +570,13 @@ asmlinkage long compat_sys_io_pgetevents_time64(compat_aio_context_t ctx_id,
 					struct io_event __user *events,
 					struct __kernel_timespec __user *timeout,
 					const struct __compat_aio_sigset __user *usig);
+asmlinkage long
+compat_sys_io_pgetevents_time32(compat_aio_context_t ctx_id,
+				compat_long_t min_nr,
+				compat_long_t nr,
+				struct io_event __user *events,
+				struct old_timespec32 __user *timeout,
+				const struct __compat_aio_sigset __user *usig);
 
 /* fs/cookies.c */
 asmlinkage long compat_sys_lookup_dcookie(u32, u32, char __user *, compat_size_t);
@@ -891,8 +941,39 @@ asmlinkage long compat_sys_sigaction(int sig,
 /* obsolete: net/socket.c */
 asmlinkage long compat_sys_socketcall(int call, u32 __user *args);
 
+asmlinkage long io_pgetevents_time32(compat_aio_context_t ctx_id,
+				     long min_nr,
+				     long nr,
+				     struct io_event __user *events,
+				     struct old_timespec32 __user *timeout,
+				     const struct __aio_sigset __user *usig);
+
+asmlinkage long compat_sys_old_msgctl(int msqid, int cmd, void __user *uptr);
+asmlinkage long compat_sys_old_semctl(int semid, int semnum, int cmd, int arg);
+asmlinkage long compat_sys_old_shmctl(int shmid, int cmd, void __user *uptr);
+asmlinkage long compat_sys_setsockopt(int fd, int level, int optname,
+				      char __user *optval, int optlen);
+asmlinkage long compat_sys_getsockopt(int fd, int level, int optname,
+				      char __user *optval, int optlen);
+asmlinkage long compat_sys_process_vm_readv(compat_pid_t pid,
+				 const struct compat_iovec __user *lvec,
+				 unsigned long liovcnt,
+				 const struct compat_iovec __user *rvec,
+				 unsigned long riovcnt,
+				 unsigned long flags);
+asmlinkage long compat_sys_process_vm_writev(compat_pid_t pid,
+				 const struct compat_iovec __user *lvec,
+				 unsigned long liovcnt,
+				 const struct compat_iovec __user *rvec,
+				 unsigned long riovcnt,
+				 unsigned long flags);
+
+asmlinkage long compat_sys_s390_ipc(uint call, int first, unsigned long second,
+				    unsigned long third, void __user *ptr);
+
 #endif /* CONFIG_ARCH_HAS_SYSCALL_WRAPPER */
 
+#ifdef CONFIG_COMPAT
 
 /*
  * For most but not all architectures, "am I in a compat syscall?" and
