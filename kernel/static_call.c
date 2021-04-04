@@ -10,6 +10,8 @@
 #include <linux/processor.h>
 #include <asm/sections.h>
 
+#ifdef CONFIG_HAVE_STATIC_CALL_INLINE
+
 extern struct static_call_site __start_static_call_sites[],
 			       __stop_static_call_sites[];
 extern struct static_call_tramp_key __start_static_call_tramp_key[],
@@ -495,6 +497,8 @@ int __init static_call_init(void)
 	return 0;
 }
 early_initcall(static_call_init);
+
+#endif /* HAVE_STATIC_CALL_INLINE */
 
 long __static_call_return0(void)
 {
