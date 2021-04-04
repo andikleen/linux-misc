@@ -24,12 +24,12 @@
 
 #ifndef cond_syscall
 #define cond_syscall(x)	\
-	extern long x(void) __attribute__((alias("sys_ni_syscall"), weak));
+	typeof(x) x __attribute__((alias("sys_ni_syscall"), weak))
 #endif
 
 #ifndef SYSCALL_ALIAS
 #define SYSCALL_ALIAS(a, name) \
-	long a(void) __attribute__((alias(__stringify(name))))
+	typeof(a) a __attribute__((alias(__stringify(name))))
 #endif
 
 #define __page_aligned_data	__section(".data..page_aligned") __aligned(PAGE_SIZE)
