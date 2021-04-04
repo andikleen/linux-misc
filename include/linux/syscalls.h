@@ -1262,6 +1262,27 @@ asmlinkage long sys_old_mmap(struct mmap_arg_struct __user *arg);
  */
 asmlinkage long sys_ni_syscall(void);
 
+struct vm86_struct;
+asmlinkage long sys_vm86old(struct vm86_struct __user *user_vm86);
+asmlinkage long sys_vm86(unsigned cmd, unsigned arg);
+asmlinkage long sys_modify_ldt(int func , void __user *ptr,
+			       unsigned long bytecount);
+
+asmlinkage long sys_s390_pci_mmio_read(unsigned long mmio_addr,
+				   void __user *user_buffer,
+				   size_t length);
+asmlinkage long sys_s390_pci_mmio_write(unsigned long mmio_addr,
+				   void __user *user_buffer,
+				   size_t length);
+asmlinkage long sys_s390_ipc(uint call, int first, unsigned long second,
+			 unsigned long third, void __user *ptr);
+
+struct rtas_args;
+asmlinkage long sys_rtas(struct rtas_args __user *uargs);
+asmlinkage long sys_subpage_prot(unsigned long addr,
+			         unsigned long len,
+			         u32 __user *map);
+
 #endif /* CONFIG_ARCH_HAS_SYSCALL_WRAPPER */
 
 
