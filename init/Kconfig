@@ -1369,7 +1369,7 @@ config LD_ORPHAN_WARN
 	depends on !LD_IS_LLD || LLD_VERSION >= 110000
 	depends on $(ld-option,--orphan-handling=warn)
 
-config ARCH_SUPPORTS_LTO
+config ARCH_SUPPORTS_GCC_LTO
 	bool
 
 # Some ar versions leak file descriptors when using the LTO
@@ -1384,15 +1384,16 @@ config BAD_AR
 	depends on $(shell,ulimit -n) < 4000
 	def_bool y
 
-config LTO_MENU
+config LTO_GCC_MENU
 	bool "Enable gcc link time optimization (LTO)"
-	depends on ARCH_SUPPORTS_LTO
+	depends on ARCH_SUPPORTS_GCC_LTO
 	depends on CC_IS_GCC
 	depends on GCC_VERSION >= 90000
 # binutils before 2.27 has various problems with plugins
 	depends on LD_VERSION >= 22700
 	depends on !BAD_AR
 	select CC_NEEDS_FRE_WA if GCC_VERSION < 10030
+	select LTO_COMMON
 	help
 	  Enable whole program (link time) optimizations (LTO) for the the
 	  whole kernel and each module.  This usually increases compile time,
@@ -1415,13 +1416,13 @@ config LTO_MENU
 
 config LTO_DISABLE
          bool "Disable LTO again"
-         depends on LTO_MENU
+	 depends on LTO_GCC_MENU
          default n
          help
            This option is merely here so that allyesconfig or allmodconfig do
            not enable LTO. If you want to actually use LTO do not enable.
 
-config LTO
+config LTO_GCC
 	bool
 	default y
 	depends on LTO_MENU && !LTO_DISABLE

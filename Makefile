@@ -980,7 +980,7 @@ include-$(CONFIG_KCSAN)		+= scripts/Makefile.kcsan
 include-$(CONFIG_UBSAN)		+= scripts/Makefile.ubsan
 include-$(CONFIG_KCOV)		+= scripts/Makefile.kcov
 include-$(CONFIG_GCC_PLUGINS)	+= scripts/Makefile.gcc-plugins
-include-$(CONFIG_LTO)		+= scripts/Makefile.lto
+include-$(CONFIG_LTO_GCC)	+= scripts/Makefile.lto
 
 include $(addprefix $(srctree)/, $(include-y))
 

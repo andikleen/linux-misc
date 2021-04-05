@@ -90,12 +90,14 @@ modpost_link()
 			gen_symversions
 			lds="${lds} -T .tmp_symversions.lds"
 		fi
+	fi
 
+	if [ -n "${CONFIG_LTO_COMMON}" ] ; then
 		# This might take a while, so indicate that we're doing
 		# an LTO link
 		info LTO ${1}
 	else
-		info LDFINAL ${1}
+		info LD ${1}
 	fi
 
 	${LDFINAL} ${KBUILD_LDFLAGS} -r -o ${1} ${lds} ${objects}

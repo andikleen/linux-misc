@@ -12,7 +12,7 @@ export LTO_CFLAGS
 export KBUILD_MOD_LDFLAGS
 export KBUILD_MODPOST_LDFLAGS
 
-ifdef CONFIG_LTO
+ifdef CONFIG_LTO_GCC
 	LTO_CFLAGS := -flto
 
 	LTO_FINAL_CFLAGS := -flto=jobserver
@@ -53,4 +53,4 @@ endif
 	# use plugin aware tools
 	AR = $(CROSS_COMPILE)gcc-ar
 	NM = $(CROSS_COMPILE)gcc-nm
-endif # CONFIG_LTO
+endif # CONFIG_LTO_GCC
