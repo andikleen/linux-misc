@@ -608,6 +608,9 @@ config LTO
 	help
 	  Selected if the kernel will be built using the compiler's LTO feature.
 
+config LTO_COMMON
+	bool
+
 config LTO_CLANG
 	bool
 	select LTO
@@ -663,6 +666,7 @@ config LTO_CLANG_FULL
 	depends on HAS_LTO_CLANG
 	depends on !COMPILE_TEST
 	select LTO_CLANG
+	select LTO_COMMON
 	help
           This option enables Clang's full Link Time Optimization (LTO), which
           allows the compiler to optimize the kernel globally. If you enable
@@ -681,6 +685,7 @@ config LTO_CLANG_THIN
 	bool "Clang ThinLTO (EXPERIMENTAL)"
 	depends on HAS_LTO_CLANG && ARCH_SUPPORTS_LTO_CLANG_THIN
 	select LTO_CLANG
+	select LTO_COMMON
 	help
 	  This option enables Clang's ThinLTO, which allows for parallel
 	  optimization and faster incremental compiles compared to the

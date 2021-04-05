@@ -31,8 +31,8 @@ quiet_cmd_cc_o_c = CC [M]  $@
 
 ARCH_POSTLINK := $(wildcard $(srctree)/arch/$(SRCARCH)/Makefile.postlink)
 
-ifdef CONFIG_LTO_CLANG
-# With CONFIG_LTO_CLANG, reuse the object file we compiled for modpost to
+ifdef CONFIG_LTO_COMMON
+# With CONFIG_LTO_COMMON, reuse the object file we compiled for modpost to
 # avoid a second slow LTO link
 prelink-ext := .lto
 
@@ -48,7 +48,7 @@ cmd_ld_ko_o +=								\
 endif # SKIP_STACK_VALIDATION
 endif # CONFIG_STACK_VALIDATION
 
-endif # CONFIG_LTO_CLANG
+endif # CONFIG_LTO_COMMON
 
 quiet_cmd_ld_ko_o = LDFINAL [M]  $@
       cmd_ld_ko_o +=							\

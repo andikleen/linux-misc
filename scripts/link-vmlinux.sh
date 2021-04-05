@@ -54,7 +54,7 @@ gen_initcalls()
 		> .tmp_initcalls.lds
 }
 
-# If CONFIG_LTO_CLANG is selected, collect generated symbol versions into
+# If CONFIG_LTO_COMMON is selected, collect generated symbol versions into
 # .tmp_symversions.lds
 gen_symversions()
 {
@@ -106,7 +106,7 @@ objtool_link()
 	local objtoolcmd;
 	local objtoolopt;
 
-	if [ "${CONFIG_LTO_CLANG} ${CONFIG_STACK_VALIDATION}" = "y y" ]; then
+	if [ "${CONFIG_LTO_COMMON} ${CONFIG_STACK_VALIDATION}" = "y y" ] ; then
 		# Don't perform vmlinux validation unless explicitly requested,
 		# but run objtool on vmlinux.o now that we have an object file.
 		if [ -n "${CONFIG_UNWINDER_ORC}" ]; then
@@ -132,7 +132,7 @@ objtool_link()
 		if [ -z "${CONFIG_FRAME_POINTER}" ]; then
 			objtoolopt="${objtoolopt} --no-fp"
 		fi
-		if [ -n "${CONFIG_GCOV_KERNEL}" ] || [ -n "${CONFIG_LTO_CLANG}" ]; then
+		if [ -n "${CONFIG_GCOV_KERNEL}" ] || [ -n "${CONFIG_LTO_COMMON}" ]; then
 			objtoolopt="${objtoolopt} --no-unreachable"
 		fi
 		if [ -n "${CONFIG_RETPOLINE}" ]; then
@@ -162,16 +162,12 @@ vmlinux_link()
 	shift
 
 	# The kallsyms linking does not need debug symbols included.
-	# except for gcc LTO because gcc 10 LTO changes the layout of the
-	# data segment with --strip-debug
-	if [ "$output" != "${output#.tmp_vmlinux.kallsyms}" -a 	\
-	     -z "$CONFIG_LTO"  -a 				\
-	     -n "$CONFIG_CC_IS_GCC" ] ; then
+	if [ "$output" != "${output#.tmp_vmlinux.kallsyms}" ]; then
 		strip_debug=-Wl,--strip-debug
 	fi
 
 	if [ "${SRCARCH}" != "um" ]; then
-		if [ -n "${CONFIG_LTO_CLANG}" ]; then
+		if [ -n "${CONFIG_LTO_COMMON}" ]; then
 			# Use vmlinux.o instead of performing the slow LTO
 			# link again.
 			objects="--whole-archive		\
