@@ -31,7 +31,7 @@ asmlinkage long sys_ni_posix_timers(void)
 }
 
 #ifndef SYS_NI
-#define SYS_NI(name)  SYSCALL_ALIAS(sys_##name, sys_ni_posix_timers)
+#define SYS_NI(name)  SYSCALL_ALIAS_PROTO(sys_##name, sys_ni_posix_timers)
 #endif
 
 #ifndef COMPAT_SYS_NI
