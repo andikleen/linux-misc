@@ -264,7 +264,7 @@ kallsyms_s()
 
 	info KSYMS ${2}
 	(
-	if [ -n "$CONFIG_LTO" -a -n "$CONFIG_KALLSYMS_SINGLE" -a -n "$CONFIG_CC_IS_GCC" ] &&
+	if [ -n "$CONFIG_LTO_GCC" -a -n "$CONFIG_KALLSYMS_SINGLE" ] &&
 		( ${OBJDUMP} -h ${1} | grep -q gnu\.lto) ; then
         # workaround for slim LTO gcc-nm not outputing static symbols
         # http://gcc.gnu.org/PR60016
