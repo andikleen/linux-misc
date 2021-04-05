@@ -105,8 +105,8 @@ $(input-symdump):
 	@echo >&2 'WARNING: Symbol version dump "$@" is missing.'
 	@echo >&2 '         Modules may not have dependencies or modversions.'
 
-ifdef CONFIG_LTO_CLANG
-# With CONFIG_LTO_CLANG, .o files might be LLVM bitcode, so we need to run
+ifdef CONFIG_LTO
+# With CONFIG_LTO, .o files might be LLVM bitcode, so we need to run
 # LTO to compile them into native code before running modpost
 prelink-ext := .lto
 
