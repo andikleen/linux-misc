@@ -105,6 +105,11 @@ static int get_alt_entry(struct elf *elf, struct special_entry *entry,
 				  sec, offset + entry->new);
 			return -1;
 		}
+		if (!new_reloc->sym->sec) {
+			WARN_FUNC("can't find new reloc symbol sec",
+				  sec, offset + entry->new);
+			return -1;
+		}
 
 		alt->new_sec = new_reloc->sym->sec;
 		alt->new_off = (unsigned int)new_reloc->addend;
@@ -112,6 +117,8 @@ static int get_alt_entry(struct elf *elf, struct special_entry *entry,
 		/* _ASM_EXTABLE_EX hack */
 		if (alt->new_off >= 0x7ffffff0)
 			alt->new_off -= 0x7ffffff0;
+	} else {
+		return -1;
 	}
 
 	return 0;
