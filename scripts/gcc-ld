@@ -6,6 +6,12 @@
 
 ARGS="-nostdlib"
 
+for j in "$@" ; do
+	if [ "$j" = -v ] ; then
+		exec `$CC -print-prog-name=ld` -v
+	fi
+done
+
 while [ "$1" != "" ] ; do
 	case "$1" in
 	-save-temps*|-m32|-m64) N="$1" ;;
