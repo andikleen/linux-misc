@@ -26,10 +26,10 @@ if [ -n "$CONFIG_MODVERSIONS" ]; then
 	needed_symbols="$needed_symbols module_layout"
 fi
 
-# With CONFIG_LTO_CLANG, LLVM bitcode has not yet been compiled into a binary
+# With CONFIG_LTO, LLVM bitcode has not yet been compiled into a binary
 # when the .mod files are generated, which means they don't yet contain
 # references to certain symbols that will be present in the final binaries.
-if [ -n "$CONFIG_LTO_CLANG" ]; then
+if [ -n "$CONFIG_LTO" ]; then
 	# intrinsic functions
 	needed_symbols="$needed_symbols memcpy memmove memset"
 	# ftrace
