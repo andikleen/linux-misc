@@ -82,17 +82,18 @@ modpost_link()
 		${KBUILD_VMLINUX_LIBS}				\
 		--end-group"
 
-	if [ -n "${CONFIG_LTO_CLANG}" ]; then
-		gen_initcalls
-		lds="-T .tmp_initcalls.lds"
+	if [ -n "${CONFIG_LTO}" ]; then
+		lds=""
+		if [ -n "${CONFIG_LTO_CLANG}" ] ; then
+			gen_initcalls
+			lds="-T .tmp_initcalls.lds"
+		fi
 
 		if [ -n "${CONFIG_MODVERSIONS}" ]; then
 			gen_symversions
 			lds="${lds} -T .tmp_symversions.lds"
 		fi
-	fi
 
-	if [ -n "${CONFIG_LTO}" ] ; then
 		# This might take a while, so indicate that we're doing
 		# an LTO link
 		info LTO ${1}
