@@ -92,7 +92,7 @@ modpost_link()
 		fi
 	fi
 
-	if [ -n "${CONFIG_LTO_COMMON}" ] ; then
+	if [ -n "${CONFIG_LTO}" ] ; then
 		# This might take a while, so indicate that we're doing
 		# an LTO link
 		info LTO ${1}
