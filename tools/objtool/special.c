@@ -120,6 +120,9 @@ static int get_alt_entry(struct elf *elf, struct special_entry *entry,
 			alt->new_off -= 0x7ffffff0;
 	}
 
+	if (!alt->new_sec)
+		return -1;
+
 	return 0;
 }
 
