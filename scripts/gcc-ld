@@ -19,12 +19,13 @@ while [ "$1" != "" ] ; do
 	-flinker-output*) N="$1" ;;
 	-[Wg]*) N="$1" ;;
 	-[olv]|-[Ofd]*|-nostdlib) N="$1" ;;
-	--end-group|--start-group|--whole-archive|--no-whole-archive)
+	--end-group|--start-group|--whole-archive|--no-whole-archive|\
+--no-undefined|--hash-style*|--build-id*|--eh-frame-hdr|-Bsymbolic)
 		 N="-Wl,$1" ;;
 	-[RTFGhIezcbyYu]*|\
 --script|--defsym|-init|-Map|--oformat|-rpath|\
--rpath-link|--sort-section|--section-start|-Tbss|-Tdata|-Ttext|\
---version-script|--dynamic-list|--version-exports-symbol|--wrap|-m)
+-rpath-link|--sort-section|--section-start|-Tbss|-Tdata|-Ttext|-soname|\
+--version-script|--dynamic-list|--version-exports-symbol|--wrap|-m|-z)
 		A="$1" ; shift ; N="-Wl,$A,$1" ;;
 	-[m]*) N="$1" ;;
 	-*) N="-Wl,$1" ;;
