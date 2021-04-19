@@ -872,6 +872,10 @@ void smb2_deferred_work_close(struct work_struct *work)
 			struct cifsFileInfo, deferred.work);
 
 	spin_lock(&CIFS_I(d_inode(cfile->dentry))->deferred_lock);
+	if (!cfile->deferred_scheduled) {
+		spin_unlock(&CIFS_I(d_inode(cfile->dentry))->deferred_lock);
+		return;
+	}
 	cifs_del_deferred_close(cfile);
 	cfile->deferred_scheduled = false;
 	spin_unlock(&CIFS_I(d_inode(cfile->dentry))->deferred_lock);
@@ -4858,7 +4862,6 @@ oplock_break_ack:
 							     cinode);
 		cifs_dbg(FYI, "Oplock release rc = %d\n", rc);
 	}
-	_cifsFileInfo_put(cfile, false /* do not wait for ourself */, false);
 	/*
 	 * When oplock break is received and there are no active
 	 * file handles but cached, then set the flag oplock_break_received.
@@ -4866,11 +4869,12 @@ oplock_break_ack:
 	 */
 	spin_lock(&CIFS_I(inode)->deferred_lock);
 	is_deferred = cifs_is_deferred_close(cfile, &dclose);
-	if (is_deferred) {
+	if (is_deferred && cfile->deferred_scheduled) {
 		cfile->oplock_break_received = true;
 		mod_delayed_work(deferredclose_wq, &cfile->deferred, 0);
 	}
 	spin_unlock(&CIFS_I(inode)->deferred_lock);
+	_cifsFileInfo_put(cfile, false /* do not wait for ourself */, false);
 	cifs_done_oplock_break(cinode);
 }
 
