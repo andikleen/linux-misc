@@ -2044,6 +2044,17 @@ int mmc_sw_reset(struct mmc_host *host)
 }
 EXPORT_SYMBOL(mmc_sw_reset);
 
+int mmc_flush_cache(struct mmc_card *card)
+{
+	const struct mmc_bus_ops *bus_ops = card->host->bus_ops;
+
+	if (bus_ops->flush_cache)
+		return bus_ops->flush_cache(card);
+
+	return 0;
+}
+EXPORT_SYMBOL(mmc_flush_cache);
+
 static int mmc_rescan_try_freq(struct mmc_host *host, unsigned freq)
 {
 	host->f_init = freq;
