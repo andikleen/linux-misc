@@ -1193,8 +1193,9 @@ $(autoksyms_h):
 ARCH_POSTLINK := $(wildcard $(srctree)/arch/$(SRCARCH)/Makefile.postlink)
 
 # Final link of vmlinux with optional arch pass after final link
-cmd_link-vmlinux =                                                 \
-	$(CONFIG_SHELL) $< "$(LDFINAL)" "$(KBUILD_LDFLAGS)" "$(LDFLAGS_vmlinux)";    \
+cmd_link-vmlinux =                                                  \
+	$(CONFIG_SHELL) $< "$(LD)" "$(LDFINAL)" "$(KBUILD_LDFLAGS)" \
+	"$(LDFLAGS_vmlinux)" ;					    \
 	$(if $(ARCH_POSTLINK), $(MAKE) -f $(ARCH_POSTLINK) $@, true)
 
 vmlinux: scripts/link-vmlinux.sh autoksyms_recursive $(vmlinux-deps) FORCE
