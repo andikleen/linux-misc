@@ -713,15 +713,18 @@ config LTO_GCC
 	depends on LD_VERSION >= 22700
 	depends on !BAD_AR
 	select LTO
-	select CC_NEEDS_FRE_WA if GCC_VERSION < 10030
+	select CC_NEEDS_FRE_WA if GCC_VERSION < 100300
 	help
 	  Enable whole program (link time) optimizations (LTO) for the the
 	  whole kernel and each module.  This usually increases compile time,
-	  but can lead to better code. It allows the compiler to inline
-	  functions between different files and do other global optimization,
-	  like propagating constants between functions or optimize unused
-	  function arguments and other optimizations. It also allows the compiler
-	  to drop unused code.
+	  especially for incremential builds, but tends to generate better code
+	  as well as some global checks.
+
+	  It allows the compiler to inline functions between different files
+	  and do other global optimization, like propagating constants between
+	  functions, determine side effects of functions, avoid unnecessary
+	  register saving around functions, or optimize unused function arguments.
+	  It also allows the compiler to drop unused functions.
 
 	  With this option the compiler will also do some global checking over
 	  different source files.
@@ -729,7 +732,7 @@ config LTO_GCC
 	  This requires a gcc 9 or later compiler and binutils >= 2.27.
 
 	  On larger non modular configurations this may need more than 4GB of
-	  RAM for the link phase.
+	  RAM for the link phase, as well as a 64bit host compiler.
 
 	  For more information see Documentation/kbuild/lto-build.rst
 endchoice
@@ -739,7 +742,7 @@ config LTO_CP_CLONE
 	depends on LTO_GCC
 	help
 	  Allow the compiler to clone and specialize functions for specific
-	  arguments when it determines these arguments are very commonly
+	  arguments when it determines these arguments are commonly
 	  called.  Experimential. Will increase text size.
 
 config HAVE_ARCH_WITHIN_STACK_FRAMES
