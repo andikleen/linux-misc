@@ -2947,7 +2947,7 @@ static void blk_mq_del_queue_tag_set(struct request_queue *q)
 	struct blk_mq_tag_set *set = q->tag_set;
 
 	mutex_lock(&set->tag_list_lock);
-	list_del(&q->tag_set_list);
+	list_del_rcu(&q->tag_set_list);
 	if (list_is_singular(&set->tag_list)) {
 		/* just transitioned to unshared */
 		set->flags &= ~BLK_MQ_F_TAG_QUEUE_SHARED;
@@ -2955,7 +2955,11 @@ static void blk_mq_del_queue_tag_set(struct request_queue *q)
 		blk_mq_update_tag_set_shared(set, false);
 	}
 	mutex_unlock(&set->tag_list_lock);
-	INIT_LIST_HEAD(&q->tag_set_list);
+	/*
+	 * Calling synchronize_rcu() and INIT_LIST_HEAD(&q->tag_set_list) is
+	 * not necessary since blk_mq_del_queue_tag_set() is only called from
+	 * blk_cleanup_queue().
+	 */
 }
 
 static void blk_mq_add_queue_tag_set(struct blk_mq_tag_set *set,
