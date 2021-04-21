@@ -376,6 +376,31 @@ void blk_mq_all_tag_iter_atomic(struct blk_mq_tags *tags, busy_tag_iter_fn *fn,
 	__blk_mq_all_tag_iter(tags, fn, priv, BT_TAG_ITER_STATIC_RQS);
 }
 
+/*
+ * Iterate over all request queues in a tag set, find the first queue with a
+ * non-zero usage count, increment its usage count and return the pointer to
+ * that request queue. This prevents that blk_mq_update_nr_hw_queues() will
+ * modify @set->nr_hw_queues while iterating over tags since
+ * blk_mq_update_nr_hw_queues() only modifies @set->nr_hw_queues while the
+ * usage count of all queues associated with a tag set is zero.
+ */
+static struct request_queue *
+blk_mq_get_any_tagset_queue(struct blk_mq_tag_set *set)
+{
+	struct request_queue *q;
+
+	rcu_read_lock();
+	list_for_each_entry_rcu(q, &set->tag_list, tag_set_list) {
+		if (percpu_ref_tryget(&q->q_usage_counter)) {
+			rcu_read_unlock();
+			return q;
+		}
+	}
+	rcu_read_unlock();
+
+	return NULL;
+}
+
 /**
  * blk_mq_tagset_busy_iter - iterate over all started requests in a tag set
  * @tagset:	Tag set to iterate over.
@@ -391,15 +416,22 @@ void blk_mq_all_tag_iter_atomic(struct blk_mq_tags *tags, busy_tag_iter_fn *fn,
 void blk_mq_tagset_busy_iter(struct blk_mq_tag_set *tagset,
 		busy_tag_iter_fn *fn, void *priv)
 {
+	struct request_queue *q;
 	int i;
 
 	might_sleep();
+
+	q = blk_mq_get_any_tagset_queue(tagset);
+	if (!q)
+		return;
 
 	for (i = 0; i < tagset->nr_hw_queues; i++) {
 		if (tagset->tags && tagset->tags[i])
 			__blk_mq_all_tag_iter(tagset->tags[i], fn, priv,
 				BT_TAG_ITER_STARTED | BT_TAG_ITER_MAY_SLEEP);
 	}
+
+	blk_queue_exit(q);
 }
 EXPORT_SYMBOL(blk_mq_tagset_busy_iter);
 
@@ -418,13 +450,20 @@ EXPORT_SYMBOL(blk_mq_tagset_busy_iter);
 void blk_mq_tagset_busy_iter_atomic(struct blk_mq_tag_set *tagset,
 		busy_tag_iter_fn *fn, void *priv)
 {
+	struct request_queue *q;
 	int i;
+
+	q = blk_mq_get_any_tagset_queue(tagset);
+	if (!q)
+		return;
 
 	for (i = 0; i < tagset->nr_hw_queues; i++) {
 		if (tagset->tags && tagset->tags[i])
 			__blk_mq_all_tag_iter(tagset->tags[i], fn, priv,
 					      BT_TAG_ITER_STARTED);
 	}
+
+	blk_queue_exit(q);
 }
 EXPORT_SYMBOL(blk_mq_tagset_busy_iter_atomic);
 
