@@ -201,7 +201,7 @@ long __strncpy_from_user(char *dst, const char *src, long count)
 EXPORT_SYMBOL(__strncpy_from_user);
 
 /*
- * strlen_user: - Get the size of a string in user space.
+ * strnlen_user: - Get the size of a string in user space.
  * @str: The string to measure.
  * @n:   The maximum valid length
  *
