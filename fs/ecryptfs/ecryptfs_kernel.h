@@ -496,12 +496,6 @@ ecryptfs_set_superblock_lower(struct super_block *sb,
 	((struct ecryptfs_sb_info *)sb->s_fs_info)->wsi_sb = lower_sb;
 }
 
-static inline struct ecryptfs_dentry_info *
-ecryptfs_dentry_to_private(struct dentry *dentry)
-{
-	return (struct ecryptfs_dentry_info *)dentry->d_fsdata;
-}
-
 static inline void
 ecryptfs_set_dentry_private(struct dentry *dentry,
 			    struct ecryptfs_dentry_info *dentry_info)
@@ -515,12 +509,6 @@ ecryptfs_dentry_to_lower(struct dentry *dentry)
 	return ((struct ecryptfs_dentry_info *)dentry->d_fsdata)->lower_path.dentry;
 }
 
-static inline struct vfsmount *
-ecryptfs_dentry_to_lower_mnt(struct dentry *dentry)
-{
-	return ((struct ecryptfs_dentry_info *)dentry->d_fsdata)->lower_path.mnt;
-}
-
 static inline struct path *
 ecryptfs_dentry_to_lower_path(struct dentry *dentry)
 {
@@ -528,7 +516,7 @@ ecryptfs_dentry_to_lower_path(struct dentry *dentry)
 }
 
 #define ecryptfs_printk(type, fmt, arg...) \
-        __ecryptfs_printk(type "%s: " fmt, __func__, ## arg);
+        __ecryptfs_printk(type "%s: " fmt, __func__, ## arg)
 __printf(1, 2)
 void __ecryptfs_printk(const char *fmt, ...);
 
