@@ -448,7 +448,8 @@ BPF_CALL_5(bpf_seq_printf, struct seq_file *, m, char *, fmt, u32, fmt_size,
 	if (err < 0)
 		return err;
 
-	/* Maximumly we can have MAX_SEQ_PRINTF_VARARGS parameter, just give
+	/*
+	 * The maximum we can have is MAX_SEQ_PRINTF_VARARGS parameters, so just give
 	 * all of them to seq_printf().
 	 */
 	seq_printf(m, fmt, BPF_CAST_FMT_ARG(0, args, mod),
