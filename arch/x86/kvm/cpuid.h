@@ -7,7 +7,25 @@
 #include <asm/processor.h>
 #include <uapi/asm/kvm_para.h>
 
-extern u32 kvm_cpu_caps[NCAPINTS] __read_mostly;
+/*
+ * Hardware-defined CPUID leafs that are scattered in the kernel, but need to
+ * be directly used by KVM.  Note, these word values conflict with the kernel's
+ * "bug" caps, but KVM doesn't use those.
+ */
+enum kvm_only_cpuid_leafs {
+	CPUID_12_EAX	 = NCAPINTS,
+	NR_KVM_CPU_CAPS,
+
+	NKVMCAPINTS = NR_KVM_CPU_CAPS - NCAPINTS,
+};
+
+#define KVM_X86_FEATURE(w, f)		((w)*32 + (f))
+
+/* Intel-defined SGX sub-features, CPUID level 0x12 (EAX). */
+#define KVM_X86_FEATURE_SGX1		KVM_X86_FEATURE(CPUID_12_EAX, 0)
+#define KVM_X86_FEATURE_SGX2		KVM_X86_FEATURE(CPUID_12_EAX, 1)
+
+extern u32 kvm_cpu_caps[NR_KVM_CPU_CAPS] __read_mostly;
 void kvm_set_cpu_caps(void);
 
 void kvm_update_cpuid_runtime(struct kvm_vcpu *vcpu);
@@ -80,6 +98,7 @@ static const struct cpuid_reg reverse_cpuid[] = {
 	[CPUID_8000_0007_EBX] = {0x80000007, 0, CPUID_EBX},
 	[CPUID_7_EDX]         = {         7, 0, CPUID_EDX},
 	[CPUID_7_1_EAX]       = {         7, 1, CPUID_EAX},
+	[CPUID_12_EAX]        = {0x00000012, 0, CPUID_EAX},
 };
 
 /*
@@ -101,6 +120,25 @@ static __always_inline void reverse_cpuid_check(unsigned int x86_leaf)
 }
 
 /*
+ * Translate feature bits that are scattered in the kernel's cpufeatures word
+ * into KVM feature words that align with hardware's definitions.
+ */
+static __always_inline u32 __feature_translate(int x86_feature)
+{
+	if (x86_feature == X86_FEATURE_SGX1)
+		return KVM_X86_FEATURE_SGX1;
+	else if (x86_feature == X86_FEATURE_SGX2)
+		return KVM_X86_FEATURE_SGX2;
+
+	return x86_feature;
+}
+
+static __always_inline u32 __feature_leaf(int x86_feature)
+{
+	return __feature_translate(x86_feature) / 32;
+}
+
+/*
  * Retrieve the bit mask from an X86_FEATURE_* definition.  Features contain
  * the hardware defined bit number (stored in bits 4:0) and a software defined
  * "word" (stored in bits 31:5).  The word is used to index into arrays of
@@ -108,6 +146,8 @@ static __always_inline void reverse_cpuid_check(unsigned int x86_leaf)
  */
 static __always_inline u32 __feature_bit(int x86_feature)
 {
+	x86_feature = __feature_translate(x86_feature);
+
 	reverse_cpuid_check(x86_feature / 32);
 	return 1 << (x86_feature & 31);
 }
@@ -116,7 +156,7 @@ static __always_inline u32 __feature_bit(int x86_feature)
 
 static __always_inline struct cpuid_reg x86_feature_cpuid(unsigned int x86_feature)
 {
-	unsigned int x86_leaf = x86_feature / 32;
+	unsigned int x86_leaf = __feature_leaf(x86_feature);
 
 	reverse_cpuid_check(x86_leaf);
 	return reverse_cpuid[x86_leaf];
@@ -248,6 +288,14 @@ static inline bool guest_cpuid_is_amd_or_hygon(struct kvm_vcpu *vcpu)
 		is_guest_vendor_hygon(best->ebx, best->ecx, best->edx));
 }
 
+static inline bool guest_cpuid_is_intel(struct kvm_vcpu *vcpu)
+{
+	struct kvm_cpuid_entry2 *best;
+
+	best = kvm_find_cpuid_entry(vcpu, 0, 0);
+	return best && is_guest_vendor_intel(best->ebx, best->ecx, best->edx);
+}
+
 static inline int guest_cpuid_family(struct kvm_vcpu *vcpu)
 {
 	struct kvm_cpuid_entry2 *best;
@@ -308,7 +356,7 @@ static inline bool cpuid_fault_enabled(struct kvm_vcpu *vcpu)
 
 static __always_inline void kvm_cpu_cap_clear(unsigned int x86_feature)
 {
-	unsigned int x86_leaf = x86_feature / 32;
+	unsigned int x86_leaf = __feature_leaf(x86_feature);
 
 	reverse_cpuid_check(x86_leaf);
 	kvm_cpu_caps[x86_leaf] &= ~__feature_bit(x86_feature);
@@ -316,7 +364,7 @@ static __always_inline void kvm_cpu_cap_clear(unsigned int x86_feature)
 
 static __always_inline void kvm_cpu_cap_set(unsigned int x86_feature)
 {
-	unsigned int x86_leaf = x86_feature / 32;
+	unsigned int x86_leaf = __feature_leaf(x86_feature);
 
 	reverse_cpuid_check(x86_leaf);
 	kvm_cpu_caps[x86_leaf] |= __feature_bit(x86_feature);
@@ -324,7 +372,7 @@ static __always_inline void kvm_cpu_cap_set(unsigned int x86_feature)
 
 static __always_inline u32 kvm_cpu_cap_get(unsigned int x86_feature)
 {
-	unsigned int x86_leaf = x86_feature / 32;
+	unsigned int x86_leaf = __feature_leaf(x86_feature);
 
 	reverse_cpuid_check(x86_leaf);
 	return kvm_cpu_caps[x86_leaf] & __feature_bit(x86_feature);
