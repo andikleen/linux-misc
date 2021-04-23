@@ -20,7 +20,6 @@
 #include "mmc_ops.h"
 
 #define MMC_BKOPS_TIMEOUT_MS		(120 * 1000) /* 120s */
-#define MMC_CACHE_FLUSH_TIMEOUT_MS	(30 * 1000) /* 30s */
 #define MMC_SANITIZE_TIMEOUT_MS		(240 * 1000) /* 240s */
 
 static const u8 tuning_blk_pattern_4bit[] = {
@@ -296,61 +295,40 @@ mmc_send_cxd_data(struct mmc_card *card, struct mmc_host *host,
 	return 0;
 }
 
-static int mmc_spi_send_csd(struct mmc_host *host, u32 *csd)
+static int mmc_spi_send_cxd(struct mmc_host *host, u32 *cxd, u32 opcode)
 {
 	int ret, i;
-	__be32 *csd_tmp;
+	__be32 *cxd_tmp;
 
-	csd_tmp = kzalloc(16, GFP_KERNEL);
-	if (!csd_tmp)
+	cxd_tmp = kzalloc(16, GFP_KERNEL);
+	if (!cxd_tmp)
 		return -ENOMEM;
 
-	ret = mmc_send_cxd_data(NULL, host, MMC_SEND_CSD, csd_tmp, 16);
+	ret = mmc_send_cxd_data(NULL, host, opcode, cxd_tmp, 16);
 	if (ret)
 		goto err;
 
 	for (i = 0; i < 4; i++)
-		csd[i] = be32_to_cpu(csd_tmp[i]);
+		cxd[i] = be32_to_cpu(cxd_tmp[i]);
 
 err:
-	kfree(csd_tmp);
+	kfree(cxd_tmp);
 	return ret;
 }
 
 int mmc_send_csd(struct mmc_card *card, u32 *csd)
 {
 	if (mmc_host_is_spi(card->host))
-		return mmc_spi_send_csd(card->host, csd);
+		return mmc_spi_send_cxd(card->host, csd, MMC_SEND_CSD);
 
 	return mmc_send_cxd_native(card->host, card->rca << 16,	csd,
 				MMC_SEND_CSD);
 }
 
-static int mmc_spi_send_cid(struct mmc_host *host, u32 *cid)
-{
-	int ret, i;
-	__be32 *cid_tmp;
-
-	cid_tmp = kzalloc(16, GFP_KERNEL);
-	if (!cid_tmp)
-		return -ENOMEM;
-
-	ret = mmc_send_cxd_data(NULL, host, MMC_SEND_CID, cid_tmp, 16);
-	if (ret)
-		goto err;
-
-	for (i = 0; i < 4; i++)
-		cid[i] = be32_to_cpu(cid_tmp[i]);
-
-err:
-	kfree(cid_tmp);
-	return ret;
-}
-
 int mmc_send_cid(struct mmc_host *host, u32 *cid)
 {
 	if (mmc_host_is_spi(host))
-		return mmc_spi_send_cid(host, cid);
+		return mmc_spi_send_cxd(host, cid, MMC_SEND_CID);
 
 	return mmc_send_cxd_native(host, 0, cid, MMC_ALL_SEND_CID);
 }
@@ -553,12 +531,13 @@ int mmc_poll_for_busy(struct mmc_card *card, unsigned int timeout_ms,
  *	@timing: new timing to change to
  *	@send_status: send status cmd to poll for busy
  *	@retry_crc_err: retry when CRC errors when polling with CMD13 for busy
+ *	@retries: number of retries
  *
  *	Modifies the EXT_CSD register for selected card.
  */
 int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
 		unsigned int timeout_ms, unsigned char timing,
-		bool send_status, bool retry_crc_err)
+		bool send_status, bool retry_crc_err, unsigned int retries)
 {
 	struct mmc_host *host = card->host;
 	int err;
@@ -598,7 +577,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
 		cmd.flags |= MMC_RSP_SPI_R1 | MMC_RSP_R1;
 	}
 
-	err = mmc_wait_for_cmd(host, &cmd, MMC_CMD_RETRIES);
+	err = mmc_wait_for_cmd(host, &cmd, retries);
 	if (err)
 		goto out;
 
@@ -633,7 +612,7 @@ int mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
 		unsigned int timeout_ms)
 {
 	return __mmc_switch(card, set, index, value, timeout_ms, 0,
-			    true, false);
+			    true, false, MMC_CMD_RETRIES);
 }
 EXPORT_SYMBOL_GPL(mmc_switch);
 
@@ -981,28 +960,6 @@ void mmc_run_bkops(struct mmc_card *card)
 }
 EXPORT_SYMBOL(mmc_run_bkops);
 
-/*
- * Flush the cache to the non-volatile storage.
- */
-int mmc_flush_cache(struct mmc_card *card)
-{
-	int err = 0;
-
-	if (mmc_card_mmc(card) &&
-			(card->ext_csd.cache_size > 0) &&
-			(card->ext_csd.cache_ctrl & 1)) {
-		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-				 EXT_CSD_FLUSH_CACHE, 1,
-				 MMC_CACHE_FLUSH_TIMEOUT_MS);
-		if (err)
-			pr_err("%s: cache flush error %d\n",
-					mmc_hostname(card->host), err);
-	}
-
-	return err;
-}
-EXPORT_SYMBOL(mmc_flush_cache);
-
 static int mmc_cmdq_switch(struct mmc_card *card, bool enable)
 {
 	u8 val = enable ? EXT_CSD_CMDQ_MODE_ENABLED : 0;
@@ -1031,7 +988,7 @@ int mmc_cmdq_disable(struct mmc_card *card)
 }
 EXPORT_SYMBOL_GPL(mmc_cmdq_disable);
 
-int mmc_sanitize(struct mmc_card *card)
+int mmc_sanitize(struct mmc_card *card, unsigned int timeout_ms)
 {
 	struct mmc_host *host = card->host;
 	int err;
@@ -1041,12 +998,15 @@ int mmc_sanitize(struct mmc_card *card)
 		return -EOPNOTSUPP;
 	}
 
+	if (!timeout_ms)
+		timeout_ms = MMC_SANITIZE_TIMEOUT_MS;
+
 	pr_debug("%s: Sanitize in progress...\n", mmc_hostname(host));
 
 	mmc_retune_hold(host);
 
-	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_SANITIZE_START,
-			 1, MMC_SANITIZE_TIMEOUT_MS);
+	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_SANITIZE_START,
+			   1, timeout_ms, 0, true, false, 0);
 	if (err)
 		pr_err("%s: Sanitize failed err=%d\n", mmc_hostname(host), err);
 
