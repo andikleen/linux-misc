@@ -1,5 +1,6 @@
+/* SPDX-License-Identifier: GPL-2.0 OR MIT */
 /*
- * Copyright 2017 Advanced Micro Devices, Inc.
+ * Copyright 2020-2021 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -19,35 +20,46 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
- * Authors: Christian König
  */
-#ifndef __AMDGPU_MN_H__
-#define __AMDGPU_MN_H__
 
-#include <linux/types.h>
-#include <linux/hmm.h>
+#ifndef KFD_MIGRATE_H_
+#define KFD_MIGRATE_H_
+
+#if IS_ENABLED(CONFIG_HSA_AMD_SVM)
+
 #include <linux/rwsem.h>
-#include <linux/workqueue.h>
-#include <linux/interval_tree.h>
+#include <linux/list.h>
+#include <linux/mutex.h>
+#include <linux/sched/mm.h>
+#include <linux/hmm.h>
+#include "kfd_priv.h"
+#include "kfd_svm.h"
 
-int amdgpu_hmm_range_get_pages(struct mmu_interval_notifier *notifier,
-			       struct mm_struct *mm, struct page **pages,
-			       uint64_t start, uint64_t npages,
-			       struct hmm_range **phmm_range, bool readonly,
-			       bool mmap_locked);
-int amdgpu_hmm_range_get_pages_done(struct hmm_range *hmm_range);
+enum MIGRATION_COPY_DIR {
+	FROM_RAM_TO_VRAM = 0,
+	FROM_VRAM_TO_RAM
+};
 
-#if defined(CONFIG_HMM_MIRROR)
-int amdgpu_mn_register(struct amdgpu_bo *bo, unsigned long addr);
-void amdgpu_mn_unregister(struct amdgpu_bo *bo);
+int svm_migrate_to_vram(struct svm_range *prange,  uint32_t best_loc,
+			struct mm_struct *mm);
+int svm_migrate_vram_to_ram(struct svm_range *prange, struct mm_struct *mm);
+unsigned long
+svm_migrate_addr_to_pfn(struct amdgpu_device *adev, unsigned long addr);
+
+int svm_migrate_init(struct amdgpu_device *adev);
+void svm_migrate_fini(struct amdgpu_device *adev);
+
 #else
-static inline int amdgpu_mn_register(struct amdgpu_bo *bo, unsigned long addr)
-{
-	DRM_WARN_ONCE("HMM_MIRROR kernel config option is not enabled, "
-		      "add CONFIG_ZONE_DEVICE=y in config file to fix this\n");
-	return -ENODEV;
-}
-static inline void amdgpu_mn_unregister(struct amdgpu_bo *bo) {}
-#endif
 
-#endif
+static inline int svm_migrate_init(struct amdgpu_device *adev)
+{
+	return 0;
+}
+static inline void svm_migrate_fini(struct amdgpu_device *adev)
+{
+	/* empty */
+}
+
+#endif /* IS_ENABLED(CONFIG_HSA_AMD_SVM) */
+
+#endif /* KFD_MIGRATE_H_ */
