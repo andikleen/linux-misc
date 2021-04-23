@@ -280,6 +280,36 @@ void blk_dump_rq_flags(struct request *rq, char *msg)
 EXPORT_SYMBOL(blk_dump_rq_flags);
 
 /**
+ * blk_mq_wait_for_tag_iter - wait for preexisting tag iteration functions to finish
+ * @set: Tag set to wait on.
+ *
+ * Waits for preexisting calls of blk_mq_all_tag_iter(),
+ * blk_mq_tagset_busy_iter() and also for their atomic variants to finish
+ * accessing hctx->tags->rqs[]. New readers may start while this function is
+ * in progress or after this function has returned. Use this function to make
+ * sure that hctx->tags->rqs[] changes have become globally visible.
+ *
+ * Waits for preexisting blk_mq_queue_tag_busy_iter(q, fn, priv) calls to
+ * finish accessing requests associated with other request queues than 'q'.
+ */
+void blk_mq_wait_for_tag_iter(struct blk_mq_tag_set *set)
+{
+	struct blk_mq_tags *tags;
+	int i;
+
+	if (set->tags) {
+		for (i = 0; i < set->nr_hw_queues; i++) {
+			tags = set->tags[i];
+			if (!tags)
+				continue;
+			down_write(&tags->iter_rwsem);
+			up_write(&tags->iter_rwsem);
+		}
+	}
+	synchronize_rcu();
+}
+
+/**
  * blk_sync_queue - cancel any pending callbacks on a queue
  * @q: the queue
  *
@@ -412,8 +442,10 @@ void blk_cleanup_queue(struct request_queue *q)
 	 * it is safe to free requests now.
 	 */
 	mutex_lock(&q->sysfs_lock);
-	if (q->elevator)
+	if (q->elevator) {
+		blk_mq_wait_for_tag_iter(q->tag_set);
 		blk_mq_sched_free_requests(q);
+	}
 	mutex_unlock(&q->sysfs_lock);
 
 	percpu_ref_exit(&q->q_usage_counter);
@@ -1161,10 +1193,8 @@ static blk_status_t blk_cloned_rq_check_limits(struct request_queue *q,
 	}
 
 	/*
-	 * queue's settings related to segment counting like q->bounce_pfn
-	 * may differ from that of other stacking queues.
-	 * Recalculate it to check the request correctly on this queue's
-	 * limitation.
+	 * The queue settings related to segment counting may differ from the
+	 * original queue.
 	 */
 	rq->nr_phys_segments = blk_recalc_rq_segments(rq);
 	if (rq->nr_phys_segments > queue_max_segments(q)) {

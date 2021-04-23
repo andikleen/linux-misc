@@ -20,6 +20,7 @@ struct nullb_cmd {
 	struct bio *bio;
 	unsigned int tag;
 	blk_status_t error;
+	bool hipri;
 	struct nullb_queue *nq;
 	struct hrtimer timer;
 	bool fake_timeout;
@@ -31,6 +32,9 @@ struct nullb_queue {
 	unsigned int queue_depth;
 	struct nullb_device *dev;
 	unsigned int requeue_selection;
+
+	struct list_head poll_list;
+	spinlock_t poll_lock;
 
 	struct nullb_cmd *cmds;
 };
@@ -83,6 +87,7 @@ struct nullb_device {
 	unsigned int zone_max_open; /* max number of open zones */
 	unsigned int zone_max_active; /* max number of active zones */
 	unsigned int submit_queues; /* number of submission queues */
+	unsigned int poll_queues; /* number of IOPOLL submission queues */
 	unsigned int home_node; /* home node for the device */
 	unsigned int queue_mode; /* block interface */
 	unsigned int blocksize; /* block size */
@@ -97,6 +102,7 @@ struct nullb_device {
 	bool memory_backed; /* if data is stored in memory */
 	bool discard; /* if support discard */
 	bool zoned; /* if device is zoned */
+	bool virt_boundary; /* virtual boundary on/off for the device */
 };
 
 struct nullb {

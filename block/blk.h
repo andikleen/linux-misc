@@ -6,6 +6,7 @@
 #include <linux/blk-mq.h>
 #include <linux/part_stat.h>
 #include <linux/blk-crypto.h>
+#include <linux/memblock.h>	/* for max_pfn/max_low_pfn */
 #include <xen/xen.h>
 #include "blk-crypto-internal.h"
 #include "blk-mq.h"
@@ -184,6 +185,8 @@ bool blk_bio_list_merge(struct request_queue *q, struct list_head *list,
 void blk_account_io_start(struct request *req);
 void blk_account_io_done(struct request *req, u64 now);
 
+void blk_mq_wait_for_tag_iter(struct blk_mq_tag_set *set);
+
 /*
  * Internal elevator interface
  */
@@ -197,15 +200,6 @@ int elevator_switch_mq(struct request_queue *q,
 void __elevator_exit(struct request_queue *, struct elevator_queue *);
 int elv_register_queue(struct request_queue *q, bool uevent);
 void elv_unregister_queue(struct request_queue *q);
-
-static inline void elevator_exit(struct request_queue *q,
-		struct elevator_queue *e)
-{
-	lockdep_assert_held(&q->sysfs_lock);
-
-	blk_mq_sched_free_requests(q);
-	__elevator_exit(q, e);
-}
 
 ssize_t part_size_show(struct device *dev, struct device_attribute *attr,
 		char *buf);
@@ -311,18 +305,20 @@ static inline void blk_throtl_bio_endio(struct bio *bio) { }
 static inline void blk_throtl_stat_add(struct request *rq, u64 time) { }
 #endif
 
-#ifdef CONFIG_BOUNCE
-extern int init_emergency_isa_pool(void);
-extern void blk_queue_bounce(struct request_queue *q, struct bio **bio);
-#else
-static inline int init_emergency_isa_pool(void)
+void __blk_queue_bounce(struct request_queue *q, struct bio **bio);
+
+static inline bool blk_queue_may_bounce(struct request_queue *q)
 {
-	return 0;
+	return IS_ENABLED(CONFIG_BOUNCE) &&
+		q->limits.bounce == BLK_BOUNCE_HIGH &&
+		max_low_pfn >= max_pfn;
 }
+
 static inline void blk_queue_bounce(struct request_queue *q, struct bio **bio)
 {
+	if (unlikely(blk_queue_may_bounce(q) && bio_has_data(*bio)))
+		__blk_queue_bounce(q, bio);	
 }
-#endif /* CONFIG_BOUNCE */
 
 #ifdef CONFIG_BLK_CGROUP_IOLATENCY
 extern int blk_iolatency_init(struct request_queue *q);
@@ -346,7 +342,6 @@ char *disk_name(struct gendisk *hd, int partno, char *buf);
 #define ADDPART_FLAG_NONE	0
 #define ADDPART_FLAG_RAID	1
 #define ADDPART_FLAG_WHOLEDISK	2
-void delete_partition(struct block_device *part);
 int bdev_add_partition(struct block_device *bdev, int partno,
 		sector_t start, sector_t length);
 int bdev_del_partition(struct block_device *bdev, int partno);
