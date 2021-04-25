@@ -10,7 +10,7 @@ bounds-file := include/generated/bounds.h
 always-y := $(bounds-file)
 targets := kernel/bounds.s
 
-kernel/bounds.s: KBUILD_CFLAGS += $(DISABLE_LTO)
+kernel/bounds.s: KBUILD_CFLAGS += $(DISABLE_LTO_GCC)
 
 $(bounds-file): kernel/bounds.s FORCE
 	$(call filechk,offsets,__LINUX_BOUNDS_H__)
@@ -34,7 +34,7 @@ always-y += $(offsets-file)
 targets += arch/$(SRCARCH)/kernel/asm-offsets.s
 
 arch/$(SRCARCH)/kernel/asm-offsets.s: $(timeconst-file) $(bounds-file)
-arch/$(SRCARCH)/kernel/asm-offsets.s: KBUILD_CFLAGS += $(DISABLE_LTO)
+arch/$(SRCARCH)/kernel/asm-offsets.s: KBUILD_CFLAGS += $(DISABLE_LTO_GCC)
 
 $(offsets-file): arch/$(SRCARCH)/kernel/asm-offsets.s FORCE
 	$(call filechk,offsets,__ASM_OFFSETS_H__)
