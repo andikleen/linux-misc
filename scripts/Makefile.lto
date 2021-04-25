@@ -28,6 +28,9 @@ ifdef CONFIG_LTO_GCC
 	# LTO gcc creates a lot of files in TMPDIR, and with /tmp as tmpfs
 	# it's easy to drive the machine OOM. Use the object directory
 	# instead for temporaries.
+	# This has the drawback that there might be some junk more visible
+	# after interrupted compilations, but you would have that junk
+	# there anyways in /tmp.
 	TMPDIR ?= $(objtree)
 	export TMPDIR
 

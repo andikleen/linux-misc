@@ -31,8 +31,9 @@
 set -e
 
 LD="$1"
-KBUILD_LDFLAGS="$2"
-LDFLAGS_vmlinux="$3"
+LDFINAL="$2"
+KBUILD_LDFLAGS="$3"
+LDFLAGS_vmlinux="$4"
 
 # Nice output in kbuild format
 # Will be supressed by "make -s"
