@@ -59,8 +59,10 @@ struct instruction {
 	struct list_head alts;
 	struct symbol *func;
 	struct list_head stack_ops;
-	struct cfi_state cfi;
+	struct cfi_state *cfip;
 };
+
+extern struct cfi_state *insn_get_cfi(struct instruction *);
 
 static inline bool is_static_jump(struct instruction *insn)
 {

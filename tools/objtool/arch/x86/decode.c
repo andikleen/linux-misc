@@ -613,7 +613,12 @@ const char *arch_nop_insn(int len)
 
 int arch_decode_hint_reg(struct instruction *insn, u8 sp_reg)
 {
-	struct cfi_reg *cfa = &insn->cfi.cfa;
+	struct cfi_reg *cfa;
+
+	if (sp_reg == ORC_REG_UNDEFINED && !insn->cfip)
+		return 0;
+
+	cfa = &insn_get_cfi(insn)->cfa;
 
 	switch (sp_reg) {
 	case ORC_REG_UNDEFINED:

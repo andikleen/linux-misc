@@ -253,6 +253,20 @@ static void init_insn_state(struct insn_state *state, struct section *sec)
 		state->noinstr = sec->noinstr;
 }
 
+struct cfi_state *insn_get_cfi(struct instruction *insn)
+{
+	if (!insn->cfip) {
+		struct cfi_state *cfi = calloc(sizeof(struct cfi_state), 1);
+		if (!cfi) {
+			WARN("calloc failed");
+			exit(1);
+		}
+		init_cfi_state(cfi);
+		insn->cfip = cfi;
+	}
+	return insn->cfip;
+}
+
 /*
  * Call the arch-specific instruction decoder for all the instructions and add
  * them to the global instruction list.
@@ -289,7 +303,6 @@ static int decode_instructions(struct objtool_file *file)
 			memset(insn, 0, sizeof(*insn));
 			INIT_LIST_HEAD(&insn->alts);
 			INIT_LIST_HEAD(&insn->stack_ops);
-			init_cfi_state(&insn->cfi);
 
 			insn->sec = sec;
 			insn->offset = offset;
@@ -1138,7 +1151,6 @@ static int handle_group_alt(struct objtool_file *file,
 		memset(nop, 0, sizeof(*nop));
 		INIT_LIST_HEAD(&nop->alts);
 		INIT_LIST_HEAD(&nop->stack_ops);
-		init_cfi_state(&nop->cfi);
 
 		nop->sec = special_alt->new_sec;
 		nop->offset = special_alt->new_off + special_alt->new_len;
@@ -1557,7 +1569,7 @@ static int read_unwind_hints(struct objtool_file *file)
 		insn->hint = true;
 
 		if (hint->type == UNWIND_HINT_TYPE_FUNC) {
-			set_func_state(&insn->cfi);
+			set_func_state(insn_get_cfi(insn));
 			continue;
 		}
 
@@ -1567,9 +1579,9 @@ static int read_unwind_hints(struct objtool_file *file)
 			return -1;
 		}
 
-		insn->cfi.cfa.offset = bswap_if_needed(hint->sp_offset);
-		insn->cfi.type = hint->type;
-		insn->cfi.end = hint->end;
+		insn_get_cfi(insn)->cfa.offset = bswap_if_needed(hint->sp_offset);
+		insn_get_cfi(insn)->type = hint->type;
+		insn_get_cfi(insn)->end = hint->end;
 	}
 
 	return 0;
@@ -2421,9 +2433,9 @@ static int propagate_alt_cfi(struct objtool_file *file, struct instruction *insn
 	group_off = insn->offset - insn->alt_group->first_insn->offset;
 
 	if (!alt_cfi[group_off]) {
-		alt_cfi[group_off] = &insn->cfi;
+		alt_cfi[group_off] = insn_get_cfi(insn);
 	} else {
-		if (memcmp(alt_cfi[group_off], &insn->cfi, sizeof(struct cfi_state))) {
+		if (memcmp(alt_cfi[group_off], insn_get_cfi(insn), sizeof(struct cfi_state))) {
 			WARN_FUNC("stack layout conflict in alternatives",
 				  insn->sec, insn->offset);
 			return -1;
@@ -2472,7 +2484,7 @@ static int handle_insn_ops(struct instruction *insn, struct insn_state *state)
 
 static bool insn_cfi_match(struct instruction *insn, struct cfi_state *cfi2)
 {
-	struct cfi_state *cfi1 = &insn->cfi;
+	struct cfi_state *cfi1 = insn_get_cfi(insn);
 	int i;
 
 	if (memcmp(&cfi1->cfa, &cfi2->cfa, sizeof(cfi1->cfa))) {
@@ -2694,9 +2706,9 @@ static int validate_branch(struct objtool_file *file, struct symbol *func,
 			state.instr += insn->instr;
 
 		if (insn->hint)
-			state.cfi = insn->cfi;
+			state.cfi = *insn_get_cfi(insn);
 		else
-			insn->cfi = state.cfi;
+			*insn_get_cfi(insn) = state.cfi;
 
 		insn->visited |= visited;
 
