@@ -8086,12 +8086,20 @@ void __init sched_init(void)
 	unsigned long ptr = 0;
 	int i;
 
-	/* Make sure the linker didn't screw up */
-	BUG_ON(&idle_sched_class + 1 != &fair_sched_class ||
-	       &fair_sched_class + 1 != &rt_sched_class ||
-	       &rt_sched_class + 1   != &dl_sched_class);
+	/*
+	 * Make sure the linker didn't screw up.
+	 * We have to use RELOC_HIDE to prevent gcc from optimizing
+	 * them to true because they're technically undefined in ISO-C.
+	 */
+	BUG_ON(RELOC_HIDE(&idle_sched_class, 0) + 1 !=
+			RELOC_HIDE(&fair_sched_class, 0));
+	BUG_ON(RELOC_HIDE(&fair_sched_class, 0) + 1 !=
+			RELOC_HIDE(&rt_sched_class, 0));
+	BUG_ON(RELOC_HIDE(&rt_sched_class, 0) + 1 !=
+			RELOC_HIDE(&dl_sched_class, 0));
 #ifdef CONFIG_SMP
-	BUG_ON(&dl_sched_class + 1 != &stop_sched_class);
+	BUG_ON(RELOC_HIDE(&dl_sched_class, 0) + 1 !=
+			RELOC_HIDE(&stop_sched_class, 0));
 #endif
 
 	wait_bit_init();
