@@ -238,8 +238,8 @@ int orc_create(struct objtool_file *file)
 	/* Create .orc_unwind, .orc_unwind_ip and .rela.orc_unwind_ip sections: */
 	sec = find_section_by_name(file->elf, ".orc_unwind");
 	if (sec) {
-		WARN("file already has .orc_unwind section, skipping");
-		return -1;
+		/* Don't regenerate if it already exists */
+		return 0;
 	}
 	orc_sec = elf_create_section(file->elf, ".orc_unwind", 0,
 				     sizeof(struct orc_entry), nr);
