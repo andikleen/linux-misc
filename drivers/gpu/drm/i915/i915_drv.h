@@ -1095,11 +1095,11 @@ struct drm_i915_private {
 		 * in 0.5us units for WM1+.
 		 */
 		/* primary */
-		u16 pri_latency[5];
+		u16 pri_latency[8];
 		/* sprite */
-		u16 spr_latency[5];
+		u16 spr_latency[8];
 		/* cursor */
-		u16 cur_latency[5];
+		u16 cur_latency[8];
 		/*
 		 * Raw watermark memory latency values
 		 * for SKL for all 8 levels
