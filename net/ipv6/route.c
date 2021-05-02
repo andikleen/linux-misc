@@ -6471,6 +6471,7 @@ DEFINE_BPF_ITER_FUNC(ipv6_route, struct bpf_iter_meta *meta, struct fib6_info *r
 
 BTF_ID_LIST(btf_fib6_info_id)
 BTF_ID(struct, fib6_info)
+BTF_ID_LIST_END
 
 static const struct bpf_iter_seq_info ipv6_route_seq_info = {
 	.seq_ops		= &ipv6_route_seq_ops,

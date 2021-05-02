@@ -80,6 +80,7 @@ static const struct seq_operations bpf_map_seq_ops = {
 
 BTF_ID_LIST(btf_bpf_map_id)
 BTF_ID(struct, bpf_map)
+BTF_ID_LIST_END
 
 static const struct bpf_iter_seq_info bpf_map_seq_info = {
 	.seq_ops		= &bpf_map_seq_ops,

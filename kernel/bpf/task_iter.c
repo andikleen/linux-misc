@@ -528,6 +528,7 @@ BTF_ID_LIST(btf_task_file_ids)
 BTF_ID(struct, task_struct)
 BTF_ID(struct, file)
 BTF_ID(struct, vm_area_struct)
+BTF_ID_LIST_END
 
 static const struct bpf_iter_seq_info task_seq_info = {
 	.seq_ops		= &task_seq_ops,

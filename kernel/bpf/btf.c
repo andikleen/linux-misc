@@ -4407,6 +4407,7 @@ static int btf_translate_to_vmlinux(struct bpf_verifier_log *log,
 
 BTF_ID_LIST(bpf_ctx_convert_btf_id)
 BTF_ID(struct, bpf_ctx_convert)
+BTF_ID_LIST_END
 
 struct btf *btf_parse_vmlinux(void)
 {

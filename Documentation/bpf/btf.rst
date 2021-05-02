@@ -706,6 +706,9 @@ with following syntax::
   BTF_ID_LIST(list)
   BTF_ID(type1, name1)
   BTF_ID(type2, name2)
+  BTF_ID_LIST_END
+
+The unsorted list must be terminated with ``BTF_ID_LIST_END``.
 
 resulting in following layout in .BTF_ids section::
 
@@ -723,6 +726,7 @@ want to define unused entry in BTF_ID_LIST, like::
       BTF_ID(struct, sk_buff)
       BTF_ID_UNUSED
       BTF_ID(struct, task_struct)
+      BTF_ID_LIST_END
 
 The ``BTF_SET_START/END`` macros pair defines sorted list of BTF ID values
 and their count, with following syntax::

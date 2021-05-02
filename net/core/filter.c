@@ -10479,6 +10479,7 @@ BTF_ID_LIST_GLOBAL(btf_sock_ids)
 #define BTF_SOCK_TYPE(name, type) BTF_ID(struct, type)
 BTF_SOCK_TYPE_xxx
 #undef BTF_SOCK_TYPE
+BTF_ID_LIST_END
 #else
 u32 btf_sock_ids[MAX_BTF_SOCK_TYPE];
 #endif
@@ -10601,6 +10602,7 @@ BPF_CALL_1(bpf_sock_from_file, struct file *, file)
 BTF_ID_LIST(bpf_sock_from_file_btf_ids)
 BTF_ID(struct, socket)
 BTF_ID(struct, file)
+BTF_ID_LIST_END
 
 const struct bpf_func_proto bpf_sock_from_file_proto = {
 	.func		= bpf_sock_from_file,

@@ -25,14 +25,13 @@ struct btf_id_set {
 #define BTF_IDS_SECTION ".BTF_ids"
 
 #define ____BTF_ID(symbol)				\
-asm(							\
 ".pushsection " BTF_IDS_SECTION ",\"a\";       \n"	\
 ".globl " #symbol " ;                          \n"	\
 ".type  " #symbol ", STT_OBJECT;               \n"	\
 ".size  " #symbol ", 4;                        \n"	\
 #symbol ":                                     \n"	\
 ".zero 4                                       \n"	\
-".popsection;                                  \n");
+".popsection;                                  \n"
 
 #define __BTF_ID(symbol) \
 	____BTF_ID(symbol)
@@ -46,6 +45,8 @@ asm(							\
  */
 #define BTF_ID(prefix, name) \
 	__BTF_ID(__ID(__BTF_ID__##prefix##__##name##__))
+
+#define BTF_ID_LIST_END );
 
 /*
  * The BTF_ID_LIST macro defines pure (unsorted) list
@@ -67,11 +68,11 @@ asm(							\
 ".pushsection " BTF_IDS_SECTION ",\"a\";       \n"	\
 "." #scope " " #name ";                        \n"	\
 #name ":;                                      \n"	\
-".popsection;                                  \n");
+".popsection;                                  \n"
 
 #define BTF_ID_LIST(name)				\
+extern u32 name[];					\
 __BTF_ID_LIST(name, globl)				\
-extern u32 name[];
 
 #define BTF_ID_LIST_GLOBAL(name)			\
 __BTF_ID_LIST(name, globl)
@@ -80,8 +81,9 @@ __BTF_ID_LIST(name, globl)
  * a single entry.
  */
 #define BTF_ID_LIST_SINGLE(name, prefix, typename)	\
-	BTF_ID_LIST(name) \
-	BTF_ID(prefix, typename)
+	BTF_ID_LIST(name)	 \
+	BTF_ID(prefix, typename) \
+	BTF_ID_LIST_END
 
 /*
  * The BTF_ID_UNUSED macro defines 4 zero bytes.
@@ -95,10 +97,9 @@ __BTF_ID_LIST(name, globl)
  */
 
 #define BTF_ID_UNUSED					\
-asm(							\
 ".pushsection " BTF_IDS_SECTION ",\"a\";       \n"	\
 ".zero 4                                       \n"	\
-".popsection;                                  \n");
+".popsection;                                  \n"
 
 /*
  * The BTF_SET_START/END macros pair defines sorted list of
@@ -119,7 +120,6 @@ asm(							\
  *
  */
 #define __BTF_SET_START(name, scope)			\
-asm(							\
 ".pushsection " BTF_IDS_SECTION ",\"a\";       \n"	\
 "." #scope " __BTF_ID__set__" #name ";         \n"	\
 "__BTF_ID__set__" #name ":;                    \n"	\

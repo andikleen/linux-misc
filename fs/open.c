@@ -66,7 +66,7 @@ int do_truncate(struct user_namespace *mnt_userns, struct dentry *dentry,
 	return ret;
 }
 
-long vfs_truncate(const struct path *path, loff_t length)
+__visible long vfs_truncate(const struct path *path, loff_t length)
 {
 	struct user_namespace *mnt_userns;
 	struct inode *inode;

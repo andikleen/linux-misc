@@ -2838,6 +2838,7 @@ static const struct rhashtable_params netlink_rhashtable_params = {
 #if defined(CONFIG_BPF_SYSCALL) && defined(CONFIG_PROC_FS)
 BTF_ID_LIST(btf_netlink_sock_id)
 BTF_ID(struct, netlink_sock)
+BTF_ID_LIST_END
 
 static const struct bpf_iter_seq_info netlink_seq_info = {
 	.seq_ops		= &netlink_seq_ops,
