@@ -27,7 +27,7 @@ struct btf_id_set {
 #define ____BTF_ID(symbol)				\
 asm(							\
 ".pushsection " BTF_IDS_SECTION ",\"a\";       \n"	\
-".local " #symbol " ;                          \n"	\
+".globl " #symbol " ;                          \n"	\
 ".type  " #symbol ", STT_OBJECT;               \n"	\
 ".size  " #symbol ", 4;                        \n"	\
 #symbol ":                                     \n"	\
@@ -70,7 +70,7 @@ asm(							\
 ".popsection;                                  \n");
 
 #define BTF_ID_LIST(name)				\
-__BTF_ID_LIST(name, local)				\
+__BTF_ID_LIST(name, globl)				\
 extern u32 name[];
 
 #define BTF_ID_LIST_GLOBAL(name)			\
@@ -124,10 +124,10 @@ asm(							\
 "." #scope " __BTF_ID__set__" #name ";         \n"	\
 "__BTF_ID__set__" #name ":;                    \n"	\
 ".zero 4                                       \n"	\
-".popsection;                                  \n");
+".popsection;                                  \n"
 
 #define BTF_SET_START(name)				\
-__BTF_ID_LIST(name, local)				\
+__BTF_ID_LIST(name, globl)				\
 __BTF_SET_START(name, local)
 
 #define BTF_SET_START_GLOBAL(name)			\
@@ -135,7 +135,6 @@ __BTF_ID_LIST(name, globl)				\
 __BTF_SET_START(name, globl)
 
 #define BTF_SET_END(name)				\
-asm(							\
 ".pushsection " BTF_IDS_SECTION ",\"a\";      \n"	\
 ".size __BTF_ID__set__" #name ", .-" #name "  \n"	\
 ".popsection;                                 \n");	\
