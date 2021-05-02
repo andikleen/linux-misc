@@ -232,7 +232,14 @@ gen_btf()
 	vmlinux_link ${1}
 
 	info "BTF" ${2}
-	LLVM_OBJCOPY=${OBJCOPY} ${PAHOLE} -J ${1}
+
+	BTF_ARGS=""
+	if [ -n "${CONFIG_LTO_GCC}" ]; then
+		# gcc LTO generates some dwarf symbols that pahole
+		# doesn't like. Skip those instead of aborting.
+		BTF_ARGS=--btf_encode_force
+	fi
+	LLVM_OBJCOPY=${OBJCOPY} ${PAHOLE} -J ${BTF_ARGS} ${1}
 
 	# Create ${2} which contains just .BTF section but no symbols. Add
 	# SHF_ALLOC because .BTF will be part of the vmlinux image. --strip-all
