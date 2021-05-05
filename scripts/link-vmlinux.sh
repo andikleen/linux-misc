@@ -307,11 +307,6 @@ sorttable()
 # Delete output files in case of error
 cleanup()
 {
-	# don't delete for make -i
-	case "$MFLAGS" in
-	*-i*) return ;;
-	esac
-
 	rm -f .btf.*
 	rm -f .tmp_System.map
 	rm -f .tmp_initcalls.lds
