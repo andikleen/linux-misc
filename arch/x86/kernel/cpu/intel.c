@@ -719,6 +719,15 @@ static void intel_detect_tlb(struct cpuinfo_x86 *c)
 	cpuid_leaf_0x2(&regs);
 	for_each_cpuid_0x2_desc(regs, ptr, desc)
 		intel_tlb_lookup(desc);
+
+	if (cpu_has(c, X86_FEATURE_CORE_CAPABILITIES)) {
+		u64 msr;
+
+		rdmsrl(MSR_IA32_CORE_CAPS, msr);
+
+		if (msr & MSR_IA32_CORE_CAPS_RAR)
+			setup_force_cpu_cap(X86_FEATURE_RAR);
+	}
 }
 
 static const struct cpu_dev intel_cpu_dev = {
