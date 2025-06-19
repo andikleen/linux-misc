@@ -106,6 +106,11 @@ void apic_send_nmi_to_offline_cpu(unsigned int cpu)
 		return;
 	apic->send_IPI(cpu, NMI_VECTOR);
 }
+
+void native_send_rar_ipi(const struct cpumask *mask)
+{
+	__apic_send_IPI_mask(mask, RAR_VECTOR);
+}
 #endif /* CONFIG_SMP */
 
 static inline int __prepare_ICR2(unsigned int mask)

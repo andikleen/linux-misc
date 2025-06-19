@@ -98,10 +98,15 @@
 #define LOCAL_TIMER_VECTOR		0xec
 
 /*
+ * RAR (remote action request) TLB flush
+ */
+#define RAR_VECTOR			0xe0
+
+/*
  * Posted interrupt notification vector for all device MSIs delivered to
  * the host kernel.
  */
-#define POSTED_MSI_NOTIFICATION_VECTOR	0xeb
+#define POSTED_MSI_NOTIFICATION_VECTOR	0xdf
 
 #define NR_VECTORS			 256
 
