@@ -22,6 +22,7 @@
 #include <asm/microcode.h>
 #include <asm/msr.h>
 #include <asm/numa.h>
+#include <asm/rar.h>
 #include <asm/resctrl.h>
 #include <asm/thermal.h>
 #include <asm/uaccess.h>
@@ -624,6 +625,9 @@ static void init_intel(struct cpuinfo_x86 *c)
 	split_lock_init();
 
 	intel_init_thermal(c);
+
+	if (cpu_feature_enabled(X86_FEATURE_RAR))
+		rar_cpu_init();
 }
 
 #ifdef CONFIG_X86_32
@@ -725,8 +729,10 @@ static void intel_detect_tlb(struct cpuinfo_x86 *c)
 
 		rdmsrl(MSR_IA32_CORE_CAPS, msr);
 
-		if (msr & MSR_IA32_CORE_CAPS_RAR)
+		if (msr & MSR_IA32_CORE_CAPS_RAR) {
 			setup_force_cpu_cap(X86_FEATURE_RAR);
+			rar_boot_cpu_init();
+		}
 	}
 }
 
