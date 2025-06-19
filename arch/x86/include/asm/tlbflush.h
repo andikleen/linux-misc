@@ -250,7 +250,8 @@ static inline u16 mm_global_asid(struct mm_struct *mm)
 {
 	u16 asid;
 
-	if (!cpu_feature_enabled(X86_FEATURE_INVLPGB))
+	if (!cpu_feature_enabled(X86_FEATURE_INVLPGB) &&
+	    !cpu_feature_enabled(X86_FEATURE_RAR))
 		return 0;
 
 	asid = smp_load_acquire(&mm->context.global_asid);
@@ -263,7 +264,8 @@ static inline u16 mm_global_asid(struct mm_struct *mm)
 
 static inline void mm_init_global_asid(struct mm_struct *mm)
 {
-	if (cpu_feature_enabled(X86_FEATURE_INVLPGB)) {
+	if (cpu_feature_enabled(X86_FEATURE_INVLPGB) ||
+	    cpu_feature_enabled(X86_FEATURE_RAR)) {
 		mm->context.global_asid = 0;
 		mm->context.asid_transition = false;
 	}
@@ -287,7 +289,8 @@ static inline void mm_clear_asid_transition(struct mm_struct *mm)
 
 static inline bool mm_in_asid_transition(struct mm_struct *mm)
 {
-	if (!cpu_feature_enabled(X86_FEATURE_INVLPGB))
+	if (!cpu_feature_enabled(X86_FEATURE_INVLPGB) &&
+	    !cpu_feature_enabled(X86_FEATURE_RAR))
 		return false;
 
 	return mm && READ_ONCE(mm->context.asid_transition);

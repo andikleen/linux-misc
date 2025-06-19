@@ -222,7 +222,8 @@ struct new_asid {
 	unsigned int need_flush : 1;
 };
 
-static struct new_asid choose_new_asid(struct mm_struct *next, u64 next_tlb_gen)
+static struct new_asid choose_new_asid(struct mm_struct *next, u64 next_tlb_gen,
+				       bool new_cpu)
 {
 	struct new_asid ns;
 	u16 asid;
@@ -235,14 +236,22 @@ static struct new_asid choose_new_asid(struct mm_struct *next, u64 next_tlb_gen)
 
 	/*
 	 * TLB consistency for global ASIDs is maintained with hardware assisted
-	 * remote TLB flushing. Global ASIDs are always up to date.
+	 * remote TLB flushing. Global ASIDs are always up to date with INVLPGB,
+	 * and up to date for CPUs in the mm_cpumask with RAR..
 	 */
-	if (cpu_feature_enabled(X86_FEATURE_INVLPGB)) {
+	if (cpu_feature_enabled(X86_FEATURE_INVLPGB) ||
+	    cpu_feature_enabled(X86_FEATURE_RAR)) {
 		u16 global_asid = mm_global_asid(next);
 
 		if (global_asid) {
 			ns.asid = global_asid;
 			ns.need_flush = 0;
+			/*
+			 * If the CPU fell out of the cpumask, it can be
+			 * out of date with RAR, and should be flushed.
+			 */
+			if (cpu_feature_enabled(X86_FEATURE_RAR))
+				ns.need_flush = new_cpu;
 			return ns;
 		}
 	}
@@ -300,7 +309,14 @@ static void reset_global_asid_space(void)
 {
 	lockdep_assert_held(&global_asid_lock);
 
-	invlpgb_flush_all_nonglobals();
+	/*
+	 * The global flush ensures that a freshly allocated global ASID
+	 * has no entries in any TLB, and can be used immediately.
+	 * With Intel RAR, the TLB may still need to be flushed at context
+	 * switch time when dealing with a CPU that was not in the mm_cpumask
+	 * for the process, and may have missed flushes along the way.
+	 */
+	flush_tlb_all();
 
 	/*
 	 * The TLB flush above makes it safe to re-use the previously
@@ -377,7 +393,7 @@ static void use_global_asid(struct mm_struct *mm)
 {
 	u16 asid;
 
-	guard(raw_spinlock_irqsave)(&global_asid_lock);
+	guard(raw_spinlock)(&global_asid_lock);
 
 	/* This process is already using broadcast TLB invalidation. */
 	if (mm_global_asid(mm))
@@ -403,13 +419,14 @@ static void use_global_asid(struct mm_struct *mm)
 
 void mm_free_global_asid(struct mm_struct *mm)
 {
-	if (!cpu_feature_enabled(X86_FEATURE_INVLPGB))
+	if (!cpu_feature_enabled(X86_FEATURE_INVLPGB) &&
+	    !cpu_feature_enabled(X86_FEATURE_RAR))
 		return;
 
 	if (!mm_global_asid(mm))
 		return;
 
-	guard(raw_spinlock_irqsave)(&global_asid_lock);
+	guard(raw_spinlock)(&global_asid_lock);
 
 	/* The global ASID can be re-used only after flush at wrap-around. */
 #ifdef CONFIG_BROADCAST_TLB_FLUSH
@@ -427,7 +444,8 @@ static bool mm_needs_global_asid(struct mm_struct *mm, u16 asid)
 {
 	u16 global_asid = mm_global_asid(mm);
 
-	if (!cpu_feature_enabled(X86_FEATURE_INVLPGB))
+	if (!cpu_feature_enabled(X86_FEATURE_INVLPGB) &&
+	    !cpu_feature_enabled(X86_FEATURE_RAR))
 		return false;
 
 	/* Process is transitioning to a global ASID */
@@ -445,7 +463,8 @@ static bool mm_needs_global_asid(struct mm_struct *mm, u16 asid)
  */
 static void consider_global_asid(struct mm_struct *mm)
 {
-	if (!cpu_feature_enabled(X86_FEATURE_INVLPGB))
+	if (!cpu_feature_enabled(X86_FEATURE_INVLPGB) &&
+	    !cpu_feature_enabled(X86_FEATURE_RAR))
 		return;
 
 	/* Check every once in a while. */
@@ -490,6 +509,7 @@ static void finish_asid_transition(struct flush_tlb_info *info)
 		 * that results in a (harmless) extra IPI.
 		 */
 		if (READ_ONCE(per_cpu(cpu_tlbstate.loaded_mm_asid, cpu)) != bc_asid) {
+			info->trim_cpumask = true;
 			flush_tlb_multi(mm_cpumask(info->mm), info);
 			return;
 		}
@@ -499,7 +519,7 @@ static void finish_asid_transition(struct flush_tlb_info *info)
 	mm_clear_asid_transition(mm);
 }
 
-static void broadcast_tlb_flush(struct flush_tlb_info *info)
+static void invlpgb_tlb_flush(struct flush_tlb_info *info)
 {
 	bool pmd = info->stride_shift == PMD_SHIFT;
 	unsigned long asid = mm_global_asid(info->mm);
@@ -529,8 +549,6 @@ static void broadcast_tlb_flush(struct flush_tlb_info *info)
 
 		addr += nr << info->stride_shift;
 	} while (addr < info->end);
-
-	finish_asid_transition(info);
 
 	/* Wait for the INVLPGBs kicked off above to finish. */
 	__tlbsync();
@@ -862,7 +880,7 @@ void switch_mm_irqs_off(struct mm_struct *unused, struct mm_struct *next,
 		/* Check if the current mm is transitioning to a global ASID */
 		if (mm_needs_global_asid(next, prev_asid)) {
 			next_tlb_gen = atomic64_read(&next->context.tlb_gen);
-			ns = choose_new_asid(next, next_tlb_gen);
+			ns = choose_new_asid(next, next_tlb_gen, true);
 			goto reload_tlb;
 		}
 
@@ -900,6 +918,7 @@ void switch_mm_irqs_off(struct mm_struct *unused, struct mm_struct *next,
 		ns.asid = prev_asid;
 		ns.need_flush = true;
 	} else {
+		bool new_cpu = false;
 		/*
 		 * Apply process to process speculation vulnerability
 		 * mitigations if applicable.
@@ -914,20 +933,25 @@ void switch_mm_irqs_off(struct mm_struct *unused, struct mm_struct *next,
 		this_cpu_write(cpu_tlbstate.loaded_mm, LOADED_MM_SWITCHING);
 		barrier();
 
-		/* Start receiving IPIs and then read tlb_gen (and LAM below) */
-		if (next != &init_mm && !cpumask_test_cpu(cpu, mm_cpumask(next)))
+		/* Start receiving IPIs and RAR invalidations */
+		if (next != &init_mm && !cpumask_test_cpu(cpu, mm_cpumask(next))) {
 			cpumask_set_cpu(cpu, mm_cpumask(next));
+			if (cpu_feature_enabled(X86_FEATURE_RAR))
+				new_cpu = true;
+		}
+
 		next_tlb_gen = atomic64_read(&next->context.tlb_gen);
 
-		ns = choose_new_asid(next, next_tlb_gen);
+		ns = choose_new_asid(next, next_tlb_gen, new_cpu);
 	}
 
 reload_tlb:
 	new_lam = mm_lam_cr3_mask(next);
 	if (ns.need_flush) {
-		VM_WARN_ON_ONCE(is_global_asid(ns.asid));
-		this_cpu_write(cpu_tlbstate.ctxs[ns.asid].ctx_id, next->context.ctx_id);
-		this_cpu_write(cpu_tlbstate.ctxs[ns.asid].tlb_gen, next_tlb_gen);
+		if (is_dyn_asid(ns.asid)) {
+			this_cpu_write(cpu_tlbstate.ctxs[ns.asid].ctx_id, next->context.ctx_id);
+			this_cpu_write(cpu_tlbstate.ctxs[ns.asid].tlb_gen, next_tlb_gen);
+		}
 		load_new_mm_cr3(next->pgd, ns.asid, new_lam, true);
 
 		trace_tlb_flush(TLB_FLUSH_ON_TASK_SWITCH, TLB_FLUSH_ALL);
@@ -1115,7 +1139,7 @@ static void flush_tlb_func(void *info)
 	const struct flush_tlb_info *f = info;
 	struct mm_struct *loaded_mm = this_cpu_read(cpu_tlbstate.loaded_mm);
 	u32 loaded_mm_asid = this_cpu_read(cpu_tlbstate.loaded_mm_asid);
-	u64 local_tlb_gen;
+	u64 local_tlb_gen = 0;
 	bool local = smp_processor_id() == f->initiating_cpu;
 	unsigned long nr_invalidate = 0;
 	u64 mm_tlb_gen;
@@ -1138,19 +1162,6 @@ static void flush_tlb_func(void *info)
 	if (unlikely(loaded_mm == &init_mm))
 		return;
 
-	/* Reload the ASID if transitioning into or out of a global ASID */
-	if (mm_needs_global_asid(loaded_mm, loaded_mm_asid)) {
-		switch_mm_irqs_off(NULL, loaded_mm, NULL);
-		loaded_mm_asid = this_cpu_read(cpu_tlbstate.loaded_mm_asid);
-	}
-
-	/* Broadcast ASIDs are always kept up to date with INVLPGB. */
-	if (is_global_asid(loaded_mm_asid))
-		return;
-
-	VM_WARN_ON(this_cpu_read(cpu_tlbstate.ctxs[loaded_mm_asid].ctx_id) !=
-		   loaded_mm->context.ctx_id);
-
 	if (this_cpu_read(cpu_tlbstate_shared.is_lazy)) {
 		/*
 		 * We're in lazy mode.  We need to at least flush our
@@ -1161,11 +1172,31 @@ static void flush_tlb_func(void *info)
 		 * This should be rare, with native_flush_tlb_multi() skipping
 		 * IPIs to lazy TLB mode CPUs.
 		 */
+		cpumask_clear_cpu(raw_smp_processor_id(), mm_cpumask(loaded_mm));
 		switch_mm_irqs_off(NULL, &init_mm, NULL);
 		return;
 	}
 
-	local_tlb_gen = this_cpu_read(cpu_tlbstate.ctxs[loaded_mm_asid].tlb_gen);
+	/* Reload the ASID if transitioning into or out of a global ASID */
+	if (mm_needs_global_asid(loaded_mm, loaded_mm_asid)) {
+		switch_mm_irqs_off(NULL, loaded_mm, NULL);
+		loaded_mm_asid = this_cpu_read(cpu_tlbstate.loaded_mm_asid);
+	}
+
+	/*
+	 * Broadcast ASIDs are always kept up to date with INVLPGB; with
+	 * Intel RAR IPI based flushes are used periodically to trim the
+	 * mm_cpumask, and flushes that get here should be processed.
+	 */
+	if (cpu_feature_enabled(X86_FEATURE_INVLPGB) &&
+	    is_global_asid(loaded_mm_asid))
+		return;
+
+	VM_WARN_ON(is_dyn_asid(loaded_mm_asid) && loaded_mm->context.ctx_id !=
+		   this_cpu_read(cpu_tlbstate.ctxs[loaded_mm_asid].ctx_id));
+
+	if (is_dyn_asid(loaded_mm_asid))
+		local_tlb_gen = this_cpu_read(cpu_tlbstate.ctxs[loaded_mm_asid].tlb_gen);
 
 	if (unlikely(f->new_tlb_gen != TLB_GENERATION_INVALID &&
 		     f->new_tlb_gen <= local_tlb_gen)) {
@@ -1264,7 +1295,8 @@ static void flush_tlb_func(void *info)
 	}
 
 	/* Both paths above update our state to mm_tlb_gen. */
-	this_cpu_write(cpu_tlbstate.ctxs[loaded_mm_asid].tlb_gen, mm_tlb_gen);
+	if (is_dyn_asid(loaded_mm_asid))
+		this_cpu_write(cpu_tlbstate.ctxs[loaded_mm_asid].tlb_gen, mm_tlb_gen);
 
 	/* Tracing is done in a unified manner to reduce the code size */
 done:
@@ -1305,15 +1337,15 @@ static bool should_flush_tlb(int cpu, void *data)
 	if (loaded_mm == info->mm)
 		return true;
 
-	/* In cpumask, but not the loaded mm? Periodically remove by flushing. */
-	if (info->trim_cpumask)
-		return true;
-
 	return false;
 }
 
 static bool should_trim_cpumask(struct mm_struct *mm)
 {
+	/* INVLPGB always goes to all CPUs. No need to trim the mask. */
+	if (cpu_feature_enabled(X86_FEATURE_INVLPGB) && mm_global_asid(mm))
+		return false;
+
 	if (time_after(jiffies, READ_ONCE(mm->context.next_trim_cpumask))) {
 		WRITE_ONCE(mm->context.next_trim_cpumask, jiffies + HZ);
 		return true;
@@ -1323,6 +1355,27 @@ static bool should_trim_cpumask(struct mm_struct *mm)
 
 DEFINE_PER_CPU_SHARED_ALIGNED(struct tlb_state_shared, cpu_tlbstate_shared);
 EXPORT_PER_CPU_SYMBOL(cpu_tlbstate_shared);
+
+static bool should_flush_all(const struct flush_tlb_info *info)
+{
+	if (info->freed_tables)
+		return true;
+
+	if (info->trim_cpumask)
+		return true;
+
+	/*
+	 * INVLPGB and RAR do not use this code path normally.
+	 * This call cleans up the cpumask or ASID transition.
+	 */
+	if (mm_global_asid(info->mm))
+		return true;
+
+	if (mm_in_asid_transition(info->mm))
+		return true;
+
+	return false;
+}
 
 STATIC_NOPV void native_flush_tlb_multi(const struct cpumask *cpumask,
 					 const struct flush_tlb_info *info)
@@ -1349,7 +1402,7 @@ STATIC_NOPV void native_flush_tlb_multi(const struct cpumask *cpumask,
 	 * up on the new contents of what used to be page tables, while
 	 * doing a speculative memory access.
 	 */
-	if (info->freed_tables || mm_in_asid_transition(info->mm))
+	if (should_flush_all(info))
 		on_each_cpu_mask(cpumask, flush_tlb_func, (void *)info, true);
 	else
 		on_each_cpu_cond_mask(should_flush_tlb, flush_tlb_func,
@@ -1379,6 +1432,74 @@ static DEFINE_PER_CPU_SHARED_ALIGNED(struct flush_tlb_info, flush_tlb_info);
 #ifdef CONFIG_DEBUG_VM
 static DEFINE_PER_CPU(unsigned int, flush_tlb_info_idx);
 #endif
+
+static void trim_cpumask_func(void *data)
+{
+	struct mm_struct *loaded_mm = this_cpu_read(cpu_tlbstate.loaded_mm);
+	const struct flush_tlb_info *f = data;
+
+	/*
+	 * Clearing this bit from an IRQ handler synchronizes against
+	 * the bit being set in switch_mm_irqs_off, with IRQs disabled.
+	 */
+	if (f->mm != loaded_mm)
+		cpumask_clear_cpu(raw_smp_processor_id(), mm_cpumask(f->mm));
+}
+
+static bool should_remove_cpu_from_mask(int cpu, void *data)
+{
+	struct mm_struct *loaded_mm = per_cpu(cpu_tlbstate.loaded_mm, cpu);
+	struct flush_tlb_info *info = data;
+
+	if (loaded_mm != info->mm)
+		return true;
+
+	return false;
+}
+
+/* Remove CPUs from the mm_cpumask that are running another mm. */
+static void trim_cpumask(struct flush_tlb_info *info)
+{
+	cpumask_t *cpumask = mm_cpumask(info->mm);
+	on_each_cpu_cond_mask(should_remove_cpu_from_mask, trim_cpumask_func,
+				(void *)info, 1, cpumask);
+}
+
+static void rar_tlb_flush(struct flush_tlb_info *info)
+{
+	unsigned long asid = mm_global_asid(info->mm);
+	cpumask_t *cpumask = mm_cpumask(info->mm);
+	u16 pcid = kern_pcid(asid);
+
+	if (info->trim_cpumask)
+		trim_cpumask(info);
+
+	/* Only the local CPU needs to be flushed? */
+	if (cpumask_equal(cpumask, cpumask_of(raw_smp_processor_id()))) {
+		lockdep_assert_irqs_enabled();
+		local_irq_disable();
+		flush_tlb_func(info);
+		local_irq_enable();
+		return;
+	}
+
+	/* Flush all the CPUs at once with RAR. */
+	if (cpumask_weight(cpumask)) {
+		smp_call_rar_many(mm_cpumask(info->mm), pcid, info->start, info->end);
+		if (cpu_feature_enabled(X86_FEATURE_PTI))
+			smp_call_rar_many(mm_cpumask(info->mm), user_pcid(asid), info->start, info->end);
+	}
+}
+
+static void broadcast_tlb_flush(struct flush_tlb_info *info)
+{
+	if (cpu_feature_enabled(X86_FEATURE_INVLPGB))
+		invlpgb_tlb_flush(info);
+	else /* Intel RAR */
+		rar_tlb_flush(info);
+
+	finish_asid_transition(info);
+}
 
 static struct flush_tlb_info *get_flush_tlb_info(struct mm_struct *mm,
 			unsigned long start, unsigned long end,
@@ -1441,6 +1562,13 @@ void flush_tlb_mm_range(struct mm_struct *mm, unsigned long start,
 				  new_tlb_gen);
 
 	/*
+	 * IPIs and RAR can be targeted to a cpumask. Periodically trim that
+	 * mm_cpumask by sending TLB flush IPIs, even when most TLB flushes
+	 * are done with RAR.
+	 */
+	info->trim_cpumask = should_trim_cpumask(mm);
+
+	/*
 	 * flush_tlb_multi() is not optimized for the common case in which only
 	 * a local TLB flush is needed. Optimize this use-case by calling
 	 * flush_tlb_func_local() directly in this case.
@@ -1448,7 +1576,6 @@ void flush_tlb_mm_range(struct mm_struct *mm, unsigned long start,
 	if (mm_global_asid(mm)) {
 		broadcast_tlb_flush(info);
 	} else if (cpumask_any_but(mm_cpumask(mm), cpu) < nr_cpu_ids) {
-		info->trim_cpumask = should_trim_cpumask(mm);
 		flush_tlb_multi(mm_cpumask(mm), info);
 		consider_global_asid(mm);
 	} else if (mm == this_cpu_read(cpu_tlbstate.loaded_mm)) {
@@ -1759,6 +1886,14 @@ void arch_tlbbatch_flush(struct arch_tlbflush_unmap_batch *batch)
 	if (cpu_feature_enabled(X86_FEATURE_INVLPGB) && batch->unmapped_pages) {
 		invlpgb_flush_all_nonglobals();
 		batch->unmapped_pages = false;
+	} else if (cpu_feature_enabled(X86_FEATURE_RAR) && cpumask_any(&batch->cpumask) < nr_cpu_ids) {
+		rar_full_flush(&batch->cpumask);
+		if (cpumask_test_cpu(cpu, &batch->cpumask)) {
+			lockdep_assert_irqs_enabled();
+			local_irq_disable();
+			invpcid_flush_all_nonglobals();
+			local_irq_enable();
+		}
 	} else if (cpumask_any_but(&batch->cpumask, cpu) < nr_cpu_ids) {
 		flush_tlb_multi(&batch->cpumask, info);
 	} else if (cpumask_test_cpu(cpu, &batch->cpumask)) {
