@@ -1600,7 +1600,7 @@ static void rar_full_flush(const cpumask_t *cpumask)
 {
 	guard(preempt)();
 	smp_call_rar_many(cpumask, 0, 0, TLB_FLUSH_ALL);
-	invpcid_flush_all();
+	//invpcid_flush_all();
 }
 
 static void rar_flush_all(void)
@@ -1667,7 +1667,7 @@ static void rar_kernel_range_flush(struct flush_tlb_info *info)
 {
 	guard(preempt)();
 	smp_call_rar_many(cpu_online_mask, 0, info->start, info->end);
-	do_kernel_range_flush(info);
+	//do_kernel_range_flush(info);
 }
 
 static void kernel_tlb_flush_all(struct flush_tlb_info *info)
