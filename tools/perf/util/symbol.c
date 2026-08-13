@@ -2763,3 +2763,4 @@ char *dso__demangle_sym(struct dso *dso, int kmodule, const char *elf_name)
 
 	return java_demangle_sym(elf_name, JAVA_DEMANGLE_NORET);
 }
+

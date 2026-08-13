@@ -259,6 +259,7 @@ static int add_sample(struct perf_sample *sample,
 		return 0;
 	}
 
+
 	/*
 	 * XXX filtered samples can still have branch entries pointing into our
 	 * symbol and are missed.
@@ -719,6 +720,8 @@ int cmd_annotate(int argc, const char **argv)
 	OPT_BOOLEAN(0, "tui", &annotate.use_tui, "Use the TUI interface"),
 #endif
 	OPT_BOOLEAN(0, "stdio", &annotate.use_stdio, "Use the stdio interface"),
+	OPT_BOOLEAN(0, "no-weights", &symbol_conf.hide_weight,
+		    "Hide weight columns in annotation"),
 	OPT_BOOLEAN(0, "stdio2", &annotate.use_stdio2, "Use the stdio interface"),
 	OPT_BOOLEAN(0, "ignore-vmlinux", &symbol_conf.ignore_vmlinux,
                     "don't load vmlinux even if found"),
