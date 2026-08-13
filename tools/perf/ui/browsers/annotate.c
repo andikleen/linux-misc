@@ -189,7 +189,7 @@ static void annotate_browser__draw_current_jump(struct ui_browser *browser)
 	struct map_symbol *ms = ab->b.priv;
 	struct symbol *sym = ms->sym;
 	struct annotation *notes = symbol__annotation(sym);
-	u8 pcnt_width = annotation__pcnt_width(notes);
+	u8 pcnt_width = annotation__pcnt_width(notes, ab->evsel);
 	u8 cntr_width = annotation__br_cntr_width();
 	int width;
 	int diff = 0;
@@ -255,7 +255,8 @@ static unsigned int annotate_browser__refresh(struct ui_browser *browser)
 {
 	struct annotation *notes = browser__annotation(browser);
 	int ret = ui_browser__list_head_refresh(browser);
-	int pcnt_width = annotation__pcnt_width(notes);
+	int pcnt_width = annotation__pcnt_width(notes,
+		container_of(browser, struct annotate_browser, b)->evsel);
 
 	if (annotate_opts.jump_arrows)
 		annotate_browser__draw_current_jump(browser);
@@ -972,6 +973,7 @@ static int annotate_browser__run(struct annotate_browser *browser,
 		"O             Bump offset level (jump targets -> +call -> all -> cycle thru)\n"
 		"s             Toggle source code view\n"
 		"t             Circulate percent, total period, samples view\n"
+		"w             Toggle weight columns\n"
 		"c             Show min/max cycle\n"
 		"/             Search string\n"
 		"k             Toggle line numbers\n"
@@ -1090,6 +1092,15 @@ show_sup_ins:
 			else
 				symbol_conf.show_total_period = true;
 			annotation__update_column_widths(notes);
+			continue;
+		case 'w':
+			symbol_conf.annotate_weight = !symbol_conf.annotate_weight;
+			symbol_conf.weight_mask_user = true;
+			symbol_conf.weight_mask = !symbol_conf.annotate_weight ?
+				0 : sym_hist__weight_mask(annotation__histogram(notes, evsel));
+			browser->b.width = notes->src->widths.max_line_len +
+					   annotation__pcnt_width(notes, evsel);
+			ui_browser__refresh_dimensions(&browser->b);
 			continue;
 		case 'c':
 			if (annotate_opts.show_minmax_cycle)
@@ -1228,7 +1239,7 @@ int __hist_entry__tui_annotate(struct hist_entry *he, struct map_symbol *ms,
 	browser.b.width = notes->src->widths.max_line_len;
 	browser.b.nr_entries = notes->src->nr_entries;
 	browser.b.entries = &notes->src->source;
-	browser.b.width += 18; /* Percentage */
+	browser.b.width += annotation__pcnt_width(notes, evsel);
 
 	if (annotate_opts.hide_src_code)
 		ui_browser__init_asm_mode(&browser.b);
