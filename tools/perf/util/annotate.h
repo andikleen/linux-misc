@@ -86,6 +86,8 @@ struct annotation;
 struct sym_hist_entry {
 	u64		nr_samples;
 	u64		period;
+	u64		weight_sum[WEIGHT_WEIGHT3 + 1];
+	u64		weight_num[WEIGHT_WEIGHT3 + 1];
 };
 
 enum {
@@ -231,6 +233,7 @@ void symbol__calc_percent(struct symbol *sym, struct evsel *evsel);
 struct sym_hist {
 	u64		      nr_samples;
 	u64		      period;
+	u8		      weight_mask;
 };
 
 /**
@@ -378,7 +381,8 @@ static inline int annotation__cycles_width(struct annotation *notes)
 
 static inline int annotation__pcnt_width(struct annotation *notes)
 {
-	return (symbol_conf.show_total_period ? 12 : 8) * notes->src->nr_events;
+	int extra = __builtin_popcount(symbol_conf.weight_mask) * 8;
+	return ((symbol_conf.show_total_period ? 12 : 8) + extra) * notes->src->nr_events;
 }
 
 static inline bool annotation_line__filter(struct annotation_line *al)

@@ -79,6 +79,9 @@ include::itrace.txt[]
 
 --stdio:: Use the stdio interface.
 
+--no-weights:: Hide weight columns in annotation output. By default, weight columns
+	are shown when samples contain non-zero weights.
+
 --stdio2:: Use the stdio2 interface, non-interactive, uses the TUI formatting.
 
 --stdio-color=<mode>::

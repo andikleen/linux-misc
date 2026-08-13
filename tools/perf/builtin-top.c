@@ -827,6 +827,7 @@ static void perf_event__process_sample(const struct perf_tool *tool,
 			top->vmlinux_warned = true;
 		}
 	}
+	symbol_conf__set_weight_mode(&symbol_conf, sample);
 
 	if (al.sym == NULL ||
 	    !symbol__is_idle(al.sym, al.map ? map__dso(al.map) : NULL, machine->env)) {

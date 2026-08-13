@@ -972,6 +972,7 @@ static int annotate_browser__run(struct annotate_browser *browser,
 		"O             Bump offset level (jump targets -> +call -> all -> cycle thru)\n"
 		"s             Toggle source code view\n"
 		"t             Circulate percent, total period, samples view\n"
+		"w             Toggle weight columns\n"
 		"c             Show min/max cycle\n"
 		"/             Search string\n"
 		"k             Toggle line numbers\n"
@@ -1090,6 +1091,14 @@ show_sup_ins:
 			else
 				symbol_conf.show_total_period = true;
 			annotation__update_column_widths(notes);
+			continue;
+		case 'w':
+			symbol_conf.hide_weight = !symbol_conf.hide_weight;
+			symbol_conf.weight_mask = symbol_conf.hide_weight ? 0 :
+				annotation__histogram(notes, evsel)->weight_mask;
+			browser->b.width = notes->src->widths.max_line_len +
+				annotation__pcnt_width(notes);
+			ui_browser__refresh_dimensions(&browser->b);
 			continue;
 		case 'c':
 			if (annotate_opts.show_minmax_cycle)
@@ -1225,10 +1234,12 @@ int __hist_entry__tui_annotate(struct hist_entry *he, struct map_symbol *ms,
 		browser.type_hash = hashmap__new(type_hash, type_equal, /*ctx=*/NULL);
 	}
 
+	symbol_conf.weight_mask = symbol_conf.hide_weight ? 0 :
+		annotation__histogram(notes, evsel)->weight_mask;
 	browser.b.width = notes->src->widths.max_line_len;
 	browser.b.nr_entries = notes->src->nr_entries;
 	browser.b.entries = &notes->src->source;
-	browser.b.width += 18; /* Percentage */
+	browser.b.width += annotation__pcnt_width(notes);
 
 	if (annotate_opts.hide_src_code)
 		ui_browser__init_asm_mode(&browser.b);

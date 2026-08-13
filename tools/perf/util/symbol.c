@@ -2763,3 +2763,14 @@ char *dso__demangle_sym(struct dso *dso, int kmodule, const char *elf_name)
 
 	return java_demangle_sym(elf_name, JAVA_DEMANGLE_NORET);
 }
+
+void symbol_conf__set_weight_mode(struct symbol_conf *c,
+				  struct perf_sample *sample)
+{
+	if (sample->weight)
+		c->weight_mask |= BIT(WEIGHT_WEIGHT);
+	if (sample->ins_lat)
+		c->weight_mask |= BIT(WEIGHT_INSNLAT);
+	if (sample->weight3)
+		c->weight_mask |= BIT(WEIGHT_WEIGHT3);
+}

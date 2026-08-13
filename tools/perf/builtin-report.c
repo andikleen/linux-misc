@@ -329,6 +329,8 @@ static int process_sample_event(const struct perf_tool *tool,
 				     &rep->total_cycles);
 	}
 
+	symbol_conf__set_weight_mode(&symbol_conf, sample);
+
 	rep->total_samples++;
 	if (al.parallelism == 1)
 		rep->singlethreaded_samples++;
