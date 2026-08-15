@@ -59,6 +59,9 @@ DEFINE_STATIC_SRCU_FAST_UPDOWN(uretprobes_srcu);
 /* Have a copy of original instruction */
 #define UPROBE_COPY_INSN	0
 
+/* PTWRITE uprobe */
+#define UPROBE_PTWRITE		1
+
 struct uprobe {
 	struct rb_node		rb_node;	/* node in the rb tree */
 	refcount_t		ref;
@@ -1162,6 +1165,18 @@ static int install_breakpoint(struct uprobe *uprobe, struct vm_area_struct *vma,
 	if (ret)
 		return ret;
 
+	if (test_bit(UPROBE_PTWRITE, &uprobe->flags)) {
+		first_uprobe = !mm_flags_test(MMF_HAS_UPROBES, mm);
+		if (first_uprobe)
+			mm_flags_set(MMF_HAS_UPROBES, mm);
+
+		ret = arch_uprobe_install_ptwrite(&uprobe->arch, vma, vaddr);
+		if (!ret)
+			mm_flags_clear(MMF_RECALC_UPROBES, mm);
+		else if (first_uprobe)
+			mm_flags_clear(MMF_HAS_UPROBES, mm);
+		return ret;
+	}
 	/*
 	 * set MMF_HAS_UPROBES in advance for uprobe_pre_sstep_notifier(),
 	 * the task can hit this breakpoint right after __replace_page().
@@ -1185,6 +1200,9 @@ static int remove_breakpoint(struct uprobe *uprobe, struct vm_area_struct *vma,
 	struct mm_struct *mm = vma->vm_mm;
 
 	mm_flags_set(MMF_RECALC_UPROBES, mm);
+	if (test_bit(UPROBE_PTWRITE, &uprobe->flags))
+		return arch_uprobe_uninstall_ptwrite(&uprobe->arch, vma, vaddr);
+
 	return set_orig_insn(&uprobe->arch, vma, vaddr);
 }
 
@@ -1423,6 +1441,12 @@ struct uprobe *uprobe_register(struct inode *inode,
 		return uprobe;
 
 	down_write(&uprobe->register_rwsem);
+	if (test_bit(UPROBE_PTWRITE, &uprobe->flags)) {
+		up_write(&uprobe->register_rwsem);
+		put_uprobe(uprobe);
+		return ERR_PTR(-EBUSY);
+	}
+
 	consumer_add(uprobe, uc);
 	ret = register_for_each_vma(uprobe, uc);
 	up_write(&uprobe->register_rwsem);
@@ -1441,6 +1465,131 @@ struct uprobe *uprobe_register(struct inode *inode,
 	return uprobe;
 }
 EXPORT_SYMBOL_GPL(uprobe_register);
+
+/*
+ * Architecture state and PTWRITE hooks: weak defaults so the generic core
+ * builds on any architecture.
+ */
+void __weak arch_uprobe_init_state(struct mm_struct *mm)
+{
+}
+
+void __weak arch_uprobe_clear_state(struct mm_struct *mm)
+{
+}
+
+bool __weak arch_uprobe_ptwrite_supported(void)
+{
+	return false;
+}
+
+int __weak arch_uprobe_ptwrite_prepare(struct arch_uprobe *auprobe,
+				       const struct uprobe_ptwrite_desc *desc)
+{
+	return -EOPNOTSUPP;
+}
+
+int __weak arch_uprobe_install_ptwrite(struct arch_uprobe *auprobe,
+				       struct vm_area_struct *vma,
+				       unsigned long vaddr)
+{
+	return -EOPNOTSUPP;
+}
+
+int __weak arch_uprobe_uninstall_ptwrite(struct arch_uprobe *auprobe,
+					  struct vm_area_struct *vma,
+					  unsigned long vaddr)
+{
+	return 0;
+}
+
+int __weak arch_uprobe_ptwrite_fetch(struct uprobe_ptwrite_arg *arg,
+				     const struct uprobe_ptwrite_fetch *fetch)
+{
+	return -EOPNOTSUPP;
+}
+
+/**
+ * uprobe_register_ptwrite - register a PTWRITE uprobe
+ * @inode: the probed file's inode
+ * @file: open file used while populating the instruction page cache
+ * @offset: offset from the start of the file
+ * @uc: consumer controlling probe lifetime
+ * @desc: requested values to emit
+ */
+struct uprobe *uprobe_register_ptwrite(struct inode *inode, struct file *file,
+				       loff_t offset, struct uprobe_consumer *uc,
+				       const struct uprobe_ptwrite_desc *desc)
+{
+	struct uprobe *uprobe;
+	int ret;
+
+	if (!file || !uc)
+		return ERR_PTR(-EINVAL);
+
+	if (!arch_uprobe_ptwrite_supported())
+		return ERR_PTR(-EOPNOTSUPP);
+
+	if (!desc || desc->nargs == 0 || desc->nargs > UPROBE_PTWRITE_MAX_ARGS)
+		return ERR_PTR(-EINVAL);
+
+	if (!inode->i_mapping->a_ops->read_folio &&
+	    !shmem_mapping(inode->i_mapping))
+		return ERR_PTR(-EIO);
+
+	/* Racy, just to catch the obvious mistakes */
+	if (offset < 0)
+		return ERR_PTR(-EINVAL);
+	if (offset > i_size_read(inode))
+		return ERR_PTR(-EINVAL);
+	if (!IS_ALIGNED(offset, UPROBE_SWBP_INSN_SIZE))
+		return ERR_PTR(-EINVAL);
+
+	uprobe = alloc_uprobe(inode, offset, 0);
+	if (IS_ERR(uprobe))
+		return uprobe;
+
+	down_write(&uprobe->register_rwsem);
+
+	/*
+	 * Do not repurpose an existing uprobe. UPROBE_COPY_INSN remains set
+	 * after its last consumer is detached and closes the deferred-removal
+	 * window where the consumer list alone is not a sufficient mode check.
+	 */
+	if (test_bit(UPROBE_COPY_INSN, &uprobe->flags) ||
+	    !list_empty(&uprobe->consumers)) {
+		ret = -EBUSY;
+		goto out;
+	}
+
+	/* Build the mm-independent stub template once, at registration. */
+	ret = arch_uprobe_ptwrite_prepare(&uprobe->arch, desc);
+	if (ret)
+		goto out;
+
+
+	set_bit(UPROBE_PTWRITE, &uprobe->flags);
+	consumer_add(uprobe, uc);
+	ret = register_for_each_vma(uprobe, uc);
+	up_write(&uprobe->register_rwsem);
+
+	if (ret) {
+		uprobe_unregister_nosync(uprobe, uc);
+		/*
+		 * Registration might have partially succeeded. Clean
+		 * everything up.
+		 */
+		uprobe_unregister_sync();
+		return ERR_PTR(ret);
+	}
+
+	return uprobe;
+out:
+	up_write(&uprobe->register_rwsem);
+	put_uprobe(uprobe);
+	return ERR_PTR(ret);
+}
+EXPORT_SYMBOL_GPL(uprobe_register_ptwrite);
 
 /**
  * uprobe_apply - add or remove the breakpoints according to @uc->filter
@@ -1825,6 +1974,8 @@ void uprobe_clear_state(struct mm_struct *mm)
 	mutex_lock(&delayed_uprobe_lock);
 	delayed_uprobe_remove(NULL, mm);
 	mutex_unlock(&delayed_uprobe_lock);
+
+	arch_uprobe_clear_state(mm);
 
 	if (!area)
 		return;

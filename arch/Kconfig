@@ -208,6 +208,9 @@ config UPROBES
 	    managed by the kernel and kept transparent to the probed
 	    application. )
 
+config ARCH_HAS_UPROBES_PTWRITE
+	bool
+
 config HAVE_64BIT_ALIGNED_ACCESS
 	def_bool 64BIT && !HAVE_EFFICIENT_UNALIGNED_ACCESS
 	help
