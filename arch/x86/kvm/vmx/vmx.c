@@ -205,11 +205,9 @@ module_param(ple_window_shrink, uint, 0444);
 static unsigned int ple_window_max        = KVM_VMX_DEFAULT_PLE_WINDOW_MAX;
 module_param(ple_window_max, uint, 0444);
 
-/* Default is SYSTEM mode, 1 for host-guest mode (which is BROKEN) */
+/* Default is SYSTEM mode, 1 for host-guest mode. */
 int __read_mostly pt_mode = PT_MODE_SYSTEM;
-#ifdef CONFIG_BROKEN
 module_param(pt_mode, int, S_IRUGO);
-#endif
 
 struct x86_pmu_lbr __ro_after_init vmx_lbr_caps;
 
@@ -1217,7 +1215,9 @@ static unsigned long segment_base(u16 selector)
 
 static inline bool pt_can_write_msr(struct vcpu_vmx *vmx)
 {
+	/* PT nesting is unsupported once L1 has enabled VMX. */
 	return vmx_pt_mode_is_host_guest() &&
+	       !vmx->nested.vmxon &&
 	       !(vmx->pt_desc.guest.ctl & RTIT_CTL_TRACEEN);
 }
 
@@ -1260,13 +1260,10 @@ static void pt_guest_enter(struct vcpu_vmx *vmx)
 	if (vmx_pt_mode_is_system())
 		return;
 
-	/*
-	 * GUEST_IA32_RTIT_CTL is already set in the VMCS.
-	 * Save host state before VM entry.
-	 */
+	/* Save and stop host PT before every guest entry. */
 	rdmsrq(MSR_IA32_RTIT_CTL, vmx->pt_desc.host.ctl);
+	wrmsrq(MSR_IA32_RTIT_CTL, 0);
 	if (vmx->pt_desc.guest.ctl & RTIT_CTL_TRACEEN) {
-		wrmsrq(MSR_IA32_RTIT_CTL, 0);
 		pt_save_msr(&vmx->pt_desc.host, vmx->pt_desc.num_address_ranges);
 		pt_load_msr(&vmx->pt_desc.guest, vmx->pt_desc.num_address_ranges);
 	}
@@ -1281,13 +1278,28 @@ static void pt_guest_exit(struct vcpu_vmx *vmx)
 		pt_save_msr(&vmx->pt_desc.guest, vmx->pt_desc.num_address_ranges);
 		pt_load_msr(&vmx->pt_desc.host, vmx->pt_desc.num_address_ranges);
 	}
-
-	/*
-	 * KVM requires VM_EXIT_CLEAR_IA32_RTIT_CTL to expose PT to the guest,
-	 * i.e. RTIT_CTL is always cleared on VM-Exit.  Restore it if necessary.
-	 */
 	if (vmx->pt_desc.host.ctl)
 		wrmsrq(MSR_IA32_RTIT_CTL, vmx->pt_desc.host.ctl);
+}
+
+void pt_update_controls(struct vcpu_vmx *vmx)
+{
+	u32 secondary = SECONDARY_EXEC_PT_USE_GPA | SECONDARY_EXEC_PT_CONCEAL_VMX;
+	u32 entry = VM_ENTRY_LOAD_IA32_RTIT_CTL | VM_ENTRY_PT_CONCEAL_PIP;
+	u32 exit = VM_EXIT_CLEAR_IA32_RTIT_CTL | VM_EXIT_PT_CONCEAL_PIP;
+
+	if (vmx_pt_mode_is_system())
+		return;
+
+	if (vmx->pt_desc.guest.ctl & RTIT_CTL_TRACEEN) {
+		secondary_exec_controls_setbit(vmx, secondary);
+		vm_entry_controls_setbit(vmx, entry);
+		vm_exit_controls_setbit(vmx, exit);
+	} else {
+		secondary_exec_controls_clearbit(vmx, secondary);
+		vm_entry_controls_clearbit(vmx, entry);
+		vm_exit_controls_clearbit(vmx, exit);
+	}
 }
 
 void vmx_set_host_fs_gs(struct vmcs_host_state *host, u16 fs_sel, u16 gs_sel,
@@ -2521,6 +2533,7 @@ int vmx_set_msr(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		vmcs_write64(GUEST_IA32_RTIT_CTL, data);
 		vmx->pt_desc.guest.ctl = data;
 		pt_update_intercept_for_msr(vcpu);
+		pt_update_controls(vmx);
 		break;
 	case MSR_IA32_RTIT_STATUS:
 		if (!pt_can_write_msr(vmx))
@@ -4747,8 +4760,10 @@ static u32 vmx_secondary_exec_control(struct vcpu_vmx *vmx)
 
 	u32 exec_control = vmcs_config.cpu_based_2nd_exec_ctrl;
 
-	if (vmx_pt_mode_is_system())
-		exec_control &= ~(SECONDARY_EXEC_PT_USE_GPA | SECONDARY_EXEC_PT_CONCEAL_VMX);
+	if (vmx_pt_mode_is_system() ||
+	    !(vmx->pt_desc.guest.ctl & RTIT_CTL_TRACEEN))
+		exec_control &= ~(SECONDARY_EXEC_PT_USE_GPA |
+				  SECONDARY_EXEC_PT_CONCEAL_VMX);
 	if (!cpu_need_virtualize_apic_accesses(vcpu))
 		exec_control &= ~SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES;
 	if (vmx->vpid == 0)
@@ -4969,6 +4984,7 @@ static void init_vmcs(struct vcpu_vmx *vmx)
 		/* Bit[6~0] are forced to 1, writes are ignored. */
 		vmx->pt_desc.guest.output_mask = 0x7F;
 		vmcs_write64(GUEST_IA32_RTIT_CTL, 0);
+		pt_update_controls(vmx);
 	}
 
 	vmcs_write32(GUEST_SYSENTER_CS, 0);
@@ -7909,6 +7925,74 @@ static void nested_vmx_cr_fixed1_bits_update(struct kvm_vcpu *vcpu)
 #undef cr4_fixed1_update
 }
 
+/* Host PT common capabilities and address-range count. */
+static u32 vmx_pt_host_caps[PT_CPUID_LEAVES][PT_CPUID_REGS_NUM];
+static u8 vmx_pt_host_min_ranges;
+
+struct vmx_pt_caps_data {
+	u32 caps[PT_CPUID_LEAVES][PT_CPUID_REGS_NUM];
+	u8 num_address_ranges;
+};
+
+static void vmx_get_pt_host_caps(void *info)
+{
+	struct vmx_pt_caps_data __percpu *caps =
+		(struct vmx_pt_caps_data __percpu *)(unsigned long)info;
+	struct vmx_pt_caps_data *data;
+	u32 eax, ebx, ecx, edx;
+	int i;
+
+	data = this_cpu_ptr(caps);
+	for (i = 0; i < PT_CPUID_LEAVES; i++) {
+		cpuid_count(0x14, i, &eax, &ebx, &ecx, &edx);
+		data->caps[i][CPUID_EAX] = eax;
+		data->caps[i][CPUID_EBX] = ebx;
+		data->caps[i][CPUID_ECX] = ecx;
+		data->caps[i][CPUID_EDX] = edx;
+	}
+	data->num_address_ranges = eax & PT_CPUID_EAX_ADDR_RANGES_MASK;
+}
+
+static void vmx_init_pt_host_caps(void)
+{
+	struct vmx_pt_caps_data __percpu *caps;
+	int cpu, i;
+
+	caps = alloc_percpu(struct vmx_pt_caps_data);
+	if (!caps) {
+		/* Zero caps disable guest PT entirely */
+		memset(vmx_pt_host_caps, 0, sizeof(vmx_pt_host_caps));
+		vmx_pt_host_min_ranges = 0;
+		return;
+	}
+
+	memset(vmx_pt_host_caps, 0xff, sizeof(vmx_pt_host_caps));
+	vmx_pt_host_min_ranges = 0xff;
+
+	cpus_read_lock();
+	on_each_cpu(vmx_get_pt_host_caps, (void *)(unsigned long)caps, 1);
+
+	for_each_online_cpu(cpu) {
+		struct vmx_pt_caps_data *cpu_caps = per_cpu_ptr(caps, cpu);
+
+		for (i = 0; i < PT_CPUID_LEAVES; i++) {
+			vmx_pt_host_caps[i][CPUID_EAX] &= cpu_caps->caps[i][CPUID_EAX];
+			vmx_pt_host_caps[i][CPUID_EBX] &= cpu_caps->caps[i][CPUID_EBX];
+			vmx_pt_host_caps[i][CPUID_ECX] &= cpu_caps->caps[i][CPUID_ECX];
+			vmx_pt_host_caps[i][CPUID_EDX] &= cpu_caps->caps[i][CPUID_EDX];
+		}
+		vmx_pt_host_min_ranges = min(vmx_pt_host_min_ranges,
+					     cpu_caps->num_address_ranges);
+	}
+	cpus_read_unlock();
+
+	free_percpu(caps);
+
+	vmx_pt_host_caps[1][CPUID_EAX] = (vmx_pt_host_caps[1][CPUID_EAX] &
+					 ~PT_CPUID_EAX_ADDR_RANGES_MASK) |
+					vmx_pt_host_min_ranges;
+}
+
 static void update_intel_pt_cfg(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
@@ -7917,8 +8001,25 @@ static void update_intel_pt_cfg(struct kvm_vcpu *vcpu)
 
 	for (i = 0; i < PT_CPUID_LEAVES; i++) {
 		best = kvm_find_cpuid_entry_index(vcpu, 0x14, i);
-		if (!best)
-			return;
+		if (!best) {
+			/*
+			 * PT was removed from the guest CPUID; drop the stale
+			 * configuration.
+			 */
+			memset(vmx->pt_desc.caps, 0, sizeof(vmx->pt_desc.caps));
+			vmx->pt_desc.num_address_ranges = 0;
+			break;
+		}
+
+		/*
+		 * Sanitize the guest's PT capabilities against the host's
+		 * common subset
+		 */
+		best->eax &= vmx_pt_host_caps[i][CPUID_EAX];
+		best->ebx &= vmx_pt_host_caps[i][CPUID_EBX];
+		best->ecx &= vmx_pt_host_caps[i][CPUID_ECX];
+		best->edx &= vmx_pt_host_caps[i][CPUID_EDX];
+
 		vmx->pt_desc.caps[CPUID_EAX + i*PT_CPUID_REGS_NUM] = best->eax;
 		vmx->pt_desc.caps[CPUID_EBX + i*PT_CPUID_REGS_NUM] = best->ebx;
 		vmx->pt_desc.caps[CPUID_ECX + i*PT_CPUID_REGS_NUM] = best->ecx;
@@ -7976,6 +8077,16 @@ static void update_intel_pt_cfg(struct kvm_vcpu *vcpu)
 	/* unmask address range configure area */
 	for (i = 0; i < vmx->pt_desc.num_address_ranges; i++)
 		vmx->pt_desc.ctl_bitmask &= ~(0xfULL << (32 + i * 4));
+
+	if (vmx->pt_desc.guest.ctl &&
+	    (vmx_rtit_ctl_check(vcpu, vmx->pt_desc.guest.ctl) ||
+	     !vmx->pt_desc.caps[CPUID_EAX])) {
+		vmx->pt_desc.guest.ctl = 0;
+		vmcs_write64(GUEST_IA32_RTIT_CTL, 0);
+	}
+
+	pt_update_controls(vmx);
+	pt_update_intercept_for_msr(vcpu);
 }
 
 void vmx_vcpu_after_set_cpuid(struct kvm_vcpu *vcpu)
@@ -8764,6 +8875,9 @@ __init int vmx_hardware_setup(void)
 		vt_init_ops.handle_intel_pt_intr = vmx_handle_intel_pt_intr;
 	else
 		vt_init_ops.handle_intel_pt_intr = NULL;
+
+	if (pt_mode == PT_MODE_HOST_GUEST)
+		vmx_init_pt_host_caps();
 
 	setup_default_sgx_lepubkeyhash();
 
