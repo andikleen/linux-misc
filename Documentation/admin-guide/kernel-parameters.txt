@@ -3091,6 +3091,15 @@ Kernel parameters
 
 			Default is Y (on).
 
+	kvm.enable_pmu_hybrid=[KVM,X86]
+			If enabled, KVM will allow virtualization of the PMU
+			on hybrid Intel systems. The administrator is responsible
+			that either each vcpu is pinned to only its own CPU type
+			(E or P-core), or that the guest is only using enumerated
+			architectural perfmon events.
+
+			Default is N (off). This is an experimental facility so far.
+
 	kvm.enable_virt_at_load=[KVM,ARM64,LOONGARCH,MIPS,RISCV,X86]
 			If enabled, KVM will enable virtualization in hardware
 			when KVM is loaded, and disable virtualization when KVM
