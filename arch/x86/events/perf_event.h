@@ -745,6 +745,8 @@ struct x86_hybrid_pmu {
 	u64				intel_ctrl;
 	u64				pebs_events_mask;
 	u64				config_mask;
+	unsigned long			events_maskl;
+	int				events_mask_len;
 	union {
 			u64		cntr_mask64;
 			unsigned long	cntr_mask[BITS_TO_LONGS(X86_PMC_IDX_MAX)];

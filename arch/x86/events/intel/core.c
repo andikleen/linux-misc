@@ -6327,6 +6327,21 @@ static bool init_hybrid_pmu(int cpu)
 	if (this_cpu_has(X86_FEATURE_ARCH_PERFMON_EXT))
 		update_pmu_cap(&pmu->pmu);
 
+	/*
+	 * Per-type architectural events mask (CPUID.0xA EBX, bit set = event
+	 * unavailable), read from each core type's own CPUID.
+	 */
+	{
+		union cpuid10_eax eax;
+		union cpuid10_ebx ebx;
+		unsigned int fixed;
+		union cpuid10_edx edx;
+
+		cpuid(10, &eax.full, &ebx.full, &fixed, &edx.full);
+		pmu->events_maskl = ebx.full;
+		pmu->events_mask_len = eax.split.mask_length;
+	}
+
 	intel_pmu_check_hybrid_pmus(pmu);
 
 	if (!check_hw_exists(&pmu->pmu, pmu->cntr_mask, pmu->fixed_cntr_mask))
