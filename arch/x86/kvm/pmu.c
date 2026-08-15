@@ -39,6 +39,11 @@ bool __read_mostly enable_pmu = true;
 EXPORT_SYMBOL_FOR_KVM_INTERNAL(enable_pmu);
 module_param(enable_pmu, bool, 0444);
 
+/* Enable hybrid guest PMU */
+bool __read_mostly enable_hybrid_pmu;
+EXPORT_SYMBOL_FOR_KVM_INTERNAL(enable_hybrid_pmu);
+module_param(enable_hybrid_pmu, bool, 0444);
+
 /* Enable/disabled mediated PMU virtualization. */
 bool __read_mostly enable_mediated_pmu;
 EXPORT_SYMBOL_FOR_KVM_INTERNAL(enable_mediated_pmu);
@@ -123,13 +128,7 @@ void kvm_init_pmu_capability(struct kvm_pmu_ops *pmu_ops)
 	bool is_intel = boot_cpu_data.x86_vendor == X86_VENDOR_INTEL;
 	int min_nr_gp_ctrs = pmu_ops->MIN_NR_GP_COUNTERS;
 
-	/*
-	 * Hybrid PMUs don't play nice with virtualization without careful
-	 * configuration by userspace, and KVM's APIs for reporting supported
-	 * vPMU features do not account for hybrid PMUs.  Disable vPMU support
-	 * for hybrid PMUs until KVM gains a way to let userspace opt-in.
-	 */
-	if (cpu_feature_enabled(X86_FEATURE_HYBRID_CPU)) {
+	if (cpu_feature_enabled(X86_FEATURE_HYBRID_CPU) && !enable_hybrid_pmu) {
 		enable_pmu = false;
 		memset(&kvm_host_pmu, 0, sizeof(kvm_host_pmu));
 	} else {
@@ -262,6 +261,30 @@ static u64 get_sample_period(struct kvm_pmc *pmc, u64 counter_value)
 	return sample_period;
 }
 
+/* Update the vPMU type after a vCPU moves between hybrid core types. */
+u32 kvm_pmu_check_cpu_type(struct kvm_pmu *pmu, int cpu)
+{
+	u32 type = perf_get_x86_pmu_type(cpu);
+
+	if (!pmu->hybrid_pmu_type) {
+		pmu->hybrid_pmu_type = type;
+		return type;
+	}
+
+	if (type != pmu->hybrid_pmu_type) {
+		struct kvm_vcpu *vcpu = pmu_to_vcpu(pmu);
+
+		pmu->hybrid_pmu_type = type;
+		pmu->hybrid_rebind = true;
+		kvm_make_request(KVM_REQ_PMU, vcpu);
+
+		pr_warn_once("vCPU %u migrated between hybrid core types; vPMU counts may be wrong - pin the vCPU to a single core type\n",
+			     vcpu->vcpu_id);
+	}
+
+	return type;
+}
+
 static int pmc_reprogram_counter(struct kvm_pmc *pmc, u32 type, u64 config,
 				 bool exclude_user, bool exclude_kernel,
 				 bool intr)
@@ -299,6 +322,16 @@ static int pmc_reprogram_counter(struct kvm_pmc *pmc, u32 type, u64 config,
 		 * in the PEBS record is calibrated on the guest side.
 		 */
 		attr.precise_ip = pmc_get_pebs_precise_level(pmc);
+	}
+
+	/* Recheck the vCPU core type after possible migration. */
+	if (pmu->hybrid_pmu_type) {
+		u32 cur_type = perf_get_x86_pmu_type(pmu_to_vcpu(pmu)->cpu);
+
+		if (cur_type != type) {
+			type = cur_type;
+			attr.type = type;
+		}
 	}
 
 	event = perf_event_create_kernel_counter(&attr, -1, current,
@@ -378,6 +411,11 @@ static void pmc_stop_counter(struct kvm_pmc *pmc)
 {
 	if (pmc->perf_event) {
 		pmc->counter = pmc_read_counter(pmc);
+		/*
+		 * Fold-then-clear, matching pmc_pause_counter(). Needed
+		 * in case the pmu type was migrated.
+		 */
+		pmc->emulated_counter = 0;
 		pmc_release_perf_event(pmc);
 	}
 }
@@ -560,12 +598,18 @@ static int reprogram_counter(struct kvm_pmc *pmc)
 	u64 eventsel = pmc->eventsel;
 	u64 new_config = eventsel;
 	bool emulate_overflow;
+	u32 pmu_type;
 	u8 fixed_ctr_ctrl;
 
 	if (kvm_vcpu_has_mediated_pmu(pmu_to_vcpu(pmu))) {
+		/* Warn and rebind if the vCPU changed core type. */
+		kvm_pmu_check_cpu_type(pmu, pmu_to_vcpu(pmu)->cpu);
 		kvm_mediated_pmu_refresh_event_filter(pmc);
 		return 0;
 	}
+
+	/* Warn and rebind on core-type change. Bind to the current type's PMU. */
+	pmu_type = kvm_pmu_check_cpu_type(pmu, pmu_to_vcpu(pmu)->cpu);
 
 	emulate_overflow = pmc_pause_counter(pmc);
 
@@ -598,7 +642,7 @@ static int reprogram_counter(struct kvm_pmc *pmc)
 
 	pmc->current_config = new_config;
 
-	return pmc_reprogram_counter(pmc, PERF_TYPE_RAW,
+	return pmc_reprogram_counter(pmc, pmu_type,
 				     (eventsel & pmu->raw_event_mask),
 				     !(eventsel & ARCH_PERFMON_EVENTSEL_USR),
 				     !(eventsel & ARCH_PERFMON_EVENTSEL_OS),
@@ -652,6 +696,17 @@ void kvm_pmu_handle_event(struct kvm_vcpu *vcpu)
 	struct kvm_pmu *pmu = vcpu_to_pmu(vcpu);
 	struct kvm_pmc *pmc;
 	int bit;
+
+	/*
+	 * The vCPU changed core type: drop all perf events so they are
+	 * recreated for the new type's PMU.
+	 */
+	if (pmu->hybrid_rebind) {
+		pmu->hybrid_rebind = false;
+		kvm_for_each_pmc(pmu, pmc, bit, pmu->all_valid_pmc_idx)
+			pmc_stop_counter(pmc);
+		kvm_pmu_request_counters_reprogram(pmu, -1ull);
+	}
 
 	bitmap_copy(bitmap, pmu->reprogram_pmi, X86_PMC_IDX_MAX);
 

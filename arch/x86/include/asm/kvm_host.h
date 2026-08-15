@@ -640,6 +640,12 @@ struct kvm_pmu {
 	 * redundant check before cleanup if guest don't use vPMU at all.
 	 */
 	u8 event_count;
+
+	/*
+	 * Hybrid PMU type of the vPMU.
+	 */
+	u32 hybrid_pmu_type;
+	bool hybrid_rebind;
 };
 
 struct kvm_pmu_ops;
