@@ -2553,7 +2553,14 @@ static void prepare_vmcs02_early(struct vcpu_vmx *vmx, struct loaded_vmcs *vmcs0
 	exec_control = __vm_entry_controls_get(vmcs01);
 	exec_control |= (vmcs12->vm_entry_controls &
 			 ~VM_ENTRY_LOAD_IA32_PERF_GLOBAL_CTRL);
-	exec_control &= ~(VM_ENTRY_IA32E_MODE | VM_ENTRY_LOAD_IA32_EFER);
+	/*
+	 * Nested (L2) Intel PT is not supported: never load IA32_RTIT_CTL at
+	 * L2 entry.  L1's host/guest PT state is switched by pt_guest_enter(),
+	 * and an RTIT_CTL load at L2 entry could trip the TraceEn consistency
+	 * check and bypass the guest.ctl shadow.
+	 */
+	exec_control &= ~(VM_ENTRY_IA32E_MODE | VM_ENTRY_LOAD_IA32_EFER |
+			  VM_ENTRY_LOAD_IA32_RTIT_CTL);
 	if (cpu_has_load_ia32_efer()) {
 		if (guest_efer & EFER_LMA)
 			exec_control |= VM_ENTRY_IA32E_MODE;
@@ -2570,6 +2577,8 @@ static void prepare_vmcs02_early(struct vcpu_vmx *vmx, struct loaded_vmcs *vmcs0
 	 * bits may be modified by vmx_set_efer() in prepare_vmcs02().
 	 */
 	exec_control = __vm_exit_controls_get(vmcs01);
+	/* Nested Intel PT is not supported, see prepare_vmcs02() entry controls. */
+	exec_control &= ~VM_EXIT_CLEAR_IA32_RTIT_CTL;
 	if (cpu_has_load_ia32_efer() && guest_efer != kvm_host.efer)
 		exec_control |= VM_EXIT_LOAD_IA32_EFER;
 	else
@@ -5438,6 +5447,12 @@ static int enter_vmx_operation(struct kvm_vcpu *vcpu)
 	if (vmx_pt_mode_is_host_guest()) {
 		vmx->pt_desc.guest.ctl = 0;
 		pt_update_intercept_for_msr(vcpu);
+		/*
+		 * Drop the RTIT entry/exit controls too: they must match
+		 * guest.ctl or the next L1 VM-Enter can trip the TraceEn
+		 * consistency check and/or load stale RTIT state.
+		 */
+		pt_update_controls(vmx);
 	}
 
 	return 0;
