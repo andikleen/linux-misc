@@ -640,6 +640,15 @@ struct kvm_pmu {
 	 * redundant check before cleanup if guest don't use vPMU at all.
 	 */
 	u8 event_count;
+
+	/*
+	 * Hybrid vPMU: perf PMU type of the vCPU's CPU, captured at first PMU
+	 * use and updated on core-type migration (from vcpu->cpu).  On
+	 * migration, counter events are dropped and recreated for the new
+	 * core type (hybrid_rebind) and the admin is warned once.
+	 */
+	u32 hybrid_pmu_type;
+	bool hybrid_rebind;
 };
 
 struct kvm_pmu_ops;

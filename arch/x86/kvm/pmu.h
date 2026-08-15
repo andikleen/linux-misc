@@ -217,6 +217,7 @@ void kvm_init_pmu_capability(struct kvm_pmu_ops *pmu_ops);
 
 void kvm_pmu_recalc_pmc_emulation(struct kvm_pmu *pmu, struct kvm_pmc *pmc);
 void kvm_pmu_handle_event(struct kvm_vcpu *vcpu);
+u32 kvm_pmu_check_cpu_type(struct kvm_pmu *pmu, int cpu);
 
 static inline void kvm_pmu_request_counter_reprogram(struct kvm_pmc *pmc)
 {
