@@ -322,6 +322,19 @@ config SAMPLE_HUNG_TASK
 	  Reading these files with multiple processes triggers hung task
 	  detection by holding locks for a long time (256 seconds).
 
+config SAMPLE_UPROBE_PTWRITE
+	tristate "Build ptwrite uprobe test module -- loadable module only"
+	depends on UPROBES && X86_64 && m
+	help
+	  Builds the minimal ptwrite uprobe prototype driver. It replaces
+	  a 5-byte NOP at a user-specified file offset with a jmp to a per-mm
+	  user-mode stub that emits the requested live registers / immediates
+	  with the PTWRITE instruction into an externally configured Intel PT
+	  stream (no kernel entry, no syscall, no single-step at probe-hit
+	  time). The companion userspace target is test_prog.c in the same
+	  directory; the module params (path/offset/args/event_id) select the
+	  probe site and the emitted values.
+
 source "samples/rust/Kconfig"
 
 source "samples/damon/Kconfig"
