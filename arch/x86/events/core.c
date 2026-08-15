@@ -3117,20 +3117,102 @@ unsigned long perf_arch_misc_flags(struct pt_regs *regs)
 	return flags;
 }
 
+/*
+ * Export the common PMU subset across hybrid core types: counters and
+ * events that exist on every type.  The vCPU is not pinned to one core
+ * type, so guests must not see counters missing on another type.
+ */
+static void perf_get_hybrid_common_pmu_capability(struct x86_pmu_capability *cap)
+{
+	struct x86_hybrid_pmu *hpmu;
+	unsigned long events_maskl;
+	int i, first = -1;
+
+	memset(cap, 0, sizeof(*cap));
+
+	if (!x86_pmu.num_hybrid_pmus)
+		return;
+
+	/*
+	 * Hybrid PMUs are registered for all of the model's core types, even
+	 * types with no online CPUs (e.g. E-cores disabled in BIOS).  Per-type
+	 * data is filled in when the first CPU of that type comes online, so
+	 * only consider types with online CPUs.
+	 */
+	for (i = 0; i < x86_pmu.num_hybrid_pmus; i++) {
+		if (cpumask_empty(&x86_pmu.hybrid_pmu[i].supported_cpus))
+			continue;
+		first = i;
+		break;
+	}
+	if (first == -1)
+		return;
+
+	/*
+	 * This capability is a one-time snapshot (KVM takes it at module
+	 * init); CPU hotplug afterwards is not reflected.  Offlining a type
+	 * only makes the capability conservative, but onlining a type that
+	 * was offline leaves guests with a stale capability that can overstate
+	 * that type's counters and events.
+	 */
+
+	cap->version		= x86_pmu.version;
+	cap->bit_width_gp	= x86_pmu.cntval_bits;
+	cap->bit_width_fixed	= x86_pmu.cntval_bits;
+	cap->pebs_ept		= 0;	/* PEBS is not part of the common subset */
+	/*
+	 * The mediated-vPMU capability is per hybrid PMU; a vCPU can run on
+	 * any core type, so require every online type to support it.
+	 */
+	cap->mediated		= 1;
+	for (i = first; i < x86_pmu.num_hybrid_pmus; i++) {
+		hpmu = &x86_pmu.hybrid_pmu[i];
+		if (cpumask_empty(&hpmu->supported_cpus))
+			continue;
+		if (!(hpmu->pmu.capabilities & PERF_PMU_CAP_MEDIATED_VPMU))
+			cap->mediated = 0;
+	}
+
+	hpmu = &x86_pmu.hybrid_pmu[first];
+	cap->num_counters_gp	= hweight64(hpmu->cntr_mask64);
+	cap->num_counters_fixed	= hweight64(hpmu->fixed_cntr_mask64);
+	events_maskl		= hpmu->events_maskl;
+	cap->events_mask_len	= hpmu->events_mask_len;
+
+	for (i = first + 1; i < x86_pmu.num_hybrid_pmus; i++) {
+		int n;
+
+		hpmu = &x86_pmu.hybrid_pmu[i];
+		if (cpumask_empty(&hpmu->supported_cpus))
+			continue;
+		n = hweight64(hpmu->cntr_mask64);
+		if (n < cap->num_counters_gp)
+			cap->num_counters_gp = n;
+		n = hweight64(hpmu->fixed_cntr_mask64);
+		if (n < cap->num_counters_fixed)
+			cap->num_counters_fixed = n;
+		/* bit set = event unavailable; common subset = OR */
+		events_maskl |= hpmu->events_maskl;
+		if (hpmu->events_mask_len < cap->events_mask_len)
+			cap->events_mask_len = hpmu->events_mask_len;
+	}
+	if (cap->events_mask_len)
+		events_maskl &= GENMASK_ULL(cap->events_mask_len - 1, 0);
+	cap->events_mask = (unsigned int)events_maskl;
+}
+
 void perf_get_x86_pmu_capability(struct x86_pmu_capability *cap)
 {
-	/* This API doesn't currently support enumerating hybrid PMUs. */
-	if (WARN_ON_ONCE(cpu_feature_enabled(X86_FEATURE_HYBRID_CPU)) ||
-	    !x86_pmu_initialized()) {
+	if (!x86_pmu_initialized()) {
 		memset(cap, 0, sizeof(*cap));
 		return;
 	}
 
-	/*
-	 * Note, hybrid CPU models get tracked as having hybrid PMUs even when
-	 * all E-cores are disabled via BIOS.  When E-cores are disabled, the
-	 * base PMU holds the correct number of counters for P-cores.
-	 */
+	if (x86_pmu.num_hybrid_pmus) {
+		perf_get_hybrid_common_pmu_capability(cap);
+		return;
+	}
+
 	cap->version		= x86_pmu.version;
 	cap->num_counters_gp	= x86_pmu_num_counters(NULL);
 	cap->num_counters_fixed	= x86_pmu_num_counters_fixed(NULL);
@@ -3153,3 +3235,23 @@ u64 perf_get_hw_event_config(int hw_event)
 	return 0;
 }
 EXPORT_SYMBOL_FOR_KVM(perf_get_hw_event_config);
+
+/*
+ * Return the perf PMU type of the given CPU.  Non-hybrid: PERF_TYPE_RAW.
+ * Hybrid: the CPU's core type PMU (big core = PERF_TYPE_RAW, others get
+ * dynamic types).  KVM binds guest counter events to the PMU of the CPU
+ * the vCPU is on and rebinds on core-type migration.
+ */
+int perf_get_x86_pmu_type(int cpu)
+{
+	struct pmu *pmu = x86_get_pmu(cpu);
+
+	/*
+	 * Non-hybrid: the CPU PMU is PERF_TYPE_RAW.  Hybrid: the per-core-type
+	 * PMU.  If the per-CPU PMU init failed, x86_get_pmu() returns the base
+	 * PMU, which is never registered on hybrid and has type 0.  Return
+	 * PERF_TYPE_RAW instead of 0, which KVM uses for "type not captured".
+	 */
+	return pmu->type ? pmu->type : PERF_TYPE_RAW;
+}
+EXPORT_SYMBOL_FOR_KVM(perf_get_x86_pmu_type);
