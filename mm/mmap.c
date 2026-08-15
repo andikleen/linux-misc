@@ -1716,7 +1716,6 @@ __latent_entropy int dup_mmap(struct mm_struct *mm, struct mm_struct *oldmm)
 	if (mmap_write_lock_killable(oldmm))
 		return -EINTR;
 	flush_cache_dup_mm(oldmm);
-	uprobe_dup_mmap(oldmm, mm);
 	/*
 	 * Not linked in yet - no deadlock potential:
 	 */
@@ -1825,6 +1824,13 @@ __latent_entropy int dup_mmap(struct mm_struct *mm, struct mm_struct *oldmm)
 	}
 	/* a new mm has just been created */
 	retval = arch_dup_mmap(oldmm, mm);
+	if (!retval) {
+		/*
+		 * The arch state follows the fully populated child maple tree. A
+		 * non-fatal allocation failure can leave a child ptwrite hit faulting.
+		 */
+		retval = uprobe_dup_mmap(oldmm, mm);
+	}
 loop_out:
 	vma_iter_free(&vmi);
 	if (!retval) {

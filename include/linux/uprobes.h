@@ -23,9 +23,11 @@ struct uprobe;
 struct vm_area_struct;
 struct mm_struct;
 struct inode;
+struct file;
 struct notifier_block;
 struct page;
 struct srcu_ctr;
+struct uprobe_ptwrite_desc;
 
 /*
  * Allowed return values from uprobe consumer's handler callback
@@ -187,6 +189,37 @@ struct xol_area;
 
 struct uprobes_state {
 	struct xol_area		*xol_area;
+#ifdef CONFIG_X86_64
+	struct hlist_head	head_ptwrite;
+	/* Ptwrite pages and metadata use the mm mmap write lock. */
+#endif
+};
+
+#define UPROBE_PTWRITE_MAX_ARGS	8
+
+/*
+ * Header word: event_id<<48 | nargs<<40 | UPROBE_PTW_HDR_MAGIC (bits 39..0).
+ */
+#define UPROBE_PTW_HDR_MAGIC	0x5054525731UL	/* "PTRW1" */
+
+enum uprobe_ptwrite_src {
+	UPROBE_PTW_SRC_REG,	/* value = live GPR (index in .reg) */
+	UPROBE_PTW_SRC_IMM,	/* value = constant (.val), stored in stub data slot */
+};
+
+struct uprobe_ptwrite_arg {
+	u8	src;		/* enum uprobe_ptwrite_src */
+	u8	reg;		/* x86-64 GPR index (0=rax..15=r15) for SRC_REG */
+	u8	size;		/* declared type size 1/2/4/8 (decoder hint) */
+	u8	reserved;
+	u64	val;		/* SRC_IMM: constant; SRC_REG: unused */
+};
+
+struct uprobe_ptwrite_desc {
+	u16	event_id;	/* identifier carried in the header word */
+	u8	nargs;
+	u8	flags;
+	struct uprobe_ptwrite_arg args[UPROBE_PTWRITE_MAX_ARGS];
 };
 
 typedef int (*uprobe_write_verify_t)(struct page *page, unsigned long vaddr,
@@ -205,6 +238,37 @@ extern int uprobe_write(struct arch_uprobe *auprobe, struct vm_area_struct *vma,
 			uprobe_opcode_t *insn, int nbytes, uprobe_write_verify_t verify, bool is_register, bool do_update_ref_ctr,
 			void *data);
 extern struct uprobe *uprobe_register(struct inode *inode, loff_t offset, loff_t ref_ctr_offset, struct uprobe_consumer *uc);
+extern struct uprobe *uprobe_register_ptwrite(struct inode *inode,
+					      struct file *file, loff_t offset,
+					      struct uprobe_consumer *uc,
+					      const struct uprobe_ptwrite_desc *desc);
+extern bool arch_uprobe_ptwrite_supported(void);
+extern int arch_uprobe_ptwrite_prepare(struct arch_uprobe *auprobe,
+				       const struct uprobe_ptwrite_desc *desc);
+extern int arch_uprobe_install_ptwrite(struct arch_uprobe *auprobe,
+				       struct vm_area_struct *vma,
+				       unsigned long vaddr);
+extern int arch_uprobe_uninstall_ptwrite(struct arch_uprobe *auprobe,
+					 struct vm_area_struct *vma,
+					 unsigned long vaddr);
+
+enum uprobe_ptwrite_fetch_kind {
+	UPROBE_PTW_FETCH_REG,	/* live GPR */
+	UPROBE_PTW_FETCH_STACKP,/* stack pointer value ($stack) */
+	UPROBE_PTW_FETCH_STACKN,/* [SP + imm] ($stackN, imm pre-scaled) */
+	UPROBE_PTW_FETCH_MEMREG,/* [GPR + imm] (imm = disp32) */
+	UPROBE_PTW_FETCH_IMM,	/* constant */
+};
+
+struct uprobe_ptwrite_fetch {
+	enum uprobe_ptwrite_fetch_kind	kind;
+	unsigned int			reg;	/* pt_regs member offset */
+	u64				imm;	/* IMM value / MEMREG disp / STACKN off */
+};
+
+extern int arch_uprobe_ptwrite_fetch(struct uprobe_ptwrite_arg *a,
+				     const struct uprobe_ptwrite_fetch *f);
+
 extern int uprobe_apply(struct uprobe *uprobe, struct uprobe_consumer *uc, bool);
 extern void uprobe_unregister_nosync(struct uprobe *uprobe, struct uprobe_consumer *uc);
 extern void uprobe_unregister_sync(void);
@@ -212,7 +276,7 @@ extern int uprobe_mmap(struct vm_area_struct *vma);
 extern void uprobe_munmap(struct vm_area_struct *vma, unsigned long start, unsigned long end);
 extern void uprobe_start_dup_mmap(void);
 extern void uprobe_end_dup_mmap(void);
-extern void uprobe_dup_mmap(struct mm_struct *oldmm, struct mm_struct *newmm);
+extern int uprobe_dup_mmap(struct mm_struct *oldmm, struct mm_struct *newmm);
 extern void uprobe_free_utask(struct task_struct *t);
 extern void uprobe_copy_process(struct task_struct *t, u64 flags);
 extern int uprobe_post_sstep_notifier(struct pt_regs *regs);
@@ -236,6 +300,9 @@ extern void uprobe_handle_trampoline(struct pt_regs *regs);
 extern void *arch_uretprobe_trampoline(unsigned long *psize);
 extern unsigned long uprobe_get_trampoline_vaddr(void);
 extern void uprobe_copy_from_page(struct page *page, unsigned long vaddr, void *dst, int len);
+extern void arch_uprobe_clear_state(struct mm_struct *mm);
+extern void arch_uprobe_init_state(struct mm_struct *mm);
+extern int arch_uprobe_dup_ptwrite(struct mm_struct *oldmm, struct mm_struct *newmm);
 extern void handle_syscall_uprobe(struct pt_regs *regs, unsigned long bp_vaddr);
 extern void arch_uprobe_optimize(struct arch_uprobe *auprobe, unsigned long vaddr);
 extern unsigned long arch_uprobe_get_xol_area(void);
@@ -251,6 +318,13 @@ static inline void uprobes_init(void)
 
 static inline struct uprobe *
 uprobe_register(struct inode *inode, loff_t offset, loff_t ref_ctr_offset, struct uprobe_consumer *uc)
+{
+	return ERR_PTR(-ENOSYS);
+}
+static inline struct uprobe *
+uprobe_register_ptwrite(struct inode *inode, struct file *file, loff_t offset,
+			struct uprobe_consumer *uc,
+			const struct uprobe_ptwrite_desc *desc)
 {
 	return ERR_PTR(-ENOSYS);
 }
@@ -280,9 +354,10 @@ static inline void uprobe_start_dup_mmap(void)
 static inline void uprobe_end_dup_mmap(void)
 {
 }
-static inline void
-uprobe_dup_mmap(struct mm_struct *oldmm, struct mm_struct *newmm)
+static inline int uprobe_dup_mmap(struct mm_struct *oldmm,
+				  struct mm_struct *newmm)
 {
+	return 0;
 }
 static inline void uprobe_notify_resume(struct pt_regs *regs)
 {
