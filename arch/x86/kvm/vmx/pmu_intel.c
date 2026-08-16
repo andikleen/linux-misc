@@ -793,6 +793,15 @@ static bool intel_pmu_is_mediated_pmu_supported(struct x86_pmu_capability *host_
 
 static void intel_pmu_write_global_ctrl(u64 global_ctrl)
 {
+	/*
+	 * The guest value is loaded at VM-entry (the mediated path sets the
+	 * "load IA32_PERF_GLOBAL_CTRL" control); VM-entry fails with invalid
+	 * guest state if the field has reserved bits set.  Restrict it to the
+	 * counters the guest can enumerate (the hybrid common subset) so a
+	 * guest over-enumerating its PMU can't trip VM-entry.
+	 */
+	global_ctrl &= (GENMASK_ULL(kvm_pmu_cap.num_counters_gp - 1, 0) |
+			GENMASK_ULL(kvm_pmu_cap.num_counters_fixed - 1 + 32, 32));
 	vmcs_write64(GUEST_IA32_PERF_GLOBAL_CTRL, global_ctrl);
 }
 

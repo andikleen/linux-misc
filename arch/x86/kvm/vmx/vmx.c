@@ -7606,6 +7606,18 @@ fastpath_t vmx_vcpu_run(struct kvm_vcpu *vcpu, u64 run_flags)
 
 	pt_guest_enter(vmx);
 
+	/*
+	 * Re-mask the guest's passthrough GLOBAL_CTRL: it is saved to this
+	 * field at every exit and loaded at entry, and VM-entry fails if the
+	 * field has reserved bits (a guest over-enumerating its PMU can set
+	 * them).  Only mediated vCPUs load the field, so skip everyone else.
+	 */
+	if (enable_mediated_pmu && kvm_vcpu_has_mediated_pmu(vcpu))
+		vmcs_write64(GUEST_IA32_PERF_GLOBAL_CTRL,
+			    vmcs_read64(GUEST_IA32_PERF_GLOBAL_CTRL) &
+			    (GENMASK_ULL(kvm_pmu_cap.num_counters_gp - 1, 0) |
+			     GENMASK_ULL(kvm_pmu_cap.num_counters_fixed - 1 + 32, 32)));
+
 	atomic_switch_perf_msrs(vmx);
 	if (intel_pmu_lbr_is_enabled(vcpu))
 		vmx_passthrough_lbr_msrs(vcpu);
