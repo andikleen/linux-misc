@@ -1291,10 +1291,16 @@ static void pt_guest_exit(struct vcpu_vmx *vmx)
 }
 
 /*
- * Toggle the RTIT VM-entry/exit controls to match whether the guest is
- * tracing.  Keeping them clear while the guest is not tracing lets host
- * Intel PT keep running across VM-Enter and avoids the SDM consistency
- * check (TraceEn must be 0 at VM entry when "load IA32_RTIT_CTL" is set).
+ * Toggle the Intel PT VMX controls to match whether the guest is tracing.
+ * All six PT controls (secondary "Intel PT uses guest physical addresses" /
+ * "conceal VMX non-root operation from Intel PT", VM-entry "load IA32_RTIT_CTL" /
+ * "conceal VM entries from Intel PT", and the VM-exit clear/conceal pair) must
+ * move in lockstep: SDM 26.2.1.1 enforces pairwise consistency between them
+ * (e.g. "conceal VM entries from Intel PT" requires "load IA32_RTIT_CTL", and
+ * "Intel PT uses guest physical addresses" requires EPT).  Keeping them clear
+ * while the guest is not tracing lets host Intel PT keep running across
+ * VM-Enter and avoids the VM-entry consistency checks (VM-instruction error 7,
+ * "invalid control field(s)") when only a subset of the controls is enabled.
  */
 void pt_update_controls(struct vcpu_vmx *vmx)
 {
@@ -1302,11 +1308,19 @@ void pt_update_controls(struct vcpu_vmx *vmx)
 		return;
 
 	if (vmx->pt_desc.guest.ctl & RTIT_CTL_TRACEEN) {
-		vm_entry_controls_setbit(vmx, VM_ENTRY_LOAD_IA32_RTIT_CTL);
-		vm_exit_controls_setbit(vmx, VM_EXIT_CLEAR_IA32_RTIT_CTL);
+		secondary_exec_controls_setbit(vmx, SECONDARY_EXEC_PT_USE_GPA |
+						    SECONDARY_EXEC_PT_CONCEAL_VMX);
+		vm_entry_controls_setbit(vmx, VM_ENTRY_LOAD_IA32_RTIT_CTL |
+					      VM_ENTRY_PT_CONCEAL_PIP);
+		vm_exit_controls_setbit(vmx, VM_EXIT_CLEAR_IA32_RTIT_CTL |
+					      VM_EXIT_PT_CONCEAL_PIP);
 	} else {
-		vm_entry_controls_clearbit(vmx, VM_ENTRY_LOAD_IA32_RTIT_CTL);
-		vm_exit_controls_clearbit(vmx, VM_EXIT_CLEAR_IA32_RTIT_CTL);
+		secondary_exec_controls_clearbit(vmx, SECONDARY_EXEC_PT_USE_GPA |
+						  SECONDARY_EXEC_PT_CONCEAL_VMX);
+		vm_entry_controls_clearbit(vmx, VM_ENTRY_LOAD_IA32_RTIT_CTL |
+					   VM_ENTRY_PT_CONCEAL_PIP);
+		vm_exit_controls_clearbit(vmx, VM_EXIT_CLEAR_IA32_RTIT_CTL |
+					  VM_EXIT_PT_CONCEAL_PIP);
 	}
 }
 
@@ -4768,8 +4782,10 @@ static u32 vmx_secondary_exec_control(struct vcpu_vmx *vmx)
 
 	u32 exec_control = vmcs_config.cpu_based_2nd_exec_ctrl;
 
-	if (vmx_pt_mode_is_system())
-		exec_control &= ~(SECONDARY_EXEC_PT_USE_GPA | SECONDARY_EXEC_PT_CONCEAL_VMX);
+	if (vmx_pt_mode_is_system() ||
+	    !(vmx->pt_desc.guest.ctl & RTIT_CTL_TRACEEN))
+		exec_control &= ~(SECONDARY_EXEC_PT_USE_GPA |
+				  SECONDARY_EXEC_PT_CONCEAL_VMX);
 	if (!cpu_need_virtualize_apic_accesses(vcpu))
 		exec_control &= ~SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES;
 	if (vmx->vpid == 0)

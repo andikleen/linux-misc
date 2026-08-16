@@ -2560,7 +2560,8 @@ static void prepare_vmcs02_early(struct vcpu_vmx *vmx, struct loaded_vmcs *vmcs0
 	 * check and bypass the guest.ctl shadow.
 	 */
 	exec_control &= ~(VM_ENTRY_IA32E_MODE | VM_ENTRY_LOAD_IA32_EFER |
-			  VM_ENTRY_LOAD_IA32_RTIT_CTL);
+			  VM_ENTRY_LOAD_IA32_RTIT_CTL |
+			  VM_ENTRY_PT_CONCEAL_PIP);
 	if (cpu_has_load_ia32_efer()) {
 		if (guest_efer & EFER_LMA)
 			exec_control |= VM_ENTRY_IA32E_MODE;
@@ -2578,7 +2579,8 @@ static void prepare_vmcs02_early(struct vcpu_vmx *vmx, struct loaded_vmcs *vmcs0
 	 */
 	exec_control = __vm_exit_controls_get(vmcs01);
 	/* Nested Intel PT is not supported, see prepare_vmcs02() entry controls. */
-	exec_control &= ~VM_EXIT_CLEAR_IA32_RTIT_CTL;
+	exec_control &= ~(VM_EXIT_CLEAR_IA32_RTIT_CTL |
+			  VM_EXIT_PT_CONCEAL_PIP);
 	if (cpu_has_load_ia32_efer() && guest_efer != kvm_host.efer)
 		exec_control |= VM_EXIT_LOAD_IA32_EFER;
 	else
