@@ -5,10 +5,13 @@
 #ifndef SELFTEST_X86_HYBRID_UTIL_H
 #define SELFTEST_X86_HYBRID_UTIL_H
 
+#include <pthread.h>
 #include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/syscall.h>
+#include <unistd.h>
 
 #include "kvm_util.h"
 #include "processor.h"
@@ -114,6 +117,56 @@ static inline void busy_loop(u64 cycles)
 		asm volatile("nop;nop;nop;nop;nop;nop;nop;nop;"
 			     "nop;nop;nop;nop;nop;nop;nop;nop;");
 	}
+}
+
+/*
+ * Host-side vCPU migration helpers: run the vCPU on one thread while a
+ * second thread moves it across the online CPUs every 100 ms.
+ */
+struct vcpu_migrate_ctx {
+	struct kvm_vcpu *vcpu;
+	pid_t tid;
+	int iters;
+	int ncpus;
+	int cpus[CPU_SETSIZE];
+};
+
+static inline void *vcpu_run_thread(void *arg)
+{
+	struct vcpu_migrate_ctx *ctx = arg;
+
+	ctx->tid = syscall(SYS_gettid);
+	vcpu_run(ctx->vcpu);
+	return NULL;
+}
+
+static inline void *vcpu_migrator_thread(void *arg)
+{
+	struct vcpu_migrate_ctx *ctx = arg;
+	cpu_set_t set;
+	int i;
+
+	for (i = 0; i < ctx->iters; i++) {
+		CPU_ZERO(&set);
+		CPU_SET(ctx->cpus[i % ctx->ncpus], &set);
+		syscall(SYS_sched_setaffinity, ctx->tid, sizeof(set), &set);
+		usleep(100 * 1000);
+	}
+	return NULL;
+}
+
+/* Fill @ctx->cpus with the online CPUs; returns the count. */
+static inline int vcpu_migrate_ctx_init(struct vcpu_migrate_ctx *ctx)
+{
+	cpu_set_t online;
+	int i, n = 0;
+
+	read_online_cpus(&online);
+	for (i = 0; i < CPU_SETSIZE; i++)
+		if (CPU_ISSET(i, &online))
+			ctx->cpus[n++] = i;
+	ctx->ncpus = n;
+	return n;
 }
 
 #endif

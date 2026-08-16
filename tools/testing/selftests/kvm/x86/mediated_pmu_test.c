@@ -8,11 +8,17 @@
  * -EBUSY); releasing the event unblocks it.  The nmi_watchdog variant is
  * checked when the watchdog is on, or toggled when running as root.
  *
- * Guest side: the guest reads CPUID 0xA and programs fixed counter 1 via
+ * Guest side: the guest reads CPUID 0xA and programs GP counter 0 via
  * direct MSR writes.  With the vCPU pinned to P-cores and to E-cores the
  * counter must increment on both, and the CPUID caps must match.
  *
- * SKIPs when the mediated PMU is not enabled.
+ * --migrate: count while the host migrates the vCPU thread across all
+ * online CPUs (hybrid core-type crossings).  Works under either module
+ * state: with the mediated PMU the passthrough counters survive the
+ * put/load across migrations; without it the emulated counters are
+ * dropped and recreated for the new core type (hybrid_rebind).
+ *
+ * SKIPs when the mediated PMU is not enabled (default mode only).
  */
 #include <asm/msr-index.h>
 #include <errno.h>
@@ -32,6 +38,7 @@
 #endif
 
 #define COUNT_CYCLES	(2ULL * 1000 * 1000 * 1000)	/* ~0.7 s */
+#define MIGRATE_CYCLES	(2ULL * 1000 * 1000 * 1000)	/* ~0.7 s */
 
 struct pmu_guest_results {
 	u32 eax, ebx, ecx, edx;	/* CPUID.0xA */
@@ -248,15 +255,97 @@ done:
 	kvm_vm_free(vm);
 }
 
-int main(void)
+/* Count while the host migrates the vCPU thread between a P-core and an
+ * E-core (alternating, one hop per 100 ms).  Works under either module
+ * state: mediated passthrough counters survive the put/load, emulated
+ * counters are rebound to the new core type. */
+static void run_guest_migrating(void)
+{
+	struct pmu_guest_results *res_hva, res;
+	struct vcpu_migrate_ctx ctx = { .iters = 14 };
+	struct kvm_vcpu *vcpu;
+	struct kvm_vm *vm;
+	pthread_t th, mth;
+	cpu_set_t p_set, e_set;
+	gva_t res_gva;
+	struct ucall uc;
+	int i, n = 0;
+
+	/* Two CPUs suffice for the coverage: one of each core type. */
+	if (hybrid_range("cpu_core", &p_set) && hybrid_range("cpu_atom", &e_set)) {
+		for (i = 0; i < CPU_SETSIZE && !CPU_ISSET(i, &p_set); i++)
+			;
+		if (i < CPU_SETSIZE) {
+			ctx.cpus[n++] = i;
+			for (i = 0; i < CPU_SETSIZE && !CPU_ISSET(i, &e_set); i++)
+				;
+			if (i < CPU_SETSIZE)
+				ctx.cpus[n++] = i;
+		}
+	}
+	if (n < 2)
+		n = vcpu_migrate_ctx_init(&ctx);
+	ctx.ncpus = n;
+
+	vm = __vm_create(VM_SHAPE_DEFAULT, 1, 0);
+	vcpu = vm_vcpu_add(vm, 0, guest_main);
+	res_gva = vm_alloc(vm, sizeof(*res_hva), KVM_UTIL_MIN_VADDR);
+	res_hva = addr_gva2hva(vm, res_gva);
+	memset(res_hva, 0, sizeof(*res_hva));
+	vm_install_exception_handler(vm, GP_VECTOR, guest_gp_handler);
+	vcpu_args_set(vcpu, 2, res_gva, MIGRATE_CYCLES);
+
+	ctx.vcpu = vcpu;
+	pthread_create(&th, NULL, vcpu_run_thread, &ctx);
+	while (!ctx.tid)
+		usleep(1000);
+	pthread_create(&mth, NULL, vcpu_migrator_thread, &ctx);
+	pthread_join(mth, NULL);
+	pthread_join(th, NULL);
+
+	for (;;) {
+		switch (get_ucall(vcpu, &uc)) {
+		case UCALL_SYNC:
+			vcpu_run(vcpu);
+			break;
+		case UCALL_DONE:
+			goto done;
+		case UCALL_ABORT:
+			REPORT_GUEST_ASSERT(uc);
+		default:
+			TEST_ASSERT(false, "Unexpected exit: %s",
+				    exit_reason_str(vcpu->run->exit_reason));
+		}
+	}
+done:
+	memcpy(&res, res_hva, sizeof(res));
+	kvm_vm_free(vm);
+
+	TEST_ASSERT(res.done, "guest did not finish");
+	TEST_ASSERT(!res.gp_msr,
+		    "#GP on guest PMU MSR write (ECX=%x)", res.gp_msr_index);
+	TEST_ASSERT(res.count > 1000000,
+		    "count %lu across migration (want > 1000000)",
+		    res.count);
+	printf("guest PMU count across migration: %lu\n", res.count);
+}
+
+int main(int argc, char *argv[])
 {
 	struct pmu_guest_results p, e;
 	cpu_set_t p_set, e_set, all;
+	bool migrate = argc > 1 && !strcmp(argv[1], "--migrate");
 	bool hybrid;
 
 	TEST_REQUIRE(kvm_is_pmu_enabled());
-	TEST_REQUIRE(get_kvm_intel_param_bool("enable_mediated_pmu"));
+	if (!migrate)
+		TEST_REQUIRE(get_kvm_intel_param_bool("enable_mediated_pmu"));
 	TEST_REQUIRE(this_cpu_is_intel());
+
+	if (migrate) {
+		run_guest_migrating();
+		return 0;
+	}
 
 	test_host_creation_checks();
 

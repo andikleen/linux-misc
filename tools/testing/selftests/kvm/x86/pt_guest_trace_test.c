@@ -160,36 +160,14 @@ static void check_guest(struct kvm_vcpu *vcpu, struct kvm_vm *vm,
 	       nonzero, res_hva->offset, res_hva->offset >> 32, res_hva->status);
 }
 
-struct run_ctx {
-	struct kvm_vcpu *vcpu;
-	pid_t tid;
-	int iters;
-	int ncpus;
-	int cpus[CPU_SETSIZE];
-};
-
 static void *vcpu_thread(void *arg)
 {
-	struct run_ctx *ctx = arg;
-
-	ctx->tid = syscall(SYS_gettid);
-	vcpu_run(ctx->vcpu);
-	return NULL;
+	return vcpu_run_thread(arg);
 }
 
 static void *migrator_thread(void *arg)
 {
-	struct run_ctx *ctx = arg;
-	cpu_set_t set;
-	int i;
-
-	for (i = 0; i < ctx->iters; i++) {
-		CPU_ZERO(&set);
-		CPU_SET(ctx->cpus[i % ctx->ncpus], &set);
-		syscall(SYS_sched_setaffinity, ctx->tid, sizeof(set), &set);
-		usleep(100 * 1000);
-	}
-	return NULL;
+	return vcpu_migrator_thread(arg);
 }
 
 int main(int argc, char *argv[])
@@ -256,15 +234,10 @@ int main(int argc, char *argv[])
 	vcpu_args_set(vcpu, 4, res_gva, topa_gva, buf_gva, trace_cycles);
 
 	if (stress) {
-		struct run_ctx ctx = { .vcpu = vcpu, .iters = stress_secs * 10 };
-		cpu_set_t online;
+		struct vcpu_migrate_ctx ctx = { .vcpu = vcpu, .iters = stress_secs * 10 };
 		pthread_t th, mth;
 
-		read_online_cpus(&online);
-		for (i = 0; i < CPU_SETSIZE; i++)
-			if (CPU_ISSET(i, &online))
-				ctx.cpus[ctx.ncpus++] = i;
-		TEST_ASSERT(ctx.ncpus, "no online CPUs");
+		TEST_ASSERT(vcpu_migrate_ctx_init(&ctx), "no online CPUs");
 		pthread_create(&th, NULL, vcpu_thread, &ctx);
 		while (!ctx.tid)
 			usleep(1000);
