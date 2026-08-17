@@ -250,7 +250,9 @@ extern struct uprobe *uprobe_register_ptwrite(struct inode *inode,
 					      const struct uprobe_ptwrite_desc *desc);
 extern bool arch_uprobe_ptwrite_supported(void);
 extern int arch_uprobe_ptwrite_prepare(struct arch_uprobe *auprobe,
-				       const struct uprobe_ptwrite_desc *desc);
+					       struct inode *inode, struct file *file,
+					       loff_t offset,
+					       const struct uprobe_ptwrite_desc *desc);
 extern int arch_uprobe_install_ptwrite(struct arch_uprobe *auprobe,
 				       struct vm_area_struct *vma,
 				       unsigned long vaddr);
