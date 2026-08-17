@@ -17,6 +17,7 @@
  *                        m<N>[:<disp>][:<size>] = memory arg [reg + disp32],
  *                        size 4 (u32 load) or 8 (u64 load, default)
  *   event_id=0x1234      identifier carried in the PTW header word
+ *   allow_nop_run=1      accept five one-byte NOPs at the site
  */
 #include <linux/module.h>
 #include <linux/uprobes.h>
@@ -34,6 +35,10 @@ MODULE_PARM_DESC(offset, "file offset of the 5-byte NOP to probe");
 static ushort event_id = 0x1234;
 module_param(event_id, ushort, 0444);
 MODULE_PARM_DESC(event_id, "event id carried in the PTW header word");
+
+static bool allow_nop_run;
+module_param(allow_nop_run, bool, 0444);
+MODULE_PARM_DESC(allow_nop_run, "accept five one-byte NOPs at the site");
 
 static char *args = "r0";
 module_param(args, charp, 0444);
@@ -151,6 +156,7 @@ static int __init uprobe_ptwrite_test_init(void)
 	int ret;
 
 	desc.event_id = event_id;
+	desc.flags = allow_nop_run ? UPROBE_PTWRITE_FL_ALLOW_NOP_RUN : 0;
 	ret = parse_probe_args();
 	if (ret)
 		return ret;

@@ -1437,7 +1437,8 @@ int arch_uprobe_ptwrite_prepare(struct arch_uprobe *auprobe,
 		return -EINVAL;
 	if (desc->nargs > UPROBE_PTWRITE_MAX_ARGS)
 		return -E2BIG;
-	if (desc->flags & ~UPROBE_PTWRITE_FL_ALLOW_MEM)
+	if (desc->flags & ~(UPROBE_PTWRITE_FL_ALLOW_MEM |
+			     UPROBE_PTWRITE_FL_ALLOW_NOP_RUN))
 		return -EINVAL;
 
 	/* The generic registration path copied these bytes before this hook. */
@@ -1542,6 +1543,7 @@ int arch_uprobe_ptwrite_prepare(struct arch_uprobe *auprobe,
 
 	ptw->stub_len = data_off + 8 * (1 + n_imm);
 	ptw->ndata = 1 + n_imm;
+	ptw->allow_nop_run = !!(desc->flags & UPROBE_PTWRITE_FL_ALLOW_NOP_RUN);
 	return 0;
 }
 #undef PTW_NEED
@@ -1715,6 +1717,13 @@ static bool ptwrite_is_installed(struct mm_struct *mm, unsigned long vaddr,
 	return __in_uprobe_ptwrite(mm, (unsigned long)target);
 }
 
+
+/* Identify the explicitly opted-in run of five one-byte NOPs. */
+static bool ptwrite_site_is_multinop(const u8 *orig, bool allow_nop_run)
+{
+	return allow_nop_run && orig[0] == 0x90 && orig[1] == 0x90 &&
+		orig[2] == 0x90 && orig[3] == 0x90 && orig[4] == 0x90;
+}
 /*
  * Install a JMP rel32 at the probe site using the 3-phase SMP-safe poke.
  * On failure, restores the original instruction so the site is never
@@ -1751,6 +1760,44 @@ static int ptwrite_text_poke(struct arch_uprobe *auprobe,
 	}
 	return err;
 }
+
+/*
+ * Replace an aligned five-byte NOP run with a JMP in one eight-byte store.
+ * The trailing three bytes are read from the existing text. We assume
+ * nobody else is changing it. This is covered by the Intel/AMD "aligned
+ * store" cross modifying guarantee.
+ */
+static int ptwrite_multinop_text_poke(struct arch_uprobe *auprobe,
+				      struct vm_area_struct *vma,
+				      unsigned long vaddr,
+				      unsigned long stub_addr)
+{
+	struct mm_struct *mm = vma->vm_mm;
+	struct write_opcode_ctx ctx = {
+		.base = vaddr,
+		.expect = EXPECT_BYTE,
+		.expect_byte = 0x90,
+	};
+	u8 patch[8];
+	s32 rel;
+	int err;
+
+	if (vaddr & 7)
+		return -EINVAL;
+	if (!ptwrite_rel32(vaddr + 5, stub_addr, &rel))
+		return -ERANGE;
+	err = copy_from_vaddr(mm, vaddr, patch, sizeof(patch));
+	if (err)
+		return err;
+	patch[0] = 0xe9;
+	memcpy(&patch[1], &rel, sizeof(rel));
+	err = uprobe_write(auprobe, vma, vaddr, patch, sizeof(patch),
+			   verify_insn, true, false, &ctx);
+	if (!err)
+		smp_text_poke_sync_each_cpu();
+	return err;
+}
+
 
 int arch_uprobe_install_ptwrite(struct arch_uprobe *auprobe,
 		struct vm_area_struct *vma, unsigned long vaddr)
