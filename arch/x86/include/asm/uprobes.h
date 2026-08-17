@@ -49,14 +49,19 @@ struct uprobe_xol_ops;
 
 /*
  * ptwrite probe state. The stub template (code + data slots) is built
- * once at registration (mm-independent except the final jmp's rel32, patched
- * per-mm at install). Block layout:
- *   [ptwriteq hdr(%rip)] [arg emissions] [jmp probe+5] [u64 slots: header, imms]
+ * once at registration. Only the final jmp's rel32 and the copy's
+ * disp/rel fields are patched per-mm at install. Block layout:
+ *   [ptwriteq hdr(%rip)] [arg emissions] [orig-insn copy]
+ *   [jmp probe+len] [u64 slots: header, imms]
  */
 struct uprobe_ptwrite_arch {
 	u8	stub[UPROBE_PTWRITE_STUB_SIZE];
 	u16	stub_len;	/* code + data, whole block */
 	u8	jmp_off;	/* offset of the final jmp's rel32 field */
+	u8	copy_off;	/* offset of the out-of-line instruction copy */
+	u8	len;		/* copy length (0 = drop); back-jmp = vaddr+len */
+	u8	disp_off;	/* rip-relative disp32 offset in the copy (0 = none) */
+	s32	disp;		/* original disp32 (delta-patched per-mm) */
 	u8	ndata;		/* number of u64 data slots */
 	u8	orig[MAX_UINSN_BYTES];	/* pristine file bytes, before generic analysis */
 	u8	allow_nop_run;	/* accept a five-byte run of 0x90 */

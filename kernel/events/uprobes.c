@@ -1515,6 +1515,8 @@ bool __weak arch_uprobe_ptwrite_supported(void)
 }
 
 int __weak arch_uprobe_ptwrite_prepare(struct arch_uprobe *auprobe,
+				       struct inode *inode, struct file *file,
+				       loff_t offset,
 				       const struct uprobe_ptwrite_desc *desc)
 {
 	return -EOPNOTSUPP;
@@ -1595,13 +1597,19 @@ struct uprobe *uprobe_register_ptwrite(struct inode *inode, struct file *file,
 		ret = -EBUSY;
 		goto out;
 	}
-
-	/* Build the mm-independent stub template once, at registration. */
-	ret = arch_uprobe_ptwrite_prepare(&uprobe->arch, desc);
+	/*
+	 * Prepare the immutable PTWRITE stub before exposing the uprobe. The
+	 * copy-instruction flag also keeps the normal XOL preparation path out.
+	 */
+	ret = copy_insn(uprobe, file);
 	if (ret)
 		goto out;
-
-
+	ret = arch_uprobe_ptwrite_prepare(&uprobe->arch, inode, file, offset,
+					  desc);
+	if (ret)
+		goto out;
+	smp_wmb();
+	set_bit(UPROBE_COPY_INSN, &uprobe->flags);
 	set_bit(UPROBE_PTWRITE, &uprobe->flags);
 	consumer_add(uprobe, uc);
 	ret = register_for_each_vma(uprobe, uc);
