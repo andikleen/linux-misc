@@ -1442,10 +1442,12 @@ int arch_uprobe_ptwrite_prepare(struct arch_uprobe *auprobe,
 		return -EINVAL;
 	if (desc->nargs > UPROBE_PTWRITE_MAX_ARGS)
 		return -E2BIG;
-	if (desc->flags & ~UPROBE_PTWRITE_FL_ALLOW_MEM)
+	if (desc->flags & ~(UPROBE_PTWRITE_FL_ALLOW_MEM |
+			     UPROBE_PTWRITE_FL_ALLOW_NOP_RUN))
 		return -EINVAL;
 
 	/* The generic registration path copied these bytes before this hook. */
+
 	memcpy(ptw->orig, auprobe->insn, sizeof(ptw->orig));
 
 	for (i = 0; i < desc->nargs; i++) {
@@ -1545,6 +1547,7 @@ int arch_uprobe_ptwrite_prepare(struct arch_uprobe *auprobe,
 
 	ptw->stub_len = data_off + 8 * (1 + n_imm);
 	ptw->ndata = 1 + n_imm;
+	ptw->allow_nop_run = desc->flags & UPROBE_PTWRITE_FL_ALLOW_NOP_RUN;
 	return 0;
 }
 #undef PTW_NEED
@@ -1754,6 +1757,8 @@ static int ptwrite_text_poke(struct arch_uprobe *auprobe,
 	}
 	return err;
 }
+
+
 
 int arch_uprobe_install_ptwrite(struct arch_uprobe *auprobe,
 		struct vm_area_struct *vma, unsigned long vaddr)

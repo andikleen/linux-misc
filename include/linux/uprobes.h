@@ -210,6 +210,7 @@ enum uprobe_ptwrite_src {
 
 /* uprobe_ptwrite_desc.flags */
 #define UPROBE_PTWRITE_FL_ALLOW_MEM	BIT(0) /* SRC_MEM args enabled */
+#define UPROBE_PTWRITE_FL_ALLOW_NOP_RUN	BIT(2) /* accept five 1-byte NOPs */
 
 struct uprobe_ptwrite_arg {
 	u8	src;		/* enum uprobe_ptwrite_src */
