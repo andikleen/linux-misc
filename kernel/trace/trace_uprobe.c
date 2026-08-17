@@ -18,6 +18,7 @@
 #include <linux/security.h>
 #include <linux/string.h>
 #include <linux/uaccess.h>
+#include <linux/fs.h>
 #include <linux/uprobes.h>
 
 #include "trace.h"
@@ -66,6 +67,9 @@ struct trace_uprobe {
 	unsigned long			offset;
 	unsigned long			ref_ctr_offset;
 	unsigned long __percpu		*nhits;
+	bool				is_ptwrite;
+	struct uprobe_ptwrite_desc	ptwrite_desc;
+	/* tp.args[] is a flex array and must remain the last member */
 	struct trace_probe		tp;
 };
 
@@ -275,7 +279,7 @@ static bool trace_uprobe_is_busy(struct dyn_event *ev)
 {
 	struct trace_uprobe *tu = to_trace_uprobe(ev);
 
-	return trace_probe_is_enabled(&tu->tp);
+	return trace_probe_is_enabled(&tu->tp) || tu->uprobe;
 }
 
 static bool trace_uprobe_match_command_head(struct trace_uprobe *tu,
@@ -510,7 +514,8 @@ static int register_trace_uprobe(struct trace_uprobe *tu)
 	old_tu = find_probe_event(trace_probe_name(&tu->tp),
 				  trace_probe_group_name(&tu->tp));
 	if (old_tu) {
-		if (is_ret_probe(tu) != is_ret_probe(old_tu)) {
+		if (is_ret_probe(tu) != is_ret_probe(old_tu) ||
+		    tu->is_ptwrite != old_tu->is_ptwrite) {
 			trace_probe_log_set_index(0);
 			trace_probe_log_err(0, DIFF_PROBE_TYPE);
 			return -EEXIST;
@@ -536,8 +541,84 @@ static int register_trace_uprobe(struct trace_uprobe *tu)
 DEFINE_FREE(free_trace_uprobe, struct trace_uprobe *, free_trace_uprobe(_T))
 
 /*
+ * Compile one parsed fetch arg into a ptwrite descriptor entry. The
+ * arch-independent part: decode the fetch chain, reject shapes the
+ * scratch-free stub cannot emit, and hand the rest to the arch hook.
+ */
+static int ptwrite_compile_arg(struct trace_uprobe *tu, int i)
+{
+	struct fetch_insn *code = tu->tp.args[i].code;
+	struct uprobe_ptwrite_arg *a = &tu->ptwrite_desc.args[i];
+	struct uprobe_ptwrite_fetch f;
+
+	if (code[1].op == FETCH_OP_ST_MEM || code[1].op == FETCH_OP_ST_UMEM) {
+		if (code[2].op != FETCH_OP_END)
+			return -EINVAL;
+		if (code[0].op != FETCH_OP_REG) {
+			/*
+			 * +off($stackN): the STACK op derefs [rsp+8N] to a
+			 * POINTER, and ST_MEM derefs that pointer (load-of-
+			 * load). The scratch-free stub has no register to
+			 * hold the intermediate pointer, so reject.
+			 */
+			return -EINVAL;
+		}
+		if (tu->tp.args[i].type->size != 4 &&
+		    tu->tp.args[i].type->size != 8)
+			return -EINVAL;	/* memory derefs are u32 or u64 */
+		f.kind = UPROBE_PTW_FETCH_MEMREG;
+		f.reg = code[0].param;
+		f.imm = code[1].offset;
+		goto compile;
+	}
+
+	/*
+	 * $stackN: [STACK, ST_RAW, END], the deref is folded inside the
+	 * STACK op (get_user_stack_nth reads [rsp + 8N]).
+	 */
+	if (code[0].op == FETCH_OP_STACK &&
+	    code[1].op == FETCH_OP_ST_RAW && code[2].op == FETCH_OP_END) {
+		if (tu->tp.args[i].type->size != 4 &&
+		    tu->tp.args[i].type->size != 8)
+			return -EINVAL;	/* stack slots are u32 or u64 */
+		f.kind = UPROBE_PTW_FETCH_STACKN;
+		f.imm = 8L * code[0].param;
+		goto compile;
+	}
+
+	if (code[1].op != FETCH_OP_ST_RAW || code[2].op != FETCH_OP_END)
+		return -EINVAL;
+
+	switch (code->op) {
+	case FETCH_OP_REG:	/* %reg */
+		f.kind = UPROBE_PTW_FETCH_REG;
+		f.reg = code->param;
+		break;
+	case FETCH_OP_STACKP:	/* $stack: SP value, never faults */
+		f.kind = UPROBE_PTW_FETCH_STACKP;
+		break;
+	case FETCH_OP_IMM:	/* \IMM */
+		f.kind = UPROBE_PTW_FETCH_IMM;
+		f.imm = code->immediate;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+compile:
+	if (f.kind == UPROBE_PTW_FETCH_MEMREG ||
+	    f.kind == UPROBE_PTW_FETCH_STACKN)
+		tu->ptwrite_desc.flags |= UPROBE_PTWRITE_FL_ALLOW_MEM;
+	if (arch_uprobe_ptwrite_fetch(a, &f))
+		return -EINVAL;
+	a->size = tu->tp.args[i].type->size;
+	return 0;
+}
+
+/*
  * Argument syntax:
  *  - Add uprobe: p|r[:[GRP/][EVENT]] PATH:OFFSET[%return][(REF)] [FETCHARGS]
+ *  - Add ptwrite uprobe: ptw[:[GRP/][EVENT]] PATH:OFFSET [FETCHARGS]
  */
 static int __trace_uprobe_create(int argc, const char **argv)
 {
@@ -553,9 +634,16 @@ static int __trace_uprobe_create(int argc, const char **argv)
 	char *buf __free(kfree) = NULL;
 	enum probe_print_type ptype;
 	bool is_return = false;
-	int i, ret;
+	bool is_ptwrite = false;
+	int i, ret, arg_start = 2;
 
 	ref_ctr_offset = 0;
+
+	if (!strncmp(argv[0], "ptw:", 4) || !strcmp(argv[0], "ptw")) {
+		if (!IS_ENABLED(CONFIG_UPROBE_EVENTS_PTWRITE))
+			return -EOPNOTSUPP;	/* no arch backend configured */
+		is_ptwrite = true;
+	}
 
 	switch (argv[0][0]) {
 	case 'r':
@@ -572,13 +660,17 @@ static int __trace_uprobe_create(int argc, const char **argv)
 
 	trlog = trace_probe_log_init("trace_uprobe", argc, argv);
 
-	if (argc - 2 > MAX_TRACE_ARGS) {
+	if (argc - 2 > MAX_TRACE_ARGS ||
+	    (is_ptwrite && argc - 2 > UPROBE_PTWRITE_MAX_ARGS)) {
 		trace_probe_log_set_index(2);
 		trace_probe_log_err(0, TOO_MANY_ARGS);
 		return -E2BIG;
 	}
 
-	if (argv[0][1] == ':')
+	if (is_ptwrite)
+		event = argv[0][3] == ':' && argv[0][4] ?
+			&argv[0][4] : NULL;
+	else if (argv[0][1] == ':')
 		event = &argv[0][2];
 
 	if (!strchr(argv[1], '/'))
@@ -608,6 +700,10 @@ static int __trace_uprobe_create(int argc, const char **argv)
 
 	/* Parse reference counter offset if specified. */
 	rctr = strchr(arg, '(');
+	if (rctr && is_ptwrite) {
+		trace_probe_log_err(rctr - filename, BAD_REFCNT);
+		return -EINVAL;	/* SDT ref-counting needs kernel updates */
+	}
 	if (rctr) {
 		rctr_end = strchr(rctr, ')');
 		if (!rctr_end) {
@@ -632,7 +728,10 @@ static int __trace_uprobe_create(int argc, const char **argv)
 
 	/* Check if there is %return suffix */
 	tmp = strchr(arg, '%');
-	if (tmp) {
+	if (tmp && is_ptwrite) {
+		trace_probe_log_err(tmp - filename, BAD_ADDR_SUFFIX);
+		return -EINVAL;
+	} else if (tmp) {
 		if (!strcmp(tmp, "%return")) {
 			*tmp = '\0';
 			is_return = true;
@@ -677,7 +776,8 @@ static int __trace_uprobe_create(int argc, const char **argv)
 		buf = kmalloc(MAX_EVENT_NAME_LEN, GFP_KERNEL);
 		if (!buf)
 			return -ENOMEM;
-		snprintf(buf, MAX_EVENT_NAME_LEN, "%c_%s_0x%lx", 'p', tail, offset);
+		snprintf(buf, MAX_EVENT_NAME_LEN, "%c_%s_0x%lx",
+			 is_ptwrite ? 't' : 'p', tail, offset);
 		event = buf;
 		kfree(tail);
 	}
@@ -710,6 +810,25 @@ static int __trace_uprobe_create(int argc, const char **argv)
 		ret = traceprobe_parse_probe_arg(&tu->tp, i, argv[i], ctx);
 		if (ret)
 			return ret;
+	}
+
+	if (is_ptwrite) {
+		if (!argc) {
+			trace_probe_log_set_index(2);
+			trace_probe_log_err(0, NO_ARG_BODY);
+			return -EINVAL;	/* core rejects desc->nargs == 0 */
+		}
+		tu->is_ptwrite = true;
+		tu->ptwrite_desc.nargs = argc;
+		tu->ptwrite_desc.flags = 0;
+		for (i = 0; i < argc; i++) {
+			ret = ptwrite_compile_arg(tu, i);
+			if (ret) {
+				trace_probe_log_set_index(i + arg_start);
+				trace_probe_log_err(0, BAD_FETCH_ARG);
+				return ret;
+			}
+		}
 	}
 
 	ptype = is_ret_probe(tu) ? PROBE_PRINT_RETURN : PROBE_PRINT_NORMAL;
@@ -754,9 +873,24 @@ static int trace_uprobe_show(struct seq_file *m, struct dyn_event *ev)
 	char c = is_ret_probe(tu) ? 'r' : 'p';
 	int i;
 
-	seq_printf(m, "%c:%s/%s %s:0x%0*lx", c, trace_probe_group_name(&tu->tp),
-			trace_probe_name(&tu->tp), tu->filename,
-			(int)(sizeof(void *) * 2), tu->offset);
+	if (tu->is_ptwrite) {
+		seq_printf(m, "ptw:%s/%s %s:0x%0*lx",
+			   trace_probe_group_name(&tu->tp),
+			   trace_probe_name(&tu->tp), tu->filename,
+			   (int)(sizeof(void *) * 2), tu->offset);
+		if (tu->ptwrite_desc.flags & UPROBE_PTWRITE_FL_NO_LEAD_PACE) {
+			seq_puts(m, "%nopace");
+			if (tu->ptwrite_desc.flags & UPROBE_PTWRITE_FL_ALLOW_NOP_RUN)
+				seq_putc(m, ' ');
+		}
+		if (tu->ptwrite_desc.flags & UPROBE_PTWRITE_FL_ALLOW_NOP_RUN)
+			seq_puts(m, "%multinop");
+	} else {
+		seq_printf(m, "%c:%s/%s %s:0x%0*lx", c,
+			   trace_probe_group_name(&tu->tp),
+			   trace_probe_name(&tu->tp), tu->filename,
+			   (int)(sizeof(void *) * 2), tu->offset);
+	}
 
 	if (tu->ref_ctr_offset)
 		seq_printf(m, "(0x%lx)", tu->ref_ctr_offset);
@@ -1107,9 +1241,26 @@ static int trace_uprobe_enable(struct trace_uprobe *tu, filter_func_t filter)
 {
 	struct inode *inode = d_real_inode(tu->path.dentry);
 	struct uprobe *uprobe;
+	struct file *file;
 
-	tu->consumer.filter = filter;
-	uprobe = uprobe_register(inode, tu->offset, tu->ref_ctr_offset, &tu->consumer);
+	if (tu->is_ptwrite) {
+		if (filter) {
+			/* PTWRITE probes have no kernel entry to evaluate a filter. */
+			return -EINVAL;
+		}
+		file = dentry_open(&tu->path, O_RDONLY, current_cred());
+		if (IS_ERR(file))
+			return PTR_ERR(file);
+		tu->ptwrite_desc.event_id =
+			trace_probe_event_call(&tu->tp)->event.type;
+		uprobe = uprobe_register_ptwrite(inode, file, tu->offset,
+						 &tu->consumer, &tu->ptwrite_desc);
+		fput(file);
+	} else {
+		tu->consumer.filter = filter;
+		uprobe = uprobe_register(inode, tu->offset,
+					 tu->ref_ctr_offset, &tu->consumer);
+	}
 	if (IS_ERR(uprobe))
 		return PTR_ERR(uprobe);
 
@@ -1148,6 +1299,28 @@ static int probe_event_enable(struct trace_event_call *call,
 	tp = trace_probe_primary_from_call(call);
 	if (WARN_ON_ONCE(!tp))
 		return -ENODEV;
+	tu = container_of(tp, struct trace_uprobe, tp);
+
+	if (tu->is_ptwrite) {
+		if (filter || !file || file->filter)
+			return -EINVAL;
+		enabled = trace_probe_is_enabled(tp);
+		ret = trace_probe_add_file(tp, file);
+		if (ret < 0)
+			return ret;
+		if (enabled)
+			return 0;
+		list_for_each_entry(tu, trace_probe_probe_list(tp), tp.list) {
+			ret = trace_uprobe_enable(tu, NULL);
+			if (ret) {
+				__probe_event_disable(tp);
+				trace_probe_remove_file(tp, file);
+				return ret;
+			}
+		}
+		return 0;
+	}
+
 	enabled = trace_probe_is_enabled(tp);
 
 	/* This may also change "enabled" state */
@@ -1201,10 +1374,21 @@ static void probe_event_disable(struct trace_event_call *call,
 				struct trace_event_file *file)
 {
 	struct trace_probe *tp;
+	struct trace_uprobe *tu;
 
 	tp = trace_probe_primary_from_call(call);
 	if (WARN_ON_ONCE(!tp))
 		return;
+
+	tu = container_of(tp, struct trace_uprobe, tp);
+	if (tu->is_ptwrite) {
+		if (trace_probe_remove_file(tp, file) < 0)
+			return;
+		if (trace_probe_is_enabled(tp))
+			return;	/* other instances still enabled */
+		__probe_event_disable(tp);
+		return;
+	}
 
 	if (!trace_probe_is_enabled(tp))
 		return;
@@ -1493,6 +1677,13 @@ int bpf_get_uprobe_info(const struct perf_event *event, u32 *fd_type,
 }
 #endif	/* CONFIG_PERF_EVENTS */
 
+static bool ptwrite_event(struct trace_event_call *call)
+{
+	struct trace_uprobe *tu = trace_uprobe_primary_from_call(call);
+
+	return tu && tu->is_ptwrite;
+}
+
 static int
 trace_uprobe_register(struct trace_event_call *event, enum trace_reg type,
 		      void *data)
@@ -1516,9 +1707,13 @@ trace_uprobe_register(struct trace_event_call *event, enum trace_reg type,
 		return 0;
 
 	case TRACE_REG_PERF_OPEN:
+		if (ptwrite_event(event))
+			return -EINVAL;	/* no perf attach to ptwrite events */
 		return uprobe_perf_open(event, data);
 
 	case TRACE_REG_PERF_CLOSE:
+		if (ptwrite_event(event))
+			return -EINVAL;
 		return uprobe_perf_close(event, data);
 
 #endif

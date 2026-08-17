@@ -19,8 +19,8 @@ However unlike kprobe-event tracer, the uprobe event interface expects the
 user to calculate the offset of the probepoint in the object.
 
 You can also use /sys/kernel/tracing/dynamic_events instead of
-uprobe_events. That interface will provide unified access to other
-dynamic events too.
+uprobe_events. That interface provides unified access to other event types
+too.
 
 Synopsis of uprobe_tracer
 -------------------------
@@ -29,6 +29,7 @@ Synopsis of uprobe_tracer
   p[:[GRP/][EVENT]] PATH:OFFSET [FETCHARGS] : Set a uprobe
   r[:[GRP/][EVENT]] PATH:OFFSET [FETCHARGS] : Set a return uprobe (uretprobe)
   p[:[GRP/][EVENT]] PATH:OFFSET%return [FETCHARGS] : Set a return uprobe (uretprobe)
+  ptw[:[GRP/][EVENT]] PATH:OFFSET [FETCHARGS] : Set a trap-free ptwrite uprobe
   -:[GRP/][EVENT]                           : Clear uprobe or uretprobe event
 
   GRP           : Group name. If omitted, "uprobes" is the default value.
@@ -74,6 +75,47 @@ offset, and container-size (usually 32). The syntax is::
  b<bit-width>@<bit-offset>/<container-size>
 
 For $comm, the default type is "string"; any other type is invalid.
+
+
+ptwrite uprobes (ptw:)
+----------------------
+
+See ptwrite-uprobes.rst for more details.
+
+A ``ptw:`` probe emits values into an Intel Processor Trace data stream.
+It is faster than standard uprobes, but has restrictions. The Intel Processor
+Trace recording must be configured separately.
+
+Requirements and restrictions:
+
+- Intel CPU with PTWRITE support (``/sys/devices/intel_pt/format/ptw`` must exist)
+- Entry probes only: ``r:``/``%return`` and the SDT reference counter
+  ``(REF)`` are rejected.
+- The probe site must be a 5-byte NOP or a punnable instruction (see
+  ptwrite-uprobes.rst). For five ``0x90`` bytes from GCC's
+  ``-fpatchable-function-entry=5``, append ``%multinop`` to the offset.
+- The event does not produce ring-buffer records. It provides a type registry
+  (``events/GRP/EVENT/format``) and the wire ``event_id``
+  (``events/GRP/EVENT/id``) for an external decoder. Filters and perf
+  attach are rejected because filtering would need kernel entry.
+
+Wire format: each probe hit emits a 64-bit header word ``event_id<<48 |
+nargs<<40 | 0x5054525731`` followed by ``nargs`` PTWRITE payloads. Perf
+exposes each payload through its existing ``u64`` field.  Decode with
+``perf script`` and ``tools/perf/scripts/python/uprobe-ptwrite-decode.py``:
+
+::
+
+  perf record -e intel_pt/ptw=1,fup_on_ptw=1/u -o perf.data -- ./app
+  perf script --itrace=qwe -s uprobe-ptwrite-decode.py
+
+``fup_on_ptw=1`` increases the overhead, but improves decoding reliability
+because the exact IP of each probe is logged.
+
+Example::
+
+  echo 'ptw:t /bin/app:0x1234 %rdi %rsi \0x42' > /sys/kernel/tracing/uprobe_events
+  echo 1 > /sys/kernel/tracing/events/uprobes/t/enable
 
 
 Event Profiling
