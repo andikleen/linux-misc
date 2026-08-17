@@ -1440,8 +1440,29 @@ static int intel_pt_walk_fup(struct intel_pt_decoder *decoder)
 			return -EAGAIN;
 		}
 		decoder->set_fup_tx_flags = false;
-		if (err)
+		if (err) {
+			/*
+			 * A ptwrite's FUP can target an address whose
+			 * instruction cannot be resolved (e.g. the
+			 * [uprobes-ptwrite] stub is an anonymous special
+			 * mapping invisible to the machine). The FUP is
+			 * still the ptwrite's IP: report it rather than
+			 * failing the whole walk.
+			 */
+			if (decoder->set_fup_ptw) {
+				decoder->set_fup_ptw = false;
+				decoder->pkt_state = INTEL_PT_STATE_IN_SYNC;
+				decoder->state.type &= ~INTEL_PT_BRANCH;
+				decoder->state.type |= INTEL_PT_PTW;
+				decoder->state.flags |= INTEL_PT_FUP_IP;
+				decoder->state.from_ip = decoder->ip;
+				decoder->state.to_ip = 0;
+				decoder->state.ptw_payload =
+							decoder->fup_ptw_payload;
+				return 0;
+			}
 			return err;
+		}
 
 		if (intel_pt_insn.branch == INTEL_PT_BR_INDIRECT) {
 			intel_pt_log_at("ERROR: Unexpected indirect branch",
