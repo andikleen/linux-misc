@@ -29,14 +29,22 @@ enum {
 struct uprobe_xol_ops;
 
 /*
+ * Stub block array size. Worst case = 250 B (8 MEM args, rsp bases, fault
+ * table); 288 leaves 38 B slack. A file-scope static_assert in
+ * arch/x86/kernel/uprobes.c re-derives the worst case; prepare() also
+ * enforces it with -E2BIG at runtime.
+ */
+#define UPROBE_PTWRITE_STUB_SIZE	288
+
+/*
  * ptwrite probe state. The stub template (code + data slots) is built
  * once at registration (mm-independent except the final jmp's rel32, patched
  * per-mm at install). Block layout:
  *   [ptwriteq hdr(%rip)] [arg emissions] [jmp probe+5] [u64 slots: header, imms]
  */
 struct uprobe_ptwrite_arch {
-	u8	stub[256];
-	u8	stub_len;	/* code + data, whole block */
+	u8	stub[UPROBE_PTWRITE_STUB_SIZE];
+	u16	stub_len;	/* code + data + fault table, whole block */
 	u8	jmp_off;	/* offset of the final jmp's rel32 field */
 	u8	ndata;		/* number of u64 data slots */
 	u8	orig[MAX_UINSN_BYTES];	/* pristine file bytes, before generic analysis */

@@ -205,7 +205,11 @@ struct uprobes_state {
 enum uprobe_ptwrite_src {
 	UPROBE_PTW_SRC_REG,	/* value = live GPR (index in .reg) */
 	UPROBE_PTW_SRC_IMM,	/* value = constant (.val), stored in stub data slot */
+	UPROBE_PTW_SRC_MEM,	/* value = [.reg + disp32] (v2); requires ALLOW_MEM */
 };
+
+/* uprobe_ptwrite_desc.flags */
+#define UPROBE_PTWRITE_FL_ALLOW_MEM	BIT(0) /* SRC_MEM args enabled */
 
 struct uprobe_ptwrite_arg {
 	u8	src;		/* enum uprobe_ptwrite_src */
