@@ -1323,6 +1323,24 @@ static int ptwrite_emit_riprel(u8 *p, s32 disp)
 }
 
 
+static int ptwrite_emit_lfence(u8 *p)
+{
+	*p++ = 0x0f;
+	*p++ = 0xae;
+	*p++ = 0xe8;	/* lfence */
+	return 3;
+}
+
+/* the default pacing: one or more fences per word gap. */
+static int ptwrite_emit_lfences(u8 *p)
+{
+	int i;
+
+	for (i = 0; i < UPROBE_PTWRITE_SERIALIZE_LFENCES; i++)
+		p += ptwrite_emit_lfence(p);
+	return UPROBE_PTWRITE_SERIALIZE_LFENCES * 3;
+}
+
 bool arch_uprobe_ptwrite_supported(void)
 {
 	u32 eax, ebx, ecx, edx;
@@ -1416,6 +1434,7 @@ static bool ptwrite_has_room(const u8 *base, const u8 *p, size_t len)
 		       sizeof(((struct uprobe_ptwrite_arch *)0)->stub) - len;
 }
 
+
 #define PTW_NEED(_len) do { \
 		if (!ptwrite_has_room(code, p, (_len))) \
 			return -E2BIG; \
@@ -1430,6 +1449,7 @@ int arch_uprobe_ptwrite_prepare(struct arch_uprobe *auprobe,
 	unsigned int data_off;
 	unsigned int hdr_off = 0;
 	unsigned int imm_idx = 0, n_imm = 0;
+	bool paced = false;
 	u64 hdr;
 	int i;
 
@@ -1469,9 +1489,26 @@ int arch_uprobe_ptwrite_prepare(struct arch_uprobe *auprobe,
 		}
 	}
 
+	/* Slow down the probes to avoid PT overflow. */
+#define PTW_NEED(_len) do { \
+		if (!ptwrite_has_room(code, p, (_len))) \
+			return -E2BIG; \
+	} while (0)
+
+	paced = !(desc->flags & UPROBE_PTWRITE_FL_NO_LEAD_PACE);
+	if (paced) {
+		PTW_NEED(UPROBE_PTWRITE_SERIALIZE_LFENCES * 3);
+		p += ptwrite_emit_lfences(p);
+	}
+
 	/* header word emission (disp32 patched below) */
 	PTW_NEED(9);
+	hdr_off = p - code;
 	p += ptwrite_emit_riprel(p, 0);
+	if (paced) {
+		PTW_NEED(UPROBE_PTWRITE_SERIALIZE_LFENCES * 3);
+		p += ptwrite_emit_lfences(p);
+	}
 
 	for (i = 0; i < desc->nargs; i++) {
 		switch (desc->args[i].src) {
@@ -1507,9 +1544,13 @@ int arch_uprobe_ptwrite_prepare(struct arch_uprobe *auprobe,
 			break;
 		}
 		}
+		if (paced && i + 1 < desc->nargs) {
+			PTW_NEED(UPROBE_PTWRITE_SERIALIZE_LFENCES * 3);
+			p += ptwrite_emit_lfences(p);
+		}
 	}
 
-	/* final jmp back to probe+5; rel32 patched per-mm at install */
+	/* final jmp back to probe+len; rel32 patched per-mm at install */
 	PTW_NEED(5);
 	*p++ = 0xe9;
 	if (p - code > U8_MAX)

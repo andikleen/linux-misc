@@ -644,6 +644,7 @@ static int __trace_uprobe_create(int argc, const char **argv)
 	enum probe_print_type ptype;
 	bool is_return = false;
 	bool is_ptwrite = false;
+	bool is_nopace = false;
 	bool is_nop_run = false;
 	int i, ret, arg_start = 2;
 
@@ -730,6 +731,11 @@ static int __trace_uprobe_create(int argc, const char **argv)
 
 	/* Check if there is %return suffix */
 	tmp = strchr(arg, '%');
+	if (tmp && is_ptwrite && !strcmp(tmp, "%nopace")) {
+		*tmp = '\0';
+		is_nopace = true;
+		tmp = NULL;
+	}
 	if (tmp && is_ptwrite) {
 		if (!strcmp(tmp, "%multinop")) {
 			*tmp = '\0';
@@ -754,9 +760,18 @@ static int __trace_uprobe_create(int argc, const char **argv)
 		trace_probe_log_err(arg - filename, BAD_UPROBE_OFFS);
 		return ret;
 	}
+	if (is_ptwrite && arg_start < argc &&
+	    !strcmp(argv[arg_start], "%nopace")) {
+		is_nopace = true;
+		arg_start++;
+	}
 	if (is_ptwrite) {
 		while (arg_start < argc && !strcmp(argv[arg_start], "%multinop")) {
 			is_nop_run = true;
+			arg_start++;
+		}
+		if (arg_start < argc && !strcmp(argv[arg_start], "%nopace")) {
+			is_nopace = true;
 			arg_start++;
 		}
 	}
@@ -842,6 +857,8 @@ static int __trace_uprobe_create(int argc, const char **argv)
 		tu->ptwrite_desc.nargs = argc;
 		tu->ptwrite_desc.flags = is_nop_run ?
 			UPROBE_PTWRITE_FL_ALLOW_NOP_RUN : 0;
+		if (is_nopace)
+			tu->ptwrite_desc.flags |= UPROBE_PTWRITE_FL_NO_LEAD_PACE;
 		for (i = 0; i < argc; i++) {
 			ret = ptwrite_compile_arg(tu, i);
 			if (ret) {
@@ -900,6 +917,11 @@ static int trace_uprobe_show(struct seq_file *m, struct dyn_event *ev)
 			   trace_probe_group_name(&tu->tp),
 			   trace_probe_name(&tu->tp), tu->filename,
 			   (int)(sizeof(void *) * 2), tu->offset);
+		if (tu->ptwrite_desc.flags & UPROBE_PTWRITE_FL_NO_LEAD_PACE) {
+			seq_puts(m, "%nopace");
+			if (tu->ptwrite_desc.flags & UPROBE_PTWRITE_FL_ALLOW_NOP_RUN)
+				seq_putc(m, ' ');
+		}
 		if (tu->ptwrite_desc.flags & UPROBE_PTWRITE_FL_ALLOW_NOP_RUN)
 			seq_puts(m, "%multinop");
 	} else
