@@ -517,6 +517,11 @@ DEFINE_IDTENTRY_ERRORCODE(exc_segment_not_present)
 
 DEFINE_IDTENTRY_ERRORCODE(exc_stack_segment)
 {
+	if (user_mode(regs) &&
+	    notify_x86_user_fault(regs, error_code, 0, X86_TRAP_SS) ==
+			NOTIFY_STOP)
+		return;
+
 	do_error_trap(regs, error_code, "stack segment", X86_TRAP_SS, SIGBUS,
 		      0, NULL);
 }
@@ -911,6 +916,30 @@ static void gp_user_force_sig_segv(struct pt_regs *regs, int trapnr,
 	force_sig(SIGSEGV);
 }
 
+static ATOMIC_NOTIFIER_HEAD(x86_user_fault_chain);
+
+int register_x86_user_fault_notifier(struct notifier_block *nb)
+{
+	return atomic_notifier_chain_register(&x86_user_fault_chain, nb);
+}
+void unregister_x86_user_fault_notifier(struct notifier_block *nb)
+{
+	atomic_notifier_chain_unregister(&x86_user_fault_chain, nb);
+}
+
+int notify_x86_user_fault(struct pt_regs *regs, unsigned long error_code,
+			  unsigned long address, unsigned int trap)
+{
+	struct x86_user_fault_args args = {
+		.regs = regs,
+		.error_code = error_code,
+		.address = address,
+		.trap = trap,
+	};
+
+	return atomic_notifier_call_chain(&x86_user_fault_chain, 0, &args);
+}
+
 DEFINE_IDTENTRY_ERRORCODE(exc_general_protection)
 {
 	char desc[sizeof(GPFSTR) + 50 + 2*sizeof(unsigned long) + 1] = GPFSTR;
@@ -940,6 +969,9 @@ DEFINE_IDTENTRY_ERRORCODE(exc_general_protection)
 			goto exit;
 
 		if (emulate_vsyscall_gp(regs))
+			goto exit;
+
+		if (notify_x86_user_fault(regs, error_code, 0, X86_TRAP_GP) == NOTIFY_STOP)
 			goto exit;
 
 		gp_user_force_sig_segv(regs, X86_TRAP_GP, error_code, desc);
