@@ -1323,6 +1323,24 @@ static int ptwrite_emit_riprel(u8 *p, s32 disp)
 	return 9;
 }
 
+static int ptwrite_emit_lfence(u8 *p)
+{
+	*p++ = 0x0f;
+	*p++ = 0xae;
+	*p++ = 0xe8;	/* LFENCE */
+	return UPROBE_PTWRITE_LFENCE_SIZE;
+}
+
+/* The default pacing: one or more fences per word gap. */
+static int ptwrite_emit_lfences(u8 *p)
+{
+	int i;
+
+	for (i = 0; i < UPROBE_PTWRITE_SERIALIZE_LFENCES; i++)
+		p += ptwrite_emit_lfence(p);
+	return UPROBE_PTWRITE_SERIALIZE_LFENCES *
+		UPROBE_PTWRITE_LFENCE_SIZE;
+}
 bool arch_uprobe_ptwrite_supported(void)
 {
 	u32 eax, ebx, ecx, edx;
@@ -1411,13 +1429,20 @@ int arch_uprobe_ptwrite_fetch(struct uprobe_ptwrite_arg *a,
 }
 
 /*
- * Worst-case stub block: header ptwriteq (9) + max memory args (10 bytes
- * each, including a SIB byte) + final jmp (5), rounded up; data adds one
- * header slot and one slot per immediate. Keep the bound below the stub size.
+ * Worst-case paced stub before instruction punning: a 9-byte header, one
+ * lead fence, one fence after the header, one fence between each argument,
+ * the largest memory form (10 bytes), and the return jump. Data adds one
+ * header slot and one slot per immediate.
  */
-static_assert((((9 + UPROBE_PTWRITE_MAX_ARGS * 10 + 5 + 7) & ~7) +
-	       8 * (1 + UPROBE_PTWRITE_MAX_ARGS)) <= UPROBE_PTWRITE_STUB_SIZE,
-	       "worst-case ptwrite stub block exceeds UPROBE_PTWRITE_STUB_SIZE");
+static_assert((((9 + UPROBE_PTWRITE_SERIALIZE_LFENCES *
+				  UPROBE_PTWRITE_LFENCE_SIZE +
+			  UPROBE_PTWRITE_MAX_ARGS *
+				  (10 + UPROBE_PTWRITE_SERIALIZE_LFENCES *
+				   UPROBE_PTWRITE_LFENCE_SIZE) +
+			  5 + 7) & ~7) +
+		       8 * (1 + UPROBE_PTWRITE_MAX_ARGS)) <=
+		      UPROBE_PTWRITE_STUB_SIZE,
+		      "worst-case ptwrite stub block exceeds UPROBE_PTWRITE_STUB_SIZE");
 
 static bool ptwrite_has_room(const u8 *base, const u8 *p, size_t len)
 {
@@ -1439,6 +1464,7 @@ int arch_uprobe_ptwrite_prepare(struct arch_uprobe *auprobe,
 	unsigned int data_off;
 	unsigned int hdr_off = 0;
 	unsigned int imm_idx = 0, n_imm = 0;
+	bool paced = false;
 	u64 hdr;
 	int i;
 
@@ -1446,7 +1472,9 @@ int arch_uprobe_ptwrite_prepare(struct arch_uprobe *auprobe,
 		return -EINVAL;
 	if (desc->nargs > UPROBE_PTWRITE_MAX_ARGS)
 		return -E2BIG;
-	if (desc->flags & ~UPROBE_PTWRITE_FL_ALLOW_MEM)
+	if (desc->flags & ~(UPROBE_PTWRITE_FL_ALLOW_MEM |
+			     UPROBE_PTWRITE_FL_NO_LEAD_PACE |
+			     UPROBE_PTWRITE_FL_ALLOW_NOP_RUN))
 		return -EINVAL;
 
 	/* The generic registration path copied these bytes before this hook. */
@@ -1477,9 +1505,22 @@ int arch_uprobe_ptwrite_prepare(struct arch_uprobe *auprobe,
 		}
 	}
 
+	paced = !(desc->flags & UPROBE_PTWRITE_FL_NO_LEAD_PACE);
+	if (paced) {
+		PTW_NEED(UPROBE_PTWRITE_SERIALIZE_LFENCES *
+			 UPROBE_PTWRITE_LFENCE_SIZE);
+		p += ptwrite_emit_lfences(p);
+	}
+
 	/* header word emission (disp32 patched below) */
 	PTW_NEED(9);
+	hdr_off = p - code;
 	p += ptwrite_emit_riprel(p, 0);
+	if (paced) {
+		PTW_NEED(UPROBE_PTWRITE_SERIALIZE_LFENCES *
+			 UPROBE_PTWRITE_LFENCE_SIZE);
+		p += ptwrite_emit_lfences(p);
+	}
 
 	for (i = 0; i < desc->nargs; i++) {
 		switch (desc->args[i].src) {
@@ -1515,9 +1556,14 @@ int arch_uprobe_ptwrite_prepare(struct arch_uprobe *auprobe,
 			break;
 		}
 		}
+		if (paced && i + 1 < desc->nargs) {
+			PTW_NEED(UPROBE_PTWRITE_SERIALIZE_LFENCES *
+				 UPROBE_PTWRITE_LFENCE_SIZE);
+			p += ptwrite_emit_lfences(p);
+		}
 	}
 
-	/* final jmp back to probe+5; rel32 patched per-mm at install */
+	/* final jmp back to probe+len; rel32 patched per-mm at install */
 	PTW_NEED(5);
 	*p++ = 0xe9;
 	if (p - code > U8_MAX)
@@ -1549,6 +1595,7 @@ int arch_uprobe_ptwrite_prepare(struct arch_uprobe *auprobe,
 
 	ptw->stub_len = data_off + 8 * (1 + n_imm);
 	ptw->ndata = 1 + n_imm;
+	ptw->allow_nop_run = desc->flags & UPROBE_PTWRITE_FL_ALLOW_NOP_RUN;
 	return 0;
 }
 #undef PTW_NEED

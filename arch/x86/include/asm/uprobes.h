@@ -30,12 +30,23 @@ enum {
 struct uprobe_xol_ops;
 
 /*
- * Stub block array size. Worst case = 250 B (8 MEM args, rsp bases, fault
- * table); 288 leaves 38 B slack. A file-scope static_assert in
- * arch/x86/kernel/uprobes.c re-derives the worst case; prepare() also
- * enforces it with -E2BIG at runtime.
+ * Stub block size. Conservative worst case is 298 bytes: 9-byte header,
+ * one lead fence, eight 21-byte memory forms with one 3-byte fence each,
+ * a 16-byte original-instruction copy, a 5-byte return jump, alignment,
+ * and 66 bytes of data/fault metadata. 384 leaves room. A static_assert in
+ * arch/x86/kernel/uprobes.c checks the bound; prepare() also checks it with
+ * -E2BIG.
  */
-#define UPROBE_PTWRITE_STUB_SIZE	288
+#define UPROBE_PTWRITE_STUB_SIZE	384
+
+
+/*
+ * Word pacing: insert this many LFENCEs between emitted ptwrite words and
+ * before the first word, unless UPROBE_PTWRITE_FL_NO_LEAD_PACE is requested.
+ */
+#define UPROBE_PTWRITE_SERIALIZE_LFENCES	1	/* LFENCEs per word gap */
+/* The encoded LFENCE instruction occupies three bytes. */
+#define UPROBE_PTWRITE_LFENCE_SIZE	3
 
 /*
  * ptwrite probe state. The stub template (code + data slots) is built
@@ -49,6 +60,9 @@ struct uprobe_ptwrite_arch {
 	u8	jmp_off;	/* offset of the final jmp's rel32 field */
 	u8	ndata;		/* number of u64 data slots */
 	u8	orig[MAX_UINSN_BYTES];	/* pristine file bytes, before generic analysis */
+	u16	ft_off;		/* fault table offset within the block (0 if none) */
+	u8	nft;		/* number of fault entries */
+	bool	allow_nop_run;	/* accept a five-byte run of 0x90 */
 };
 
 /* Per-mm page holding generated ptwrite stub blocks, like tramp_mapping. */
