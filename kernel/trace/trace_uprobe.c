@@ -635,6 +635,7 @@ static int __trace_uprobe_create(int argc, const char **argv)
 	enum probe_print_type ptype;
 	bool is_return = false;
 	bool is_ptwrite = false;
+	bool is_nop_run = false;
 	int i, ret, arg_start = 2;
 
 	ref_ctr_offset = 0;
@@ -659,13 +660,6 @@ static int __trace_uprobe_create(int argc, const char **argv)
 		return -ECANCELED;
 
 	trlog = trace_probe_log_init("trace_uprobe", argc, argv);
-
-	if (argc - 2 > MAX_TRACE_ARGS ||
-	    (is_ptwrite && argc - 2 > UPROBE_PTWRITE_MAX_ARGS)) {
-		trace_probe_log_set_index(2);
-		trace_probe_log_err(0, TOO_MANY_ARGS);
-		return -E2BIG;
-	}
 
 	if (is_ptwrite)
 		event = argv[0][4] ? &argv[0][4] : NULL;	/* after "ptw:" */
@@ -728,8 +722,13 @@ static int __trace_uprobe_create(int argc, const char **argv)
 	/* Check if there is %return suffix */
 	tmp = strchr(arg, '%');
 	if (tmp && is_ptwrite) {
-		trace_probe_log_err(tmp - filename, BAD_ADDR_SUFFIX);
-		return -EINVAL;
+		if (!strcmp(tmp, "%multinop")) {
+			*tmp = '\0';
+			is_nop_run = true;
+		} else {
+			trace_probe_log_err(tmp - filename, BAD_ADDR_SUFFIX);
+			return -EINVAL;
+		}
 	} else if (tmp) {
 		if (!strcmp(tmp, "%return")) {
 			*tmp = '\0';
@@ -745,6 +744,19 @@ static int __trace_uprobe_create(int argc, const char **argv)
 	if (ret) {
 		trace_probe_log_err(arg - filename, BAD_UPROBE_OFFS);
 		return ret;
+	}
+	if (is_ptwrite) {
+		while (arg_start < argc && !strcmp(argv[arg_start], "%multinop")) {
+			is_nop_run = true;
+			arg_start++;
+		}
+	}
+
+	if (argc - arg_start > MAX_TRACE_ARGS ||
+	    (is_ptwrite && argc - arg_start > UPROBE_PTWRITE_MAX_ARGS)) {
+		trace_probe_log_set_index(arg_start);
+		trace_probe_log_err(0, TOO_MANY_ARGS);
+		return -E2BIG;
 	}
 
 	/* setup a probe */
@@ -781,8 +793,8 @@ static int __trace_uprobe_create(int argc, const char **argv)
 		kfree(tail);
 	}
 
-	argc -= 2;
-	argv += 2;
+	argc -= arg_start;
+	argv += arg_start;
 
 	tu = alloc_trace_uprobe(group, event, argc, is_return);
 	if (IS_ERR(tu)) {
@@ -805,7 +817,7 @@ static int __trace_uprobe_create(int argc, const char **argv)
 
 	/* parse arguments */
 	for (i = 0; i < argc; i++) {
-		trace_probe_log_set_index(i + 2);
+		trace_probe_log_set_index(i + arg_start);
 		ret = traceprobe_parse_probe_arg(&tu->tp, i, argv[i], ctx);
 		if (ret)
 			return ret;
@@ -813,13 +825,14 @@ static int __trace_uprobe_create(int argc, const char **argv)
 
 	if (is_ptwrite) {
 		if (!argc) {
-			trace_probe_log_set_index(2);
+			trace_probe_log_set_index(arg_start);
 			trace_probe_log_err(0, NO_ARG_BODY);
 			return -EINVAL;	/* core rejects desc->nargs == 0 */
 		}
 		tu->is_ptwrite = true;
 		tu->ptwrite_desc.nargs = argc;
-		tu->ptwrite_desc.flags = 0;
+		tu->ptwrite_desc.flags = is_nop_run ?
+			UPROBE_PTWRITE_FL_ALLOW_NOP_RUN : 0;
 		for (i = 0; i < argc; i++) {
 			ret = ptwrite_compile_arg(tu, i);
 			if (ret) {
@@ -877,6 +890,8 @@ static int trace_uprobe_show(struct seq_file *m, struct dyn_event *ev)
 			   trace_probe_group_name(&tu->tp),
 			   trace_probe_name(&tu->tp), tu->filename,
 			   (int)(sizeof(void *) * 2), tu->offset);
+		if (tu->ptwrite_desc.flags & UPROBE_PTWRITE_FL_ALLOW_NOP_RUN)
+			seq_puts(m, "%multinop");
 	} else
 		seq_printf(m, "%c:%s/%s %s:0x%0*lx", c,
 			   trace_probe_group_name(&tu->tp),
