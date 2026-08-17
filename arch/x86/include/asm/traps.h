@@ -4,6 +4,7 @@
 
 #include <linux/context_tracking_state.h>
 #include <linux/kprobes.h>
+#include <linux/notifier.h>
 
 #include <asm/debugreg.h>
 #include <asm/idtentry.h>
@@ -58,5 +59,21 @@ static inline void cond_local_irq_disable(struct pt_regs *regs)
 	if (regs->flags & X86_EFLAGS_IF)
 		local_irq_disable();
 }
+
+/*
+ * User-mode fault notifier chain, called before a user exception is
+ * about to become a signal. NOTIFY_STOP consumes the fault.
+ */
+struct x86_user_fault_args {
+	struct pt_regs	*regs;
+	unsigned long	error_code;
+	unsigned long	address;	/* #PF: faulting address */
+	unsigned int	trap;
+};
+
+extern int register_x86_user_fault_notifier(struct notifier_block *nb);
+extern void unregister_x86_user_fault_notifier(struct notifier_block *nb);
+extern int notify_x86_user_fault(struct pt_regs *regs, unsigned long error_code,
+				 unsigned long address, unsigned int trap);
 
 #endif /* _ASM_X86_TRAPS_H */

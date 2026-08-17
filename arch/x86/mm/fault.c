@@ -821,6 +821,9 @@ __bad_area_nosemaphore(struct pt_regs *regs, unsigned long error_code,
 	if (fixup_vdso_exception(regs, X86_TRAP_PF, error_code, address))
 		return;
 
+	if (notify_x86_user_fault(regs, error_code, address, X86_TRAP_PF) == NOTIFY_STOP)
+		return;
+
 	if (likely(show_unhandled_signals))
 		show_signal_msg(regs, error_code, address, tsk);
 
@@ -932,8 +935,6 @@ do_sigbus(struct pt_regs *regs, unsigned long error_code, unsigned long address,
 	if (fixup_vdso_exception(regs, X86_TRAP_PF, error_code, address))
 		return;
 
-	set_signal_archinfo(address, error_code);
-
 #ifdef CONFIG_MEMORY_FAILURE
 	if (fault & (VM_FAULT_HWPOISON|VM_FAULT_HWPOISON_LARGE)) {
 		struct task_struct *tsk = current;
@@ -946,10 +947,16 @@ do_sigbus(struct pt_regs *regs, unsigned long error_code, unsigned long address,
 			lsb = hstate_index_to_shift(VM_FAULT_GET_HINDEX(fault));
 		if (fault & VM_FAULT_HWPOISON)
 			lsb = PAGE_SHIFT;
+		set_signal_archinfo(address, error_code);
 		force_sig_mceerr(BUS_MCEERR_AR, (void __user *)address, lsb);
 		return;
 	}
 #endif
+	if (notify_x86_user_fault(regs, error_code, address, X86_TRAP_PF) == NOTIFY_STOP)
+		return;
+
+	set_signal_archinfo(address, error_code);
+
 	force_sig_fault(SIGBUS, BUS_ADRERR, (void __user *)address);
 }
 
