@@ -3,6 +3,11 @@
 %{!?make: %define make make}
 %define makeflags %{?_smp_mflags} ARCH=%{ARCH}
 
+# SUSE's kernel.attr fileattr runs find-requires.ksyms on modules. A package
+# named exactly "kernel" misses its kernel-* guard and gets ~6900 ksym()
+# requires with no provides, so `rpm -Uvh` cannot install the package. Disable the generator.
+%global __kernel_requires /bin/true
+
 Name: kernel
 Summary: The Linux Kernel
 Version: %(echo %{KERNELRELEASE} | sed -e 's/-/_/g')
@@ -182,9 +187,6 @@ rm -f debugfiles.list debuglinks.list debugsourcefiles.list debugsources.list \
 %endif
 
 %post
-if [ -x /usr/bin/kernel-install ]; then
-	/usr/bin/kernel-install add %{KERNELRELEASE} /lib/modules/%{KERNELRELEASE}/vmlinuz
-fi
 for file in vmlinuz System.map config; do
 	if ! cmp --silent "/lib/modules/%{KERNELRELEASE}/${file}" "/boot/${file}-%{KERNELRELEASE}"; then
 		cp "/lib/modules/%{KERNELRELEASE}/${file}" "/boot/${file}-%{KERNELRELEASE}"
@@ -195,13 +197,28 @@ if [ -d "/lib/modules/%{KERNELRELEASE}/dtb" ] && \
 	rm -rf "/boot/dtb-%{KERNELRELEASE}"
 	cp -r "/lib/modules/%{KERNELRELEASE}/dtb" "/boot/dtb-%{KERNELRELEASE}"
 fi
-if [ ! -e "/lib/modules/%{KERNELRELEASE}/modules.dep" ]; then
-	/usr/sbin/depmod %{KERNELRELEASE}
+depmod %{KERNELRELEASE}
+if [ -x /usr/lib/bootloader/bootloader_entry ] && [ -x /usr/bin/dracut ]; then
+	# openSUSE: kernel-install(8) does not produce an initrd or boot entry.
+	# Distro kernels build the initrd with dracut and refresh the
+	# bootloader via bootloader_entry (pbl), which dispatches to
+	# grub2-mkconfig on this system (LOADER_TYPE=grub2-efi).
+	dracut --force "/boot/initrd-%{KERNELRELEASE}" %{KERNELRELEASE}
+	/usr/lib/bootloader/bootloader_entry add default %{KERNELRELEASE} vmlinuz-%{KERNELRELEASE} initrd-%{KERNELRELEASE} || \
+		/usr/sbin/grub2-mkconfig -o /boot/grub2/grub.cfg
+elif [ -x /usr/bin/kernel-install ]; then
+	# generic (Fedora-style) path
+	/usr/bin/kernel-install add %{KERNELRELEASE} /lib/modules/%{KERNELRELEASE}/vmlinuz
 fi
 
 %preun
-if [ -x /usr/bin/kernel-install ]; then
-kernel-install remove %{KERNELRELEASE}
+if [ -x /usr/lib/bootloader/bootloader_entry ]; then
+	rm -f /boot/vmlinuz-%{KERNELRELEASE} /boot/initrd-%{KERNELRELEASE} \
+	      /boot/System.map-%{KERNELRELEASE} /boot/config-%{KERNELRELEASE}
+	/usr/lib/bootloader/bootloader_entry remove default %{KERNELRELEASE} vmlinuz-%{KERNELRELEASE} initrd-%{KERNELRELEASE} || \
+		/usr/sbin/grub2-mkconfig -o /boot/grub2/grub.cfg
+elif [ -x /usr/bin/kernel-install ]; then
+	kernel-install remove %{KERNELRELEASE}
 fi
 
 %files -f %{buildroot}/kernel.list
