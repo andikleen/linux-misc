@@ -7940,8 +7940,9 @@ struct vmx_pt_caps_data {
 
 static void vmx_get_pt_host_caps(void *info)
 {
-	struct vmx_pt_caps_data *data = this_cpu_ptr(
-		(struct vmx_pt_caps_data __percpu *)(unsigned long)info);
+	struct vmx_pt_caps_data __percpu *caps =
+		(struct vmx_pt_caps_data __percpu *)(unsigned long)info;
+	struct vmx_pt_caps_data *data;
 	u32 eax, ebx, ecx, edx;
 	int i;
 
