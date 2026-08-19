@@ -1282,7 +1282,6 @@ static void pt_guest_exit(struct vcpu_vmx *vmx)
 	pt_save_msr(&vmx->pt_desc.guest, vmx->pt_desc.num_address_ranges);
 	pt_load_msr(&vmx->pt_desc.host, vmx->pt_desc.num_address_ranges);
 
-	/* Restore host PT state */
 	if (vmx->pt_desc.host.ctl)
 		wrmsrq(MSR_IA32_RTIT_CTL, vmx->pt_desc.host.ctl);
 }
