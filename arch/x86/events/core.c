@@ -3126,7 +3126,8 @@ static void perf_get_hybrid_common_pmu_capability(struct x86_pmu_capability *cap
 {
 	struct x86_hybrid_pmu *hpmu;
 	unsigned long events_maskl;
-	int i, first = -1;
+	int i;
+	bool first = true;
 
 	memset(cap, 0, sizeof(*cap));
 
@@ -3140,62 +3141,36 @@ static void perf_get_hybrid_common_pmu_capability(struct x86_pmu_capability *cap
 	 * only consider types with online CPUs.
 	 */
 	for (i = 0; i < x86_pmu.num_hybrid_pmus; i++) {
-		if (cpumask_empty(&x86_pmu.hybrid_pmu[i].supported_cpus))
+		hpmu = &x86_pmu.hybrid_pmu[i];
+		if (cpumask_empty(&hpmu->supported_cpus))
 			continue;
-		first = i;
-		break;
+
+		if (first) {
+			cap->version = x86_pmu.version;
+			cap->bit_width_gp = x86_pmu.cntval_bits;
+			cap->bit_width_fixed = x86_pmu.cntval_bits;
+			cap->num_counters_gp = hweight64(hpmu->cntr_mask64);
+			cap->num_counters_fixed = hweight64(hpmu->fixed_cntr_mask64);
+			events_maskl = hpmu->events_maskl;
+			cap->events_mask_len = hpmu->events_mask_len;
+			cap->mediated = !!(hpmu->pmu.capabilities & PERF_PMU_CAP_MEDIATED_VPMU);
+			first = false;
+			continue;
+		}
+
+		cap->mediated &= !!(hpmu->pmu.capabilities & PERF_PMU_CAP_MEDIATED_VPMU);
+		cap->num_counters_gp = min_t(unsigned int, cap->num_counters_gp,
+					      hweight64(hpmu->cntr_mask64));
+		cap->num_counters_fixed = min_t(unsigned int, cap->num_counters_fixed,
+						 hweight64(hpmu->fixed_cntr_mask64));
+		events_maskl |= hpmu->events_maskl;
+		cap->events_mask_len = min(cap->events_mask_len,
+						  hpmu->events_mask_len);
 	}
-	if (first == -1)
+	if (first)
 		return;
 
-	/*
-	 * This capability is a one-time snapshot (KVM takes it at module
-	 * init); CPU hotplug afterwards is not reflected.  Offlining a type
-	 * only makes the capability conservative, but onlining a type that
-	 * was offline leaves guests with a stale capability that can overstate
-	 * that type's counters and events.
-	 */
-
-	cap->version		= x86_pmu.version;
-	cap->bit_width_gp	= x86_pmu.cntval_bits;
-	cap->bit_width_fixed	= x86_pmu.cntval_bits;
-	cap->pebs_ept		= 0;	/* PEBS is not part of the common subset */
-	/*
-	 * The mediated-vPMU capability is per hybrid PMU; a vCPU can run on
-	 * any core type, so require every online type to support it.
-	 */
-	cap->mediated		= 1;
-	for (i = first; i < x86_pmu.num_hybrid_pmus; i++) {
-		hpmu = &x86_pmu.hybrid_pmu[i];
-		if (cpumask_empty(&hpmu->supported_cpus))
-			continue;
-		if (!(hpmu->pmu.capabilities & PERF_PMU_CAP_MEDIATED_VPMU))
-			cap->mediated = 0;
-	}
-
-	hpmu = &x86_pmu.hybrid_pmu[first];
-	cap->num_counters_gp	= hweight64(hpmu->cntr_mask64);
-	cap->num_counters_fixed	= hweight64(hpmu->fixed_cntr_mask64);
-	events_maskl		= hpmu->events_maskl;
-	cap->events_mask_len	= hpmu->events_mask_len;
-
-	for (i = first + 1; i < x86_pmu.num_hybrid_pmus; i++) {
-		int n;
-
-		hpmu = &x86_pmu.hybrid_pmu[i];
-		if (cpumask_empty(&hpmu->supported_cpus))
-			continue;
-		n = hweight64(hpmu->cntr_mask64);
-		if (n < cap->num_counters_gp)
-			cap->num_counters_gp = n;
-		n = hweight64(hpmu->fixed_cntr_mask64);
-		if (n < cap->num_counters_fixed)
-			cap->num_counters_fixed = n;
-		/* bit set = event unavailable; common subset = OR */
-		events_maskl |= hpmu->events_maskl;
-		if (hpmu->events_mask_len < cap->events_mask_len)
-			cap->events_mask_len = hpmu->events_mask_len;
-	}
+	/* PEBS is not part of the common subset. */
 	if (cap->events_mask_len)
 		events_maskl &= GENMASK_ULL(cap->events_mask_len - 1, 0);
 	cap->events_mask = (unsigned int)events_maskl;
