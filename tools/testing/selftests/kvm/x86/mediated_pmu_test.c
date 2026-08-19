@@ -132,6 +132,7 @@ static int create_vcpu(void)
 		close(kvm_fd);
 		return -e;
 	}
+	close(r);
 	close(vmfd);
 	close(kvm_fd);
 	return 0;
