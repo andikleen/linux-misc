@@ -7946,6 +7946,7 @@ static void vmx_get_pt_host_caps(void *info)
 	u32 eax, ebx, ecx, edx;
 	int i;
 
+	data = this_cpu_ptr(caps);
 	for (i = 0; i < PT_CPUID_LEAVES; i++) {
 		cpuid_count(0x14, i, &eax, &ebx, &ecx, &edx);
 		data->caps[i][CPUID_EAX] = eax;
