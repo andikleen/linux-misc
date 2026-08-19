@@ -7605,9 +7605,8 @@ fastpath_t vmx_vcpu_run(struct kvm_vcpu *vcpu, u64 run_flags)
 		u64 global_ctrl = vcpu_to_pmu(vcpu)->global_ctrl;
 		u64 masked_ctrl = global_ctrl & kvm_pmu_enumerated_ctrl_mask();
 
-		global_ctrl = vmcs_read64(GUEST_IA32_PERF_GLOBAL_CTRL);
-		vmcs_write64(GUEST_IA32_PERF_GLOBAL_CTRL,
-			     global_ctrl & kvm_pmu_enumerated_ctrl_mask());
+		if (global_ctrl != masked_ctrl)
+			vmcs_write64(GUEST_IA32_PERF_GLOBAL_CTRL, masked_ctrl);
 	}
 
 	atomic_switch_perf_msrs(vmx);
