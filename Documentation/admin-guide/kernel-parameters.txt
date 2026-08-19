@@ -3094,9 +3094,9 @@ Kernel parameters
     kvm.enable_hybrid_pmu=[KVM,X86]
 			If enabled, KVM will allow virtualization of the PMU
 			on hybrid Intel systems. The administrator is responsible
-			that either each vcpu is pinned to only its own CPU type
-			(E or P-core), or that the guest is only using enumerated
-			architectural perfmon events.
+			for either pinning each vCPU to a single CPU type
+			(as defined by /sys/devices/cpu_*/cpus) or ensuring the
+			guest uses only enumerated architectural perfmon events.
 
 			Default is N (off). This is an experimental facility so far.
 
