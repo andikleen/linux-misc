@@ -1286,9 +1286,6 @@ static void pt_guest_exit(struct vcpu_vmx *vmx)
 		wrmsrq(MSR_IA32_RTIT_CTL, vmx->pt_desc.host.ctl);
 }
 
-/*
- * Sync the VMCS with the guest TraceEn.
- */
 void pt_update_controls(struct vcpu_vmx *vmx)
 {
 	if (vmx_pt_mode_is_system())
