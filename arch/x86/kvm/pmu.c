@@ -40,9 +40,9 @@ EXPORT_SYMBOL_FOR_KVM_INTERNAL(enable_pmu);
 module_param(enable_pmu, bool, 0444);
 
 /* Enable hybrid guest PMU */
-bool __read_mostly enable_pmu_hybrid;
-module_param(enable_pmu_hybrid, bool, 0444);
-EXPORT_SYMBOL_FOR_KVM_INTERNAL(enable_pmu_hybrid);
+bool __read_mostly enable_hybrid_pmu;
+EXPORT_SYMBOL_FOR_KVM_INTERNAL(enable_hybrid_pmu);
+module_param(enable_hybrid_pmu, bool, 0444);
 
 /* Enable/disabled mediated PMU virtualization. */
 bool __read_mostly enable_mediated_pmu;
