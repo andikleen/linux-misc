@@ -4213,9 +4213,13 @@ void pt_update_intercept_for_msr(struct kvm_vcpu *vcpu)
 	vmx_set_intercept_for_msr(vcpu, MSR_IA32_RTIT_OUTPUT_BASE, MSR_TYPE_RW, flag);
 	vmx_set_intercept_for_msr(vcpu, MSR_IA32_RTIT_OUTPUT_MASK, MSR_TYPE_RW, flag);
 	vmx_set_intercept_for_msr(vcpu, MSR_IA32_RTIT_CR3_MATCH, MSR_TYPE_RW, flag);
-	for (i = 0; i < vmx->pt_desc.num_address_ranges; i++) {
-		vmx_set_intercept_for_msr(vcpu, MSR_IA32_RTIT_ADDR0_A + i * 2, MSR_TYPE_RW, flag);
-		vmx_set_intercept_for_msr(vcpu, MSR_IA32_RTIT_ADDR0_B + i * 2, MSR_TYPE_RW, flag);
+	for (i = 0; i < ARRAY_SIZE(vmx->pt_desc.guest.addr_a); i++) {
+		bool intercept = flag || i >= vmx->pt_desc.num_address_ranges;
+
+		vmx_set_intercept_for_msr(vcpu, MSR_IA32_RTIT_ADDR0_A + i * 2,
+					  MSR_TYPE_RW, intercept);
+		vmx_set_intercept_for_msr(vcpu, MSR_IA32_RTIT_ADDR0_B + i * 2,
+					  MSR_TYPE_RW, intercept);
 	}
 }
 
@@ -8011,11 +8015,14 @@ static void update_intel_pt_cfg(struct kvm_vcpu *vcpu)
 			break;
 		}
 
-		/*
-		 * Sanitize the guest's PT capabilities against the host's
-		 * common subset
-		 */
-		best->eax &= vmx_pt_host_caps[i][CPUID_EAX];
+		/* Sanitize guest PT capabilities against the host common subset. */
+		if (i == 0)
+			best->eax = min(best->eax, vmx_pt_host_caps[i][CPUID_EAX]);
+		else if (i == 1)
+			best->eax = (best->eax & ~PT_CPUID_EAX_ADDR_RANGES_MASK) |
+				min(best->eax & PT_CPUID_EAX_ADDR_RANGES_MASK,
+				    vmx_pt_host_caps[i][CPUID_EAX] &
+				    PT_CPUID_EAX_ADDR_RANGES_MASK);
 		best->ebx &= vmx_pt_host_caps[i][CPUID_EBX];
 		best->ecx &= vmx_pt_host_caps[i][CPUID_ECX];
 		best->edx &= vmx_pt_host_caps[i][CPUID_EDX];
