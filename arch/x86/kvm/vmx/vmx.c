@@ -1215,9 +1215,7 @@ static unsigned long segment_base(u16 selector)
 
 static inline bool pt_can_write_msr(struct vcpu_vmx *vmx)
 {
-	/*
-	 * Reject PT MSR writes from L2 as well.
-	 */
+	/* PT nesting is unsupported once L1 has enabled VMX. */
 	return vmx_pt_mode_is_host_guest() &&
 	       !vmx->nested.vmxon &&
 	       !(vmx->pt_desc.guest.ctl & RTIT_CTL_TRACEEN);
