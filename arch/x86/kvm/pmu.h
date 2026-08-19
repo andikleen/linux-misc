@@ -68,7 +68,7 @@ extern bool enable_hybrid_pmu;
 
 static inline bool kvm_hybrid_pmu_active(void)
 {
-	return cpu_feature_enabled(X86_FEATURE_HYBRID_CPU) && enable_pmu_hybrid;
+	return cpu_feature_enabled(X86_FEATURE_HYBRID_CPU) && enable_hybrid_pmu;
 }
 
 void kvm_pmu_ops_update(const struct kvm_pmu_ops *pmu_ops);
