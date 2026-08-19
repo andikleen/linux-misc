@@ -217,7 +217,7 @@ int main(int argc, char *argv[])
 		pthread_create(&th, NULL, vcpu_run_thread, &ctx);
 		while (!ctx.tid)
 			usleep(1000);
-		pthread_create(&mth, NULL, migrator_thread, &ctx);
+		pthread_create(&mth, NULL, vcpu_migrator_thread, &ctx);
 		pthread_join(mth, NULL);
 		pthread_join(th, NULL);
 	} else {
