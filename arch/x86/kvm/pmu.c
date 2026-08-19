@@ -278,9 +278,8 @@ u32 kvm_pmu_check_cpu_type(struct kvm_pmu *pmu, int cpu)
 		pmu->hybrid_rebind = true;
 		kvm_make_request(KVM_REQ_PMU, vcpu);
 
-		pr_warn_once("kvm: vCPU %u migrated between hybrid core types; "
-			     "vPMU counts may be wrong - pin the vCPU to a "
-			     "single core type\n", vcpu->vcpu_id);
+		pr_warn_once("vCPU %u migrated between hybrid core types; vPMU counts may be wrong - pin the vCPU to a single core type\n",
+			     vcpu->vcpu_id);
 	}
 
 	return type;
