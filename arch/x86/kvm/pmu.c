@@ -261,7 +261,7 @@ static u64 get_sample_period(struct kvm_pmc *pmc, u64 counter_value)
 	return sample_period;
 }
 
-/* Detect vPMU between core types with hybrid PMU. */
+/* Update the vPMU type after a vCPU moves between hybrid core types. */
 u32 kvm_pmu_check_cpu_type(struct kvm_pmu *pmu, int cpu)
 {
 	u32 type = perf_get_x86_pmu_type(cpu);
