@@ -14,6 +14,12 @@ DIR=$(dirname "$0")
 TST=$DIR/pt_guest_trace_test
 [ -x "$TST" ] || { echo "pt_host_pt: $TST not built"; exit $KSFT_SKIP; }
 
+if [ "$(id -u)" -ne 0 ] &&
+   [ "$(cat /proc/sys/kernel/perf_event_paranoid 2>/dev/null || echo 2)" -ge 0 ]; then
+	echo "pt_host_pt: insufficient perf_event permissions"
+	exit $KSFT_SKIP
+fi
+
 fail=0
 DATA1=$(mktemp /tmp/pt_host_t1.XXXXXX.data)
 DATA3=$(mktemp /tmp/pt_host_t3.XXXXXX.data)
