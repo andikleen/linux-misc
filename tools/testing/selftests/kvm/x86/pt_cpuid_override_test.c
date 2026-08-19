@@ -12,9 +12,6 @@
 #include "kvm_util.h"
 #include "processor.h"
 
-#ifndef GP_VECTOR
-#define GP_VECTOR 13
-#endif
 
 struct pt_guest_results {
 	u32 caps0[4];	/* CPUID.0x14.0 as seen by the guest */
