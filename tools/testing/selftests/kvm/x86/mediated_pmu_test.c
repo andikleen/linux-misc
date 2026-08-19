@@ -18,9 +18,6 @@
 #include "processor.h"
 #include "hybrid_util.h"
 
-#ifndef GP_VECTOR
-#define GP_VECTOR 13
-#endif
 
 #define COUNT_CYCLES	(2ULL * 1000 * 1000 * 1000)	/* ~0.7 s of ~2.9 GHz TSC */
 #define MIGRATE_CYCLES	(2ULL * 1000 * 1000 * 1000)	/* dito. */
