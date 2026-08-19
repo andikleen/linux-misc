@@ -73,7 +73,10 @@ int main(void)
 		printf("SKIP: not a hybrid host (no cpu_atom PMU node)\n");
 		exit(KSFT_SKIP);
 	}
-	hybrid_range("cpu_core", &p_set);
+	if (!hybrid_range("cpu_core", &p_set)) {
+		printf("SKIP: hybrid host has no cpu_core PMU node\n");
+		exit(KSFT_SKIP);
+	}
 
 	run_pinned(&p_set, &p);
 	run_pinned(&e_set, &e);
