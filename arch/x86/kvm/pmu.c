@@ -128,7 +128,7 @@ void kvm_init_pmu_capability(struct kvm_pmu_ops *pmu_ops)
 	bool is_intel = boot_cpu_data.x86_vendor == X86_VENDOR_INTEL;
 	int min_nr_gp_ctrs = pmu_ops->MIN_NR_GP_COUNTERS;
 
-	if (cpu_feature_enabled(X86_FEATURE_HYBRID_CPU) && !enable_pmu_hybrid) {
+	if (cpu_feature_enabled(X86_FEATURE_HYBRID_CPU) && !enable_hybrid_pmu) {
 		enable_pmu = false;
 		memset(&kvm_host_pmu, 0, sizeof(kvm_host_pmu));
 	} else {
