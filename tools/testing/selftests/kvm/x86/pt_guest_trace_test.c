@@ -214,7 +214,7 @@ int main(int argc, char *argv[])
 		pthread_t th, mth;
 
 		TEST_ASSERT(vcpu_migrate_ctx_init(&ctx), "no online CPUs");
-		pthread_create(&th, NULL, vcpu_thread, &ctx);
+		pthread_create(&th, NULL, vcpu_run_thread, &ctx);
 		while (!ctx.tid)
 			usleep(1000);
 		pthread_create(&mth, NULL, migrator_thread, &ctx);
