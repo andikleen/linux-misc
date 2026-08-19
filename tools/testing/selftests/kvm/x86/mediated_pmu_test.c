@@ -315,6 +315,17 @@ static void run_guest_migrating(void)
 	vm_install_exception_handler(vm, GP_VECTOR, guest_gp_handler);
 	vcpu_args_set(vcpu, 2, res_gva, MIGRATE_CYCLES);
 
+	vcpu_run(vcpu);
+	switch (get_ucall(vcpu, &uc)) {
+	case UCALL_SYNC:
+		break;
+	case UCALL_ABORT:
+		REPORT_GUEST_ASSERT(uc);
+	default:
+		TEST_ASSERT(false, "Unexpected exit: %s",
+			    exit_reason_str(vcpu->run->exit_reason));
+	}
+
 	ctx.vcpu = vcpu;
 	pthread_create(&th, NULL, vcpu_run_thread, &ctx);
 	while (!ctx.tid)
