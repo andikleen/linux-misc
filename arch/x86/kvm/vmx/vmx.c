@@ -1288,6 +1288,10 @@ static void pt_guest_exit(struct vcpu_vmx *vmx)
 
 void pt_update_controls(struct vcpu_vmx *vmx)
 {
+	u32 secondary = SECONDARY_EXEC_PT_USE_GPA | SECONDARY_EXEC_PT_CONCEAL_VMX;
+	u32 entry = VM_ENTRY_LOAD_IA32_RTIT_CTL | VM_ENTRY_PT_CONCEAL_PIP;
+	u32 exit = VM_EXIT_CLEAR_IA32_RTIT_CTL | VM_EXIT_PT_CONCEAL_PIP;
+
 	if (vmx_pt_mode_is_system())
 		return;
 
