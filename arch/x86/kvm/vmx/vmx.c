@@ -8037,13 +8037,24 @@ static void update_intel_pt_cfg(struct kvm_vcpu *vcpu)
 			RTIT_CTL_USR | RTIT_CTL_TSC_EN | RTIT_CTL_DISRETC |
 			RTIT_CTL_BRANCH_EN);
 
+	/*
+	 * If CPUID.(EAX=14H,ECX=0):EBX[0]=1 CR3Filter can be set otherwise
+	 * will inject an #GP
+	 */
 	if (intel_pt_validate_cap(vmx->pt_desc.caps, PT_CAP_cr3_filtering))
 		vmx->pt_desc.ctl_bitmask &= ~RTIT_CTL_CR3EN;
 
+	/*
+	 * If CPUID.(EAX=14H,ECX=0):EBX[1]=1 CYCEn, CycThresh and
+	 * PSBFreq can be set
+	 */
 	if (intel_pt_validate_cap(vmx->pt_desc.caps, PT_CAP_psb_cyc))
 		vmx->pt_desc.ctl_bitmask &= ~(RTIT_CTL_CYCLEACC |
 				RTIT_CTL_CYC_THRESH | RTIT_CTL_PSB_FREQ);
 
+	/*
+	 * If CPUID.(EAX=14H,ECX=0):EBX[3]=1 MTCEn and MTCFreq can be set
+	 */
 	if (intel_pt_validate_cap(vmx->pt_desc.caps, PT_CAP_mtc))
 		vmx->pt_desc.ctl_bitmask &= ~(RTIT_CTL_MTC_EN |
 					      RTIT_CTL_MTC_RANGE);
