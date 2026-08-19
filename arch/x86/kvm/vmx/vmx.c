@@ -7604,9 +7604,11 @@ fastpath_t vmx_vcpu_run(struct kvm_vcpu *vcpu, u64 run_flags)
 
 	pt_guest_enter(vmx);
 
-	/* In hybrid mode enforce common subset */
-	if (kvm_hybrid_pmu_active() && enable_mediated_pmu &&
-	    kvm_vcpu_has_mediated_pmu(vcpu))
+	/* In hybrid mode enforce the common subset. */
+	if (kvm_hybrid_pmu_active() && kvm_vcpu_has_mediated_pmu(vcpu)) {
+		u64 global_ctrl;
+
+		global_ctrl = vmcs_read64(GUEST_IA32_PERF_GLOBAL_CTRL);
 		vmcs_write64(GUEST_IA32_PERF_GLOBAL_CTRL,
 			    vmcs_read64(GUEST_IA32_PERF_GLOBAL_CTRL) &
 			    (GENMASK_ULL(kvm_pmu_cap.num_counters_gp - 1, 0) |
