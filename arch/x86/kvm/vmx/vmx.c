@@ -1263,8 +1263,10 @@ static void pt_guest_enter(struct vcpu_vmx *vmx)
 	/* Save and stop host PT before every guest entry. */
 	rdmsrq(MSR_IA32_RTIT_CTL, vmx->pt_desc.host.ctl);
 	wrmsrq(MSR_IA32_RTIT_CTL, 0);
-	pt_save_msr(&vmx->pt_desc.host, vmx->pt_desc.num_address_ranges);
-	pt_load_msr(&vmx->pt_desc.guest, vmx->pt_desc.num_address_ranges);
+	if (vmx->pt_desc.guest.ctl & RTIT_CTL_TRACEEN) {
+		pt_save_msr(&vmx->pt_desc.host, vmx->pt_desc.num_address_ranges);
+		pt_load_msr(&vmx->pt_desc.guest, vmx->pt_desc.num_address_ranges);
+	}
 }
 
 static void pt_guest_exit(struct vcpu_vmx *vmx)
