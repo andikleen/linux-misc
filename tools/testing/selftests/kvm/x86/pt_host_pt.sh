@@ -57,9 +57,8 @@ if [ "$(id -u)" = 0 ] && [ -n "$E_LAST" ] \
 	sleep 4
 	echo 0 > /sys/devices/system/cpu/cpu${E_LAST}/online
 	sleep 3
-	echo 1 > /sys/devices/system/cpu/cpu${E_LAST}/online
-	wait $TPID
-	if [ $? -eq 0 ]; then
+    echo 1 > "/sys/devices/system/cpu/cpu${E_LAST}/online"
+    if wait "$TPID"; then
 		echo "ok 3 T5"
 	else
 		echo "not ok 3 T5"; fail=1
