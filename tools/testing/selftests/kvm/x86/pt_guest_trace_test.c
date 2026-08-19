@@ -15,9 +15,6 @@
 #include "processor.h"
 #include "hybrid_util.h"
 
-#ifndef GP_VECTOR
-#define GP_VECTOR 13
-#endif
 
 #define TOPA_TABLE_PAGES	1
 #define TOPA_REGION_PAGES	32	/* 128 KiB per output region */
