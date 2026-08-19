@@ -17,7 +17,6 @@
 #include "kvm_util.h"
 #include "processor.h"
 
-#define RTIT_STATUS_ERROR	BIT(3)
 
 /*
  * Parse a Linux CPU-range list ("0-3", "4-11", "0,2-3") into a cpu_set_t.
