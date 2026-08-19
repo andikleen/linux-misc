@@ -3098,7 +3098,9 @@ Kernel parameters
 			(as defined by /sys/devices/cpu_*/cpus) or ensuring the
 			guest uses only enumerated architectural perfmon events.
 
-			Default is N (off). This is an experimental facility so far.
+			Experimential feature.
+
+			Default is N (off).
 
 	kvm.enable_virt_at_load=[KVM,ARM64,LOONGARCH,MIPS,RISCV,X86]
 			If enabled, KVM will enable virtualization in hardware
