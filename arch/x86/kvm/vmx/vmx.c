@@ -7984,6 +7984,7 @@ static void vmx_init_pt_host_caps(void)
 		vmx_pt_host_min_ranges = min(vmx_pt_host_min_ranges,
 					     cpu_caps->num_address_ranges);
 	}
+	cpus_read_unlock();
 
 	free_percpu(caps);
 
