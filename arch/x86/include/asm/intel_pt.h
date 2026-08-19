@@ -4,7 +4,7 @@
 
 #define PT_CPUID_LEAVES		2
 #define PT_CPUID_REGS_NUM	4 /* number of registers (eax, ebx, ecx, edx) */
-#define PT_CPUID_EAX_ADDR_RANGES_MASK	0x7 /* CPUID.0x14.1 EAX[2:0]: number of address ranges */
+#define PT_CPUID_EAX_ADDR_RANGES_MASK 0x7 /* CPUID.0x14.1 EAX[2:0]: number of address ranges */
 
 enum pt_capabilities {
 	PT_CAP_max_subleaf = 0,
