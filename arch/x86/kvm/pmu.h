@@ -219,6 +219,13 @@ static inline bool pmc_is_locally_enabled(struct kvm_pmc *pmc)
 
 extern struct x86_pmu_capability kvm_pmu_cap;
 
+static inline u64 kvm_pmu_enumerated_ctrl_mask(void)
+{
+	return GENMASK_ULL(kvm_pmu_cap.num_counters_gp - 1, 0) |
+	       GENMASK_ULL(kvm_pmu_cap.num_counters_fixed - 1 +
+		     INTEL_PMC_IDX_FIXED, INTEL_PMC_IDX_FIXED);
+}
+
 void kvm_init_pmu_capability(struct kvm_pmu_ops *pmu_ops);
 
 void kvm_pmu_recalc_pmc_emulation(struct kvm_pmu *pmu, struct kvm_pmc *pmc);
