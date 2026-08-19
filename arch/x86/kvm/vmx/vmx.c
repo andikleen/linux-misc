@@ -7976,7 +7976,7 @@ static void vmx_init_pt_host_caps(void)
 	on_each_cpu(vmx_get_pt_host_caps, (void *)(unsigned long)caps, 1);
 
 	for_each_online_cpu(cpu) {
-		struct vmx_pt_caps_data *d = per_cpu_ptr(caps, cpu);
+		struct vmx_pt_caps_data *cpu_caps = per_cpu_ptr(caps, cpu);
 
 		for (i = 0; i < PT_CPUID_LEAVES; i++) {
 			vmx_pt_host_caps[i][CPUID_EAX] &= d->caps[i][CPUID_EAX];
