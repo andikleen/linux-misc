@@ -144,15 +144,6 @@ static void check_guest(struct kvm_vcpu *vcpu, struct kvm_vm *vm,
 	       nonzero, res_hva->offset, res_hva->offset >> 32, res_hva->status);
 }
 
-static void *vcpu_thread(void *arg)
-{
-	return vcpu_run_thread(arg);
-}
-
-static void *migrator_thread(void *arg)
-{
-	return vcpu_migrator_thread(arg);
-}
 
 int main(int argc, char *argv[])
 {
