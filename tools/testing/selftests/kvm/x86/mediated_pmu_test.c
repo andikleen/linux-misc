@@ -19,8 +19,8 @@
 #include "hybrid_util.h"
 
 
-#define COUNT_CYCLES	(2ULL * 1000 * 1000 * 1000)	/* ~0.7 s of ~2.9 GHz TSC */
-#define MIGRATE_CYCLES	(2ULL * 1000 * 1000 * 1000)	/* dito. */
+#define COUNT_CYCLES (2ULL * 1000 * 1000 * 1000) /* approximately 0.7 s, hardware-dependent */
+#define MIGRATE_CYCLES (2ULL * 1000 * 1000 * 1000) /* approximately 0.7 s, hardware-dependent */
 
 struct pmu_guest_results {
 	u32 eax, ebx, ecx, edx;	/* CPUID.0xA */
