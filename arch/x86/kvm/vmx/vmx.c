@@ -7931,7 +7931,6 @@ static void nested_vmx_cr_fixed1_bits_update(struct kvm_vcpu *vcpu)
 
 /* Host PT common capabilities and address-range count. */
 static u32 vmx_pt_host_caps[PT_CPUID_LEAVES][PT_CPUID_REGS_NUM];
-
 static u8 vmx_pt_host_min_ranges;
 
 struct vmx_pt_caps_data {
