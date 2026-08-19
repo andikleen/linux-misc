@@ -7954,7 +7954,7 @@ static void vmx_get_pt_host_caps(void *info)
 		data->caps[i][CPUID_ECX] = ecx;
 		data->caps[i][CPUID_EDX] = edx;
 	}
-	data->num_address_ranges = eax & 0x7;
+	data->num_address_ranges = eax & PT_CPUID_EAX_ADDR_RANGES_MASK;
 }
 
 static void vmx_init_pt_host_caps(void)
