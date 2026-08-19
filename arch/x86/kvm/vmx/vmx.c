@@ -7979,10 +7979,10 @@ static void vmx_init_pt_host_caps(void)
 		struct vmx_pt_caps_data *cpu_caps = per_cpu_ptr(caps, cpu);
 
 		for (i = 0; i < PT_CPUID_LEAVES; i++) {
-			vmx_pt_host_caps[i][CPUID_EAX] &= d->caps[i][CPUID_EAX];
-			vmx_pt_host_caps[i][CPUID_EBX] &= d->caps[i][CPUID_EBX];
-			vmx_pt_host_caps[i][CPUID_ECX] &= d->caps[i][CPUID_ECX];
-			vmx_pt_host_caps[i][CPUID_EDX] &= d->caps[i][CPUID_EDX];
+			vmx_pt_host_caps[i][CPUID_EAX] &= cpu_caps->caps[i][CPUID_EAX];
+			vmx_pt_host_caps[i][CPUID_EBX] &= cpu_caps->caps[i][CPUID_EBX];
+			vmx_pt_host_caps[i][CPUID_ECX] &= cpu_caps->caps[i][CPUID_ECX];
+			vmx_pt_host_caps[i][CPUID_EDX] &= cpu_caps->caps[i][CPUID_EDX];
 		}
 		vmx_pt_host_min_ranges = min(vmx_pt_host_min_ranges,
 					     d->num_address_ranges);
