@@ -5151,8 +5151,8 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 		kvm_make_request(KVM_REQ_PMU, vcpu);
 	}
 
-	/* Warn and rebind if the vCPU changed hybrid core type. */
-	if (pmu->hybrid_pmu_type)
+	if (vcpu->scheduled_out && kvm_hybrid_pmu_active() &&
+	    pmu->hybrid_pmu_type)
 		kvm_pmu_check_cpu_type(pmu, cpu);
 
 	/* Address WBINVD may be executed by guest */
