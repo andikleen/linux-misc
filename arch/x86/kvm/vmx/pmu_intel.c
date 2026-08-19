@@ -794,8 +794,7 @@ static bool intel_pmu_is_mediated_pmu_supported(struct x86_pmu_capability *host_
 static void intel_pmu_write_global_ctrl(u64 global_ctrl)
 {
 	if (kvm_hybrid_pmu_active())
-		global_ctrl &= (GENMASK_ULL(kvm_pmu_cap.num_counters_gp - 1, 0) |
-				GENMASK_ULL(kvm_pmu_cap.num_counters_fixed - 1 + 32, 32));
+		global_ctrl &= kvm_pmu_enumerated_ctrl_mask();
 	vmcs_write64(GUEST_IA32_PERF_GLOBAL_CTRL, global_ctrl);
 }
 
