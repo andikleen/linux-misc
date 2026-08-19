@@ -1300,12 +1300,9 @@ void pt_update_controls(struct vcpu_vmx *vmx)
 		vm_entry_controls_setbit(vmx, entry);
 		vm_exit_controls_setbit(vmx, exit);
 	} else {
-		secondary_exec_controls_clearbit(vmx, SECONDARY_EXEC_PT_USE_GPA |
-						  SECONDARY_EXEC_PT_CONCEAL_VMX);
-		vm_entry_controls_clearbit(vmx, VM_ENTRY_LOAD_IA32_RTIT_CTL |
-					   VM_ENTRY_PT_CONCEAL_PIP);
-		vm_exit_controls_clearbit(vmx, VM_EXIT_CLEAR_IA32_RTIT_CTL |
-					  VM_EXIT_PT_CONCEAL_PIP);
+		secondary_exec_controls_clearbit(vmx, secondary);
+		vm_entry_controls_clearbit(vmx, entry);
+		vm_exit_controls_clearbit(vmx, exit);
 	}
 }
 
