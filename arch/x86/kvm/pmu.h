@@ -64,7 +64,7 @@ struct kvm_pmu_ops {
 
 extern bool enable_pmu;
 extern bool enable_mediated_pmu;
-extern bool enable_pmu_hybrid;
+extern bool enable_hybrid_pmu;
 
 static inline bool kvm_hybrid_pmu_active(void)
 {
