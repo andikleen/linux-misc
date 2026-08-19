@@ -6237,8 +6237,8 @@ static void update_pmu_cap(struct pmu *pmu)
 		x86_pmu.arch_pebs = 0;
 	}
 
-	if (!intel_pmu_broken_perf_cap()) {
-		/* Perf Metric (Bit 15) and PEBS via PT (Bit 16) are hybrid enumeration */
+	if (!intel_pmu_broken_perf_cap() && boot_cpu_has(X86_FEATURE_PDCM)) {
+		/* Perf Metric and PEBS via PT are hybrid enumeration. */
 		rdmsrq(MSR_IA32_PERF_CAPABILITIES, hybrid(pmu, intel_cap).capabilities);
 	}
 }
