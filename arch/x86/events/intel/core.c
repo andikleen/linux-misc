@@ -6327,7 +6327,7 @@ static bool init_hybrid_pmu(int cpu)
 	if (this_cpu_has(X86_FEATURE_ARCH_PERFMON_EXT))
 		update_pmu_cap(&pmu->pmu);
 	else if (!intel_pmu_broken_perf_cap() &&
-		   boot_cpu_has(X86_FEATURE_PDCM))
+		 this_cpu_has(X86_FEATURE_PDCM))
 		rdmsrq(MSR_IA32_PERF_CAPABILITIES, pmu->intel_cap.capabilities);
 
 	/*
