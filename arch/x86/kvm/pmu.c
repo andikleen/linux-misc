@@ -324,9 +324,7 @@ static int pmc_reprogram_counter(struct kvm_pmc *pmc, u32 type, u64 config,
 		attr.precise_ip = pmc_get_pebs_precise_level(pmc);
 	}
 
-	/*
-	 * Recheck the vCPU core type after possible migration.
-	 */
+	/* Recheck the vCPU core type after possible migration. */
 	if (pmu->hybrid_pmu_type) {
 		u32 cur_type = perf_get_x86_pmu_type(pmu_to_vcpu(pmu)->cpu);
 
