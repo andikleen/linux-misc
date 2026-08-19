@@ -205,7 +205,7 @@ module_param(ple_window_shrink, uint, 0444);
 static unsigned int ple_window_max        = KVM_VMX_DEFAULT_PLE_WINDOW_MAX;
 module_param(ple_window_max, uint, 0444);
 
-/* Default is SYSTEM mode, 1 for host-guest mode (which is BROKEN) */
+/* Default is SYSTEM mode, 1 for host-guest mode. */
 int __read_mostly pt_mode = PT_MODE_SYSTEM;
 module_param(pt_mode, int, S_IRUGO);
 
@@ -7985,7 +7985,7 @@ static void vmx_init_pt_host_caps(void)
 			vmx_pt_host_caps[i][CPUID_EDX] &= cpu_caps->caps[i][CPUID_EDX];
 		}
 		vmx_pt_host_min_ranges = min(vmx_pt_host_min_ranges,
-					     d->num_address_ranges);
+					     cpu_caps->num_address_ranges);
 	}
 
 	free_percpu(caps);
