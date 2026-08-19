@@ -1260,11 +1260,7 @@ static void pt_guest_enter(struct vcpu_vmx *vmx)
 	if (vmx_pt_mode_is_system())
 		return;
 
-	/* Only touch host PT state when the guest is actually tracing. */
-	if (!(vmx->pt_desc.guest.ctl & RTIT_CTL_TRACEEN))
-		return;
-
-	/* Entry loads guest RTIT_CTL; stop host tracing first (TraceEn must be 0). */
+	/* Save and stop host PT before every guest entry. */
 	rdmsrq(MSR_IA32_RTIT_CTL, vmx->pt_desc.host.ctl);
 	wrmsrq(MSR_IA32_RTIT_CTL, 0);
 	pt_save_msr(&vmx->pt_desc.host, vmx->pt_desc.num_address_ranges);
