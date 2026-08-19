@@ -7969,6 +7969,7 @@ static void vmx_init_pt_host_caps(void)
 	memset(vmx_pt_host_caps, 0xff, sizeof(vmx_pt_host_caps));
 	vmx_pt_host_min_ranges = 0xff;
 
+	cpus_read_lock();
 	on_each_cpu(vmx_get_pt_host_caps, (void *)(unsigned long)caps, 1);
 
 	for_each_online_cpu(cpu) {
