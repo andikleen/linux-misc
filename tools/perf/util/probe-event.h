@@ -60,6 +60,7 @@ struct probe_trace_event {
 	int				nargs;	/* Number of args */
 	int				lang;	/* Dwarf language code */
 	bool				uprobes;	/* uprobes only */
+	bool				ptwrite;	/* ptwrite uprobe (trap-free) */
 	struct probe_trace_arg		*args;	/* Arguments */
 };
 
@@ -99,6 +100,7 @@ struct perf_probe_event {
 	int			nargs;	/* Number of arguments */
 	bool			sdt;	/* SDT/cached event flag */
 	bool			uprobes;	/* Uprobe event flag */
+	bool			ptwrite;	/* ptwrite uprobe (trap-free) */
 	char			*target;	/* Target binary */
 	struct perf_probe_arg	*args;	/* Arguments */
 	struct probe_trace_event *tevs;
