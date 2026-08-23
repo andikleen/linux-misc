@@ -1930,6 +1930,7 @@ int parse_probe_trace_command(const char *cmd, struct probe_trace_event *tev)
 		ret = -EINVAL;
 		goto out;
 	}
+	tev->ptwrite = !strcmp(fmt1_str, "ptw");
 	pr = fmt1_str[0];
 	tev->group = strdup(fmt2_str);
 	tev->event = strdup(fmt3_str);
@@ -1937,7 +1938,8 @@ int parse_probe_trace_command(const char *cmd, struct probe_trace_event *tev)
 		ret = -ENOMEM;
 		goto out;
 	}
-	pr_debug("Group:%s Event:%s probe:%c\n", tev->group, tev->event, pr);
+	pr_debug("Group:%s Event:%s probe:%c%s\n", tev->group, tev->event, pr,
+		 tev->ptwrite ? " (ptwrite)" : "");
 
 	tp->retprobe = (pr == 'r');
 
@@ -2260,9 +2262,11 @@ char *synthesize_probe_trace_command(struct probe_trace_event *tev)
 	if (strbuf_init(&buf, 32) < 0)
 		return NULL;
 
-	if (strbuf_addf(&buf, "%c:%s/%s ", tp->retprobe ? 'r' : 'p',
-			tev->group, tev->event) < 0)
-		goto error;
+	if (tev->ptwrite)
+		err = strbuf_addf(&buf, "ptw:%s/%s ", tev->group, tev->event);
+	else
+		err = strbuf_addf(&buf, "%c:%s/%s ", tp->retprobe ? 'r' : 'p',
+				  tev->group, tev->event);
 
 	if (tev->uprobes)
 		err = synthesize_uprobe_trace_def(tp, &buf);
@@ -2274,7 +2278,6 @@ char *synthesize_probe_trace_command(struct probe_trace_event *tev)
 
 	if (err >= 0)
 		ret = strbuf_detach(&buf, NULL);
-error:
 	strbuf_release(&buf);
 	return ret;
 }
@@ -2996,6 +2999,7 @@ static int __add_probe_trace_events(struct perf_probe_event *pev,
 	ret = 0;
 	for (i = 0; i < ntevs; i++) {
 		tev = &tevs[i];
+		tev->ptwrite = pev->ptwrite;
 		up = tev->uprobes ? 1 : 0;
 		if (fd[up] == -1) {	/* Open the kprobe/uprobe_events */
 			fd[up] = __open_probe_file_and_namelist(up,
@@ -3610,6 +3614,8 @@ int convert_perf_probe_events(struct perf_probe_event *pevs, int npevs)
 
 	/* Loop 1: convert all events */
 	for (i = 0; i < npevs; i++) {
+		int j;
+
 		/* Init kprobe blacklist if needed */
 		if (!pevs[i].uprobes)
 			kprobe_blacklist__init();
@@ -3618,6 +3624,8 @@ int convert_perf_probe_events(struct perf_probe_event *pevs, int npevs)
 		if (ret < 0)
 			return ret;
 		pevs[i].ntevs = ret;
+		for (j = 0; j < pevs[i].ntevs; j++)
+			pevs[i].tevs[j].ptwrite = pevs[i].ptwrite;
 	}
 	/* This just release blacklist only if allocated */
 	kprobe_blacklist__release();
