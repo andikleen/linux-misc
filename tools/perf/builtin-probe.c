@@ -40,6 +40,7 @@ static struct {
 	int command;	/* Command short_name */
 	bool list_events;
 	bool uprobes;
+	bool ptwrite;
 	bool target_used;
 	int nevents;
 	struct perf_probe_event events[MAX_PROBES];
@@ -62,6 +63,7 @@ static int parse_probe_event(const char *str)
 	}
 
 	pev->uprobes = params->uprobes;
+	pev->ptwrite = params->ptwrite;
 	if (params->target) {
 		pev->target = strdup(params->target);
 		if (!pev->target)
@@ -73,9 +75,15 @@ static int parse_probe_event(const char *str)
 
 	/* Parse a perf-probe command into event */
 	ret = parse_perf_probe_command(str, pev);
+	if (ret < 0)
+		return ret;
+	if (pev->ptwrite && pev->point.retprobe) {
+		pr_err("Error: ptwrite probes are entry-only (no %%return).\n");
+		return -EINVAL;
+	}
 	pr_debug("%d arguments\n", pev->nargs);
 
-	return ret;
+	return 0;
 }
 
 static int params_add_filter(const char *str)
@@ -532,6 +540,8 @@ __cmd_probe(int argc, const char **argv)
 		    "be more verbose (show parsed arguments, etc)"),
 	OPT_BOOLEAN('q', "quiet", &quiet,
 		    "be quiet (do not show any warnings or messages)"),
+	OPT_BOOLEAN(0, "ptwrite", &params->ptwrite,
+		    "create trap-free ptwrite uprobes (requires -x)"),
 	OPT_CALLBACK_DEFAULT('l', "list", NULL, "[GROUP:]EVENT",
 			     "list up probe events",
 			     opt_set_filter_with_command, DEFAULT_LIST_FILTER),
@@ -730,6 +740,11 @@ __cmd_probe(int argc, const char **argv)
 		if (params->target && !params->target_used) {
 			pr_err("  Error: -x/-m must follow the probe definitions.\n");
 			parse_options_usage(probe_usage, options, "m", true);
+			parse_options_usage(NULL, options, "x", true);
+			return -EINVAL;
+		}
+		if (params->ptwrite && !params->uprobes) {
+			pr_err("  Error: --ptwrite requires -x.\n");
 			parse_options_usage(NULL, options, "x", true);
 			return -EINVAL;
 		}
