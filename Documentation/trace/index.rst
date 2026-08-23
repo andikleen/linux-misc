@@ -90,6 +90,7 @@ interactions.
 .. toctree::
    :maxdepth: 1
 
+   ptwrite-uprobes
    user_events
    uprobetracer
 
