@@ -136,6 +136,12 @@ OPTIONS
 --max-probes=NUM::
 	Set the maximum number of probe points for an event. Default is 128.
 
+--ptwrite::
+	Create a ptwrite uprobe (with -x). The probe writes its values
+	into the Intel PT trace stream instead of entering the kernel,
+	which is faster. Requires an Intel PT/PTWRITE CPU and a kernel
+	with ptwrite uprobe support.
+
 --target-ns=PID:
 	Obtain mount namespace information from the target pid.  This is
 	used when creating a uprobe for a process that resides in a
