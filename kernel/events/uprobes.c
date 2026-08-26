@@ -1630,7 +1630,13 @@ int uprobe_mmap(struct vm_area_struct *vma)
 		if (!fatal_signal_pending(current) &&
 		    filter_chain(uprobe, vma->vm_mm)) {
 			unsigned long vaddr = offset_to_vaddr(vma, uprobe->offset);
-			install_breakpoint(uprobe, vma, vaddr);
+			int err = install_breakpoint(uprobe, vma, vaddr);
+
+			if (err)
+				pr_warn_ratelimited(
+					"uprobes: probe %pD+0x%llx failed to install (%d)\n",
+					vma->vm_file,
+					(unsigned long long)uprobe->offset, err);
 		}
 		put_uprobe(uprobe);
 	}
