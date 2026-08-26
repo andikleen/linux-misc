@@ -192,7 +192,20 @@ void uprobe_copy_from_page(struct page *page, unsigned long vaddr, void *dst, in
 static void copy_to_page(struct page *page, unsigned long vaddr, const void *src, int len)
 {
 	void *kaddr = kmap_local_page(page);
-	memcpy(kaddr + (vaddr & ~PAGE_MASK), src, len);
+	void *dst = kaddr + (vaddr & ~PAGE_MASK);
+
+	/*
+	 * Atomic eight-byte stores are required for safe cross-modification of
+	 * live user text; other writes use the ordinary byte-copy path.
+	 */
+	if (len == sizeof(u64) && IS_ALIGNED(vaddr, sizeof(u64))) {
+		u64 value;
+
+		memcpy(&value, src, sizeof(value));
+		WRITE_ONCE(*(u64 *)dst, value);
+	} else {
+		memcpy(dst, src, len);
+	}
 	kunmap_local(kaddr);
 }
 

@@ -17,6 +17,7 @@
 #include <linux/kdebug.h>
 #include <linux/highmem.h>
 #include <linux/mm.h>
+#include <linux/security.h>
 #include <asm/processor.h>
 #include <asm/insn.h>
 #include <asm/insn-eval.h>
@@ -828,6 +829,8 @@ int uprobe_ptwrite_dup_mmap(struct mm_struct *oldmm, struct mm_struct *newmm)
 		kunmap_local(src);
 		new->vaddr = ptw->vaddr;
 		new->cursor = ptw->cursor;
+		new->nblocks = ptw->nblocks;
+		memcpy(new->index, ptw->index, sizeof(new->index));
 
 		vma = install_uprobe_ptwrite_vma(newmm, new->vaddr);
 		if (IS_ERR(vma)) {
@@ -1448,7 +1451,7 @@ static_assert((((9 + UPROBE_PTWRITE_SERIALIZE_LFENCES *
 			  UPROBE_PTWRITE_MAX_ARGS *
 				  (10 + UPROBE_PTWRITE_SERIALIZE_LFENCES *
 				   UPROBE_PTWRITE_LFENCE_SIZE) +
-			  5 + 7) & ~7) +
+			  UPROBE_PTWRITE_COPY_SIZE + 5 + 7) & ~7) +
 		       8 * (1 + UPROBE_PTWRITE_MAX_ARGS)) <=
 		      UPROBE_PTWRITE_STUB_SIZE,
 		      "worst-case ptwrite stub block exceeds UPROBE_PTWRITE_STUB_SIZE");
@@ -1460,6 +1463,7 @@ static bool ptwrite_has_room(const u8 *base, const u8 *p, size_t len)
 }
 
 static bool pun_site_is_nop(const u8 *orig, bool allow_nop_run);
+static bool ptwrite_site_is_multinop(const u8 *orig, bool allow_nop_run);
 static int pun_classify_insn(struct insn *insn, u8 *disp_off, s32 *disp);
 static int pun_decode_site(struct inode *inode, struct file *file,
 			       loff_t offset, u8 *copy,
@@ -1494,7 +1498,18 @@ int arch_uprobe_ptwrite_prepare(struct arch_uprobe *auprobe,
 		return -EINVAL;
 
 	/* The generic registration path copied these bytes before this hook. */
+	ptw->allow_nop_run =
+		desc->flags & UPROBE_PTWRITE_FL_ALLOW_NOP_RUN;
 	memcpy(ptw->orig, auprobe->insn, sizeof(ptw->orig));
+	/*
+	 * File mappings preserve page offsets, so an unaligned file offset
+	 * cannot become an aligned runtime address. Reject it before the probe
+	 * is exposed; install-time failures for a future mapping are otherwise
+	 * not observable through the tracefs enable operation.
+	 */
+	if (ptwrite_site_is_multinop(ptw->orig, ptw->allow_nop_run) &&
+	    !IS_ALIGNED(offset, sizeof(u64)))
+		return -EINVAL;
 
 	for (i = 0; i < desc->nargs; i++) {
 		switch (desc->args[i].src) {
@@ -1618,7 +1633,7 @@ int arch_uprobe_ptwrite_prepare(struct arch_uprobe *auprobe,
 
 	ptw->stub_len = data_off + 8 * (1 + n_imm);
 	ptw->ndata = 1 + n_imm;
-	ptw->allow_nop_run = desc->flags & UPROBE_PTWRITE_FL_ALLOW_NOP_RUN;
+
 
 	ret = pun_decode_site(inode, file, offset, code + ptw->copy_off,
 				  &ptw->disp_off, &ptw->disp,
@@ -1753,8 +1768,9 @@ get_uprobe_ptwrite_page(struct mm_struct *mm, unsigned long vaddr,
 }
 
 /*
- * A run of short NOPs is accepted only when requested. This validation does
- * not make the three-phase poke safe for threads that already passed byte 0.
+ * A run of short NOPs is accepted only when requested. It is patched with
+ * an aligned eight-byte read-modify-write, preserving the following bytes;
+ * code is not expected to change concurrently.
  */
 static bool ptwrite_is_nop_run(const u8 *orig)
 {
@@ -1940,6 +1956,42 @@ static int ptwrite_text_poke(struct arch_uprobe *auprobe,
 	return err;
 }
 
+/*
+ * Replace an aligned five-byte NOP run with a JMP in one eight-byte store.
+ * The trailing three bytes are read from the existing text. We assume
+ * nobody else is changing it. This is covered by the Intel/AMD "aligned store"
+ * cross modifying guarantee.
+ */
+static int ptwrite_multinop_text_poke(struct arch_uprobe *auprobe,
+				      struct vm_area_struct *vma,
+				      unsigned long vaddr,
+				      unsigned long stub_addr)
+{
+	struct mm_struct *mm = vma->vm_mm;
+	struct write_opcode_ctx ctx = {
+		.base = vaddr,
+		.expect = EXPECT_BYTE,
+		.expect_byte = 0x90,
+	};
+	u8 patch[sizeof(u64)];
+	s32 rel;
+	int err;
+
+	if (!IS_ALIGNED(vaddr, sizeof(u64)))
+		return -EINVAL;
+	if (!ptwrite_rel32(vaddr + 5, stub_addr, &rel))
+		return -ERANGE;
+	err = copy_from_vaddr(mm, vaddr, patch, sizeof(patch));
+	if (err)
+		return err;
+	patch[0] = 0xe9;
+	memcpy(&patch[1], &rel, sizeof(rel));
+	err = uprobe_write(auprobe, vma, vaddr, patch, sizeof(patch),
+			   verify_insn, true, false, &ctx);
+	if (!err)
+		smp_text_poke_sync_each_cpu();
+	return err;
+}
 static int pun_text_poke(struct arch_uprobe *auprobe,
 				 struct vm_area_struct *vma,
 				 unsigned long vaddr, u8 e9,
@@ -1971,65 +2023,40 @@ static int pun_install(struct arch_uprobe *auprobe,
 	unsigned long t, page_base, block_off, stub_addr;
 	s64 site_delta, target;
 	s32 jump_rel, disp32, orig_rel;
-	u8 site_len;
 	bool found = false;
-	bool nop_fallback = ptwrite_site_is_multinop(orig,
-						     ptw_a->allow_nop_run) &&
-			    (vaddr & 7);
 	u8 *kaddr;
 	int b, ret;
 
 	mmap_assert_write_locked(mm);
-	if (nop_fallback) {
-		hlist_for_each_entry(ptw, &state->head_ptwrite, node) {
-			site_delta = (s64)vaddr - (s64)ptw->vaddr;
-			if (site_delta < INT_MIN || site_delta > INT_MAX)
-				continue;
-			for (b = 0; b < smp_load_acquire(&ptw->nblocks); b++)
-				if (!ptw->index[b].pun &&
-				    ptw->index[b].site_off == (s32)site_delta &&
-				    ptw->index[b].site_len == 5 &&
-				    !memcmp(ptw->index[b].site_insn, orig, 5))
-					break;
-			if (b >= smp_load_acquire(&ptw->nblocks))
-				continue;
-			if (!__in_uprobe_ptwrite(mm, ptw->vaddr))
-				continue;
-			return ptwrite_text_poke(auprobe, vma, vaddr,
-						 ptw->vaddr + ptw->index[b].off);
+	memcpy(&orig_rel, orig + 1, sizeof(orig_rel));
+	target = (s64)vaddr + 5 + (s64)orig_rel;
+	if (target < PAGE_SIZE || target >= TASK_SIZE_MAX)
+		return -EADDRNOTAVAIL;
+	t = (unsigned long)target;
+	page_base = t & PAGE_MASK;
+	ret = security_mmap_addr(page_base);
+	if (ret)
+		return ret;
+	block_off = t & (PAGE_SIZE - 1);
+	if (block_off + ptw_a->stub_len > PAGE_SIZE)
+		return -ENOSPC;
+
+	/* Reuse an existing ptwrite page at the target, else map a new one. */
+	hlist_for_each_entry(ptw, &state->head_ptwrite, node) {
+		if (ptw->vaddr == page_base) {
+			found = true;
+			break;
 		}
-		ptw = get_uprobe_ptwrite_page(mm, vaddr, ptw_a->stub_len);
+	}
+	if (!found) {
+		if (vma_lookup(mm, page_base))
+			return -EADDRNOTAVAIL;
+		ptw = create_uprobe_ptwrite_page_at(mm, page_base);
 		if (!ptw)
 			return -ENOMEM;
-		block_off = ptw->cursor;
-	} else {
-		memcpy(&orig_rel, orig + 1, sizeof(orig_rel));
-		target = (s64)vaddr + 5 + (s64)orig_rel;
-		if (target < PAGE_SIZE || target >= TASK_SIZE_MAX)
-			return -EADDRNOTAVAIL;
-		t = (unsigned long)target;
-		page_base = t & PAGE_MASK;
-		block_off = t & (PAGE_SIZE - 1);
-		if (block_off + ptw_a->stub_len > PAGE_SIZE)
-			return -ENOSPC;
-
-		/* reuse an existing ptwrite page at the target, else map a new one */
-		hlist_for_each_entry(ptw, &state->head_ptwrite, node) {
-			if (ptw->vaddr == page_base) {
-				found = true;
-				break;
-			}
-		}
-		if (!found) {
-			if (vma_lookup(mm, page_base))
-				return -EADDRNOTAVAIL;	/* target page occupied */
-			ptw = create_uprobe_ptwrite_page_at(mm, page_base);
-			if (!ptw)
-				return -ENOMEM;
-			/* Order page initialization before publishing it to fault readers. */
-			smp_wmb();
-			hlist_add_head_rcu(&ptw->node, &state->head_ptwrite);
-		}
+		/* Publish initialized page fields before fault readers find it. */
+		smp_wmb();
+		hlist_add_head_rcu(&ptw->node, &state->head_ptwrite);
 	}
 
 	site_delta = (s64)vaddr - (s64)ptw->vaddr;
@@ -2068,19 +2095,13 @@ static int pun_install(struct arch_uprobe *auprobe,
 		disp32 = (s32)d;
 	}
 
-	/*
-	 * A NOP fallback needs a synthetic rel32 at the site, so it uses
-	 * the full five-byte poke and restore path rather than punning.
-	 */
-	site_len = nop_fallback ? 5 : ptw_a->len;
 	ptw->index[ptw->nblocks].off = block_off;
 	ptw->index[ptw->nblocks].len = ptw_a->stub_len;
-	ptw->index[ptw->nblocks].pun = !nop_fallback;
+	ptw->index[ptw->nblocks].pun = 1;
 	ptw->index[ptw->nblocks].orig0 = orig[0];
-	ptw->index[ptw->nblocks].site_len = site_len;
+	ptw->index[ptw->nblocks].site_len = ptw_a->len;
 	ptw->index[ptw->nblocks].site_off = (s32)site_delta;
-	memcpy(ptw->index[ptw->nblocks].site_insn, ptw_a->orig, site_len);
-	smp_store_release(&ptw->nblocks, ptw->nblocks + 1);
+	memcpy(ptw->index[ptw->nblocks].site_insn, ptw_a->orig, ptw_a->len);
 
 	kaddr = kmap_local_page(ptw->page);
 	memcpy(kaddr + block_off, ptw_a->stub, ptw_a->stub_len);
@@ -2089,11 +2110,10 @@ static int pun_install(struct arch_uprobe *auprobe,
 		memcpy(kaddr + block_off + ptw_a->copy_off + ptw_a->disp_off,
 		       &disp32, sizeof(disp32));
 	kunmap_local(kaddr);
+	/* Publish initialized metadata before exposing the probe jump. */
+	smp_store_release(&ptw->nblocks, ptw->nblocks + 1);
 
-	if (nop_fallback)
-		ret = ptwrite_text_poke(auprobe, vma, vaddr, stub_addr);
-	else
-		ret = pun_text_poke(auprobe, vma, vaddr, 0xe9, &ctx);
+	ret = pun_text_poke(auprobe, vma, vaddr, 0xe9, &ctx);
 	if (ret) {
 		/* Publish rollback before readers observe the reduced block count. */
 		smp_store_release(&ptw->nblocks, ptw->nblocks - 1);
@@ -2129,6 +2149,9 @@ int arch_uprobe_install_ptwrite(struct arch_uprobe *auprobe,
 	ret = copy_from_vaddr(mm, vaddr, orig, sizeof(orig));
 	if (ret)
 		return ret;
+	if (ptwrite_site_is_multinop(orig, ptw_a->allow_nop_run) &&
+	    !IS_ALIGNED(vaddr, sizeof(u64)))
+		return -EINVAL;
 	if (ptwrite_is_installed(mm, vaddr, orig))
 		return 0;
 
@@ -2151,8 +2174,13 @@ int arch_uprobe_install_ptwrite(struct arch_uprobe *auprobe,
 			continue;
 		if (!__in_uprobe_ptwrite(mm, ptw->vaddr))
 			continue;
-		return ptwrite_text_poke(auprobe, vma, vaddr,
-					ptw->vaddr + ptw->index[b].off);
+		if (ptwrite_site_is_multinop(orig, ptw_a->allow_nop_run))
+			ret = ptwrite_multinop_text_poke(auprobe, vma, vaddr,
+							ptw->vaddr + ptw->index[b].off);
+		else
+			ret = ptwrite_text_poke(auprobe, vma, vaddr,
+						ptw->vaddr + ptw->index[b].off);
+		return ret;
 	}
 	ptw = get_uprobe_ptwrite_page(mm, vaddr, ptw_a->stub_len);
 	if (!ptw)
@@ -2186,10 +2214,17 @@ int arch_uprobe_install_ptwrite(struct arch_uprobe *auprobe,
 	memcpy(kaddr + block_off + ptw_a->jmp_off, &rel, sizeof(rel));
 	kunmap_local(kaddr);
 
-	ret = ptwrite_text_poke(auprobe, vma, vaddr, stub_addr);
-	if (!ret)
-		ptw->cursor = block_off + ptw_a->stub_len;
-	return ret;
+	if (ptwrite_site_is_multinop(orig, ptw_a->allow_nop_run))
+		ret = ptwrite_multinop_text_poke(auprobe, vma, vaddr, stub_addr);
+	else
+		ret = ptwrite_text_poke(auprobe, vma, vaddr, stub_addr);
+	if (ret) {
+		/* Publish rollback before readers use the reduced block count. */
+		smp_store_release(&ptw->nblocks, ptw->nblocks - 1);
+		return ret;
+	}
+	ptw->cursor = block_off + ptw_a->stub_len;
+	return 0;
 }
 
 int arch_uprobe_uninstall_ptwrite(struct arch_uprobe *auprobe,
