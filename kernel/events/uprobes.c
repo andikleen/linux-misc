@@ -191,7 +191,16 @@ void uprobe_copy_from_page(struct page *page, unsigned long vaddr, void *dst, in
 static void copy_to_page(struct page *page, unsigned long vaddr, const void *src, int len)
 {
 	void *kaddr = kmap_local_page(page);
-	memcpy(kaddr + (vaddr & ~PAGE_MASK), src, len);
+	void *dst = kaddr + (vaddr & ~PAGE_MASK);
+
+	if (len == 8) {
+		u64 value;
+
+		memcpy(&value, src, sizeof(value));
+		atomic64_set((atomic64_t *)dst, value);
+	} else {
+		memcpy(dst, src, len);
+	}
 	kunmap_local(kaddr);
 }
 
