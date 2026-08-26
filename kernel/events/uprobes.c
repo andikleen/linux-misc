@@ -139,7 +139,8 @@ static bool valid_vma(struct vm_area_struct *vma, bool is_register)
 	if (is_register)
 		flags |= VM_WRITE;
 
-	return vma->vm_file && (vma->vm_flags & flags) == VM_MAYEXEC;
+	return !vma_is_anonymous(vma) && vma->vm_file &&
+		(vma->vm_flags & flags) == VM_MAYEXEC;
 }
 
 static unsigned long offset_to_vaddr(struct vm_area_struct *vma, loff_t offset)
