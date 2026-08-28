@@ -23,9 +23,32 @@ typedef u8 uprobe_opcode_t;
 enum {
 	ARCH_UPROBE_FLAG_CAN_OPTIMIZE   = 0,
 	ARCH_UPROBE_FLAG_OPTIMIZE_FAIL  = 1,
+	ARCH_UPROBE_FLAG_PTWRITE        = 2,
 };
 
 struct uprobe_xol_ops;
+
+/*
+ * ptwrite probe state. The stub template (code + data slots) is built
+ * once at registration (mm-independent except the final jmp's rel32, patched
+ * per-mm at install). Block layout:
+ *   [ptwriteq hdr(%rip)] [arg emissions] [jmp probe+5] [u64 slots: header, imms]
+ */
+struct uprobe_ptwrite_arch {
+	u8	stub[256];
+	u8	stub_len;	/* code + data, whole block */
+	u8	jmp_off;	/* offset of the final jmp's rel32 field */
+	u8	ndata;		/* number of u64 data slots */
+	u8	orig[MAX_UINSN_BYTES];	/* pristine file bytes, before generic analysis */
+};
+
+/* Per-mm page holding generated ptwrite stub blocks (mirrors trampolines). */
+struct uprobe_ptwrite_page {
+	struct hlist_node	node;
+	struct page		*page;		/* stub blocks written via kmap */
+	unsigned long		vaddr;		/* mapping base */
+	u16			cursor;		/* next free block offset */
+};
 
 struct arch_uprobe {
 	union {
@@ -51,6 +74,7 @@ struct arch_uprobe {
 		}			push;
 	};
 
+	struct uprobe_ptwrite_arch	ptwrite;
 	unsigned long flags;
 };
 
