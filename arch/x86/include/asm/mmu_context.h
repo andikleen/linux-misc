@@ -215,12 +215,27 @@ static inline void arch_dup_pkeys(struct mm_struct *oldmm,
 #endif
 }
 
+/* Put here to avoid asm/uprobes.h's dependencies */
+extern int uprobe_ptwrite_dup_mmap(struct mm_struct *oldmm,
+				   struct mm_struct *newmm);
+
 static inline int arch_dup_mmap(struct mm_struct *oldmm, struct mm_struct *mm)
 {
+	int ret;
+
 	arch_dup_pkeys(oldmm, mm);
 	paravirt_enter_mmap(mm);
 	dup_lam(oldmm, mm);
-	return ldt_dup_context(oldmm, mm);
+
+	ret = ldt_dup_context(oldmm, mm);
+	if (ret)
+		return ret;
+#ifdef CONFIG_UPROBES
+	ret = uprobe_ptwrite_dup_mmap(oldmm, mm);
+	if (ret)
+		return ret;
+#endif
+	return 0;
 }
 
 static inline void arch_exit_mmap(struct mm_struct *mm)
