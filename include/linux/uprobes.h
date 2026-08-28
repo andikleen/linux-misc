@@ -304,6 +304,8 @@ extern void uprobe_handle_trampoline(struct pt_regs *regs);
 extern void *arch_uretprobe_trampoline(unsigned long *psize);
 extern unsigned long uprobe_get_trampoline_vaddr(void);
 extern void uprobe_copy_from_page(struct page *page, unsigned long vaddr, void *dst, int len);
+extern int uprobe_copy_from_file(struct inode *inode, struct file *file,
+					 loff_t offset, void *buf, int size);
 extern void arch_uprobe_clear_state(struct mm_struct *mm);
 extern void arch_uprobe_init_state(struct mm_struct *mm);
 extern int arch_uprobe_dup_ptwrite(struct mm_struct *oldmm, struct mm_struct *newmm);

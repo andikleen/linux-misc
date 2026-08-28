@@ -1073,30 +1073,52 @@ static int __copy_insn(struct address_space *mapping, struct file *filp,
 	return 0;
 }
 
+/**
+ * uprobe_copy_from_file - read bytes from a file's page cache
+ * @inode: the file's inode
+ * @file: file used by the filesystem's read_folio callback
+ * @offset: byte offset into the file
+ * @buf: destination buffer
+ * @size: number of bytes to read (may cross page boundaries)
+ *
+ * Handles page-crossing reads transparently.  The return value is the number
+ * of bytes copied, or a negative error code.  Callers that require a full
+ * instruction must check that the requested size was copied.
+ */
+int uprobe_copy_from_file(struct inode *inode, struct file *file,
+			  loff_t offset, void *buf, int size)
+{
+	struct address_space *mapping = inode->i_mapping;
+	loff_t file_size;
+	int len, copied = 0, err;
+
+	if (offset < 0 || size < 0)
+		return -EINVAL;
+	while (copied < size) {
+		file_size = i_size_read(inode);
+		if (offset >= file_size)
+			break;
+
+		len = min_t(loff_t, size - copied, file_size - offset);
+		len = min_t(int, len, PAGE_SIZE - (offset & ~PAGE_MASK));
+		err = __copy_insn(mapping, file, buf + copied, len, offset);
+		if (err)
+			return err;
+
+		copied += len;
+		offset += len;
+	}
+	return copied;
+}
+
 static int copy_insn(struct uprobe *uprobe, struct file *filp)
 {
-	struct address_space *mapping = uprobe->inode->i_mapping;
-	loff_t offs = uprobe->offset;
-	void *insn = &uprobe->arch.insn;
-	int size = sizeof(uprobe->arch.insn);
-	int len, err = -EIO;
+	int ret;
 
-	/* Copy only available bytes, -EIO if nothing was read */
-	do {
-		if (offs >= i_size_read(uprobe->inode))
-			break;
-
-		len = min_t(int, size, PAGE_SIZE - (offs & ~PAGE_MASK));
-		err = __copy_insn(mapping, filp, insn, len, offs);
-		if (err)
-			break;
-
-		insn += len;
-		offs += len;
-		size -= len;
-	} while (size);
-
-	return err;
+	ret = uprobe_copy_from_file(uprobe->inode, filp, uprobe->offset,
+				   &uprobe->arch.insn,
+				   sizeof(uprobe->arch.insn));
+	return ret < 0 ? ret : ret == sizeof(uprobe->arch.insn) ? 0 : -EIO;
 }
 
 static int prepare_uprobe(struct uprobe *uprobe, struct file *file,
