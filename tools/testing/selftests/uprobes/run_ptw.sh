@@ -14,6 +14,7 @@ cleanup() {
 	fi
 	echo "-:pw" > "$EV" 2>/dev/null
 	echo "-:bad" > "$EV" 2>/dev/null
+	[ -z "$TMP" ] || rm -rf "$TMP"
 }
 
 if [ ! -e "$PTW" ]; then
@@ -26,6 +27,11 @@ if [ ! -e "$EV" ] || [ "$(id -u)" != 0 ] || [ ! -x "$BIN" ] ||
 	echo "1..0 # SKIP missing tracefs, root, ptw_probe, objdump, or readelf"
 	exit 0
 fi
+TMP=$(mktemp -d "${TMPDIR:-/tmp}/ptw.XXXXXX") || {
+	echo "1..0 # SKIP unable to create secure temporary directory"
+	exit 0
+}
+PERF_DATA="$TMP/ptw-perf.data"
 trap cleanup EXIT
 
 # the probe sites: the entry instructions
@@ -58,7 +64,7 @@ NOP5_OFF=$(elf_off 0x$NOP5_V)
 UNOP_OFF=$(elf_off 0x$UNOP_V)
 RZ_OFF=$(elf_off 0x$RZ_V)
 
-echo "1..10"
+echo "1..12"
 failures=0
 
 # baseline (unprobed)
@@ -214,5 +220,25 @@ else
 	fi
 	echo "-:pw" > "$EV" 2>/dev/null
 fi
+
+# 12: ptwrite stream decode (payloads must capture + decode cleanly)
+if ! command -v perf >/dev/null 2>&1; then
+	tap 12 skip "ptwrite decode smoke (no perf)"
+elif ! { echo "ptw:pw $BIN:$PUN_OFF %di %si" > "$EV" &&
+	echo 1 > "$TR/events/uprobes/pw/enable" &&
+	perf record -e intel_pt/ptw=1,fup_on_ptw=1/u -o "$PERF_DATA" \
+		"$BIN" >/dev/null 2>&1 &&
+	echo 0 > "$TR/events/uprobes/pw/enable"; }; then
+	tap 12 not "perf record failed"
+else
+	words=$(perf script --itrace=qwe -i "$PERF_DATA" 2>/dev/null |
+		grep -c "ptwrite:")
+	if [ "${words:-0}" -gt 0 ]; then
+		tap 12 ok "ptwrite stream decode ($words payloads)"
+	else
+		tap 12 not "no ptwrite payloads decoded"
+	fi
+fi
+echo "-:pw" > "$EV" 2>/dev/null
 # the kselftest runner uses only the exit code
 [ "$failures" -eq 0 ] || exit 1
