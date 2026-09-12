@@ -100,7 +100,8 @@ Requirements and restrictions:
   dereferences (for example, ``+8(%di)`` = ``[%rdi + 8]``). ``u64`` sources
   use ``ptwriteq``; ``u32``/``s32``/``x32`` sources use ``ptwritel`` and read
   four bytes. Strings, bitfields, and indirect dereferences are not supported.
-- Memory accesses can fault.
+- Memory accesses can fault. A failed load emits zero, and the probed task
+  does not receive the fault. The output still has ``nargs`` payloads.
 - The event does not produce ring-buffer records. It provides a type registry
   (``events/GRP/EVENT/format``) and the wire ``event_id``
   (``events/GRP/EVENT/id``) for an external decoder. Filters and perf
