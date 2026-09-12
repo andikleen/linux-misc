@@ -45,7 +45,7 @@ struct uprobe_xol_ops;
  */
 struct uprobe_ptwrite_arch {
 	u8	stub[UPROBE_PTWRITE_STUB_SIZE];
-	u16	stub_len;	/* code + data + fault table, whole block */
+	u16	stub_len;	/* code + data, whole block */
 	u8	jmp_off;	/* offset of the final jmp's rel32 field */
 	u8	ndata;		/* number of u64 data slots */
 	u8	orig[MAX_UINSN_BYTES];	/* pristine file bytes, before generic analysis */

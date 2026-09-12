@@ -94,6 +94,13 @@ Requirements and restrictions:
 - The probe site must be a 5-byte NOP or a punnable instruction (see
   ptwrite-uprobes.rst). For five ``0x90`` bytes from GCC's
   ``-fpatchable-function-entry=5``, append ``%multinop`` to the offset.
+- FETCHARGS: register names (``%di``, ``%r8``, ...), ``$stack`` (the
+  stack pointer value), immediates (``\IMM``), and memory sources:
+  ``$stackN`` (the Nth stack slot, ``[%rsp + 8N]``) and ``+off(FETCHARG)``
+  dereferences (for example, ``+8(%di)`` = ``[%rdi + 8]``). ``u64`` sources
+  use ``ptwriteq``; ``u32``/``s32``/``x32`` sources use ``ptwritel`` and read
+  four bytes. Strings, bitfields, and indirect dereferences are not supported.
+- Memory accesses can fault.
 - The event does not produce ring-buffer records. It provides a type registry
   (``events/GRP/EVENT/format``) and the wire ``event_id``
   (``events/GRP/EVENT/id``) for an external decoder. Filters and perf
