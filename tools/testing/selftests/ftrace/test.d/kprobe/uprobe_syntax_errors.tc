@@ -33,4 +33,48 @@ if grep -q "\$current.*" README; then
 check_error 'p /bin/sh:10 ^$current:u8'	# BAD_VAR
 fi
 
+# ptwrite options may be written as an offset suffix or as separate tokens.
+# Use /bin/sh's executable entry so registration reaches the parser options.
+ptw_off=
+if command -v readelf >/dev/null 2>&1; then
+	ptw_entry=$(readelf -hW /bin/sh |
+		awk '/Entry point address:/{print $NF; exit}')
+	ptw_load_off=$(readelf -lW /bin/sh |
+		awk '$1 == "LOAD" && $0 ~ / R E/ {print $2; exit}')
+	ptw_load_vaddr=$(readelf -lW /bin/sh |
+		awk '$1 == "LOAD" && $0 ~ / R E/ {print $3; exit}')
+	if [ -n "$ptw_entry" ] && [ -n "$ptw_load_off" ] &&
+		[ -n "$ptw_load_vaddr" ]; then
+		ptw_off=$(( $(printf "%d" "$ptw_load_off") +
+			$(printf "%d" "$ptw_entry") -
+			$(printf "%d" "$ptw_load_vaddr") ))
+	fi
+fi
+if [ "$(uname -m)" = x86_64 ] &&
+	[ -e /sys/devices/intel_pt/format/ptw ] && [ -n "$ptw_off" ]; then
+check_good_ptw() {
+	local ret
+	echo > uprobe_events
+	echo "$1" > uprobe_events
+	if grep -q 'ptw:uprobes/ptw_parser' uprobe_events; then
+		ret=0
+	else
+		ret=1
+	fi
+	echo "-:ptw_parser" > uprobe_events
+	return "$ret"
+}
+
+check_good_ptw "ptw:ptw_parser /bin/sh:$ptw_off%multinop %di" || exit 1
+check_good_ptw "ptw:ptw_parser /bin/sh:$ptw_off%nopace %multinop %di" || exit 1
+check_good_ptw "ptw:ptw_parser /bin/sh:$ptw_off %multinop %nopace %di" || exit 1
+
+check_error "ptw:ptw_parser /bin/sh:$ptw_off^%return %di"	# BAD_ADDR_SUFFIX
+check_error "ptw:ptw_parser /bin/sh:$ptw_off^%unknown %di"	# BAD_ADDR_SUFFIX
+if grep -q '\$comm' README; then
+	check_error "ptw:ptw_parser /bin/sh:$ptw_off %multinop %di ^\$comm"	# BAD_FETCH_ARG
+fi
+echo > uprobe_events
+fi
+
 exit 0
