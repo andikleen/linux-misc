@@ -1327,6 +1327,7 @@ static int ptwrite_emit_riprel(u8 *p, s32 disp)
 	return 9;
 }
 
+
 bool arch_uprobe_ptwrite_supported(void)
 {
 	u32 eax, ebx, ecx, edx;
@@ -1361,7 +1362,10 @@ static const struct {
 	{ offsetof(struct pt_regs, r14), 14 }, { offsetof(struct pt_regs, r15), 15 },
 };
 
-/* Compile the register, stack-pointer, and immediate fetch forms. */
+/*
+ * Compile one tracefs fetch arg (arch-neutral form, see
+ * uprobe_ptwrite_fetch) into a ptwrite descriptor entry.
+ */
 int arch_uprobe_ptwrite_fetch(struct uprobe_ptwrite_arg *a,
 			      const struct uprobe_ptwrite_fetch *f)
 {
@@ -1369,21 +1373,30 @@ int arch_uprobe_ptwrite_fetch(struct uprobe_ptwrite_arg *a,
 
 	switch (f->kind) {
 	case UPROBE_PTW_FETCH_REG:
+	case UPROBE_PTW_FETCH_MEMREG:
 		for (j = 0; j < ARRAY_SIZE(ptwrite_reg_map); j++)
 			if (ptwrite_reg_map[j].off == f->reg) {
 				idx = ptwrite_reg_map[j].idx;
 				break;
 			}
 		if (idx < 0)
-			return -EINVAL;
-		a->src = UPROBE_PTW_SRC_REG;
+			return -EINVAL;	/* not an x86-64 GPR */
+		a->src = f->kind == UPROBE_PTW_FETCH_REG ?
+			 UPROBE_PTW_SRC_REG : UPROBE_PTW_SRC_MEM;
 		a->reg = idx;
+		if (f->kind == UPROBE_PTW_FETCH_MEMREG)
+			a->val = (u64)(s32)f->imm;
 		break;
-	case UPROBE_PTW_FETCH_STACKP:
+	case UPROBE_PTW_FETCH_STACKP:	/* $stack: SP value, never faults */
 		a->src = UPROBE_PTW_SRC_REG;
 		a->reg = 4; /* rsp */
 		break;
-	case UPROBE_PTW_FETCH_IMM:
+	case UPROBE_PTW_FETCH_STACKN:	/* [rsp + imm] */
+		a->src = UPROBE_PTW_SRC_MEM;
+		a->reg = 4;	/* rsp */
+		a->val = f->imm;
+		break;
+	case UPROBE_PTW_FETCH_IMM:	/* \IMM */
 		a->src = UPROBE_PTW_SRC_IMM;
 		a->val = f->imm;
 		break;
@@ -1392,6 +1405,26 @@ int arch_uprobe_ptwrite_fetch(struct uprobe_ptwrite_arg *a,
 	}
 	return 0;
 }
+
+/*
+ * Worst-case stub block: header ptwriteq (9) + max memory args (10 bytes
+ * each, including a SIB byte) + final jmp (5), rounded up; data adds one
+ * header slot and one slot per immediate. Keep the bound below the stub size.
+ */
+static_assert((((9 + UPROBE_PTWRITE_MAX_ARGS * 10 + 5 + 7) & ~7) +
+	       8 * (1 + UPROBE_PTWRITE_MAX_ARGS)) <= UPROBE_PTWRITE_STUB_SIZE,
+	       "worst-case ptwrite stub block exceeds UPROBE_PTWRITE_STUB_SIZE");
+
+static bool ptwrite_has_room(const u8 *base, const u8 *p, size_t len)
+{
+	return p >= base && (size_t)(p - base) <=
+		       sizeof(((struct uprobe_ptwrite_arch *)0)->stub) - len;
+}
+
+#define PTW_NEED(_len) do { \
+		if (!ptwrite_has_room(code, p, (_len))) \
+			return -E2BIG; \
+	} while (0)
 
 int arch_uprobe_ptwrite_prepare(struct arch_uprobe *auprobe,
 				const struct uprobe_ptwrite_desc *desc)
@@ -1409,7 +1442,7 @@ int arch_uprobe_ptwrite_prepare(struct arch_uprobe *auprobe,
 		return -EINVAL;
 	if (desc->nargs > UPROBE_PTWRITE_MAX_ARGS)
 		return -E2BIG;
-	if (desc->flags)
+	if (desc->flags & ~UPROBE_PTWRITE_FL_ALLOW_MEM)
 		return -EINVAL;
 
 	/* The generic registration path copied these bytes before this hook. */
@@ -1426,24 +1459,62 @@ int arch_uprobe_ptwrite_prepare(struct arch_uprobe *auprobe,
 				return -E2BIG;
 			n_imm++;
 			break;
+		case UPROBE_PTW_SRC_MEM:
+			if (!(desc->flags & UPROBE_PTWRITE_FL_ALLOW_MEM))
+				return -EINVAL;
+			if (desc->args[i].reg > 15)
+				return -EINVAL;
+			if (desc->args[i].size != 4 &&
+			    desc->args[i].size != 8)
+				return -EINVAL;
+			break;
 		default:
 			return -EINVAL;
 		}
 	}
 
 	/* header word emission (disp32 patched below) */
+	PTW_NEED(9);
 	p += ptwrite_emit_riprel(p, 0);
 
 	for (i = 0; i < desc->nargs; i++) {
-		if (desc->args[i].src == UPROBE_PTW_SRC_REG) {
+		switch (desc->args[i].src) {
+		case UPROBE_PTW_SRC_REG:
+			PTW_NEED(5);
 			p += ptwrite_emit_reg(p, desc->args[i].reg);
-		} else {
+			break;
+		case UPROBE_PTW_SRC_IMM:
+			if (imm_idx >= ARRAY_SIZE(imm_off))
+				return -E2BIG;
+			PTW_NEED(9);
 			imm_off[imm_idx++] = p - code;
 			p += ptwrite_emit_riprel(p, 0);
+			break;
+		case UPROBE_PTW_SRC_MEM: {
+			u8 reg = desc->args[i].reg;
+			bool wide = desc->args[i].size == 8;
+			unsigned int arg_len = (wide ? 9 : 8) +
+				((reg & 7) == 4);
+
+			PTW_NEED(arg_len);
+			*p++ = 0xf3;
+			if (wide)
+				*p++ = (reg & 8) ? 0x49 : 0x48; /* REX.W */
+			else if (reg & 8)
+				*p++ = 0x41; /* REX.B only (32-bit operand) */
+			*p++ = 0x0f;
+			*p++ = 0xae;
+			*p++ = 0xa0 | (reg & 7); /* mod 10, reg /4, rm reg */
+			if ((reg & 7) == 4) /* SIB escape: base rsp/esp/r12 */
+				*p++ = 0x24;
+			p += 4;
+			break;
+		}
 		}
 	}
 
 	/* final jmp back to probe+5; rel32 patched per-mm at install */
+	PTW_NEED(5);
 	*p++ = 0xe9;
 	if (p - code > U8_MAX)
 		return -E2BIG;
@@ -1455,7 +1526,8 @@ int arch_uprobe_ptwrite_prepare(struct arch_uprobe *auprobe,
 		return -E2BIG;
 
 	/* data slots: header, then imm values in emission order */
-	hdr = ((u64)desc->event_id << 48) | ((u64)desc->nargs << 40);
+	hdr = ((u64)desc->event_id << 48) | ((u64)desc->nargs << 40) |
+	      UPROBE_PTW_HDR_MAGIC;
 	*(u64 *)(code + data_off) = hdr;
 
 	/* patch the header's disp32: hdr slot - end of header insn */
@@ -1466,8 +1538,10 @@ int arch_uprobe_ptwrite_prepare(struct arch_uprobe *auprobe,
 		if (desc->args[i].src != UPROBE_PTW_SRC_IMM)
 			continue;
 		*(s32 *)(code + imm_off[imm_idx] + 5) =
-			(s32)((data_off + 8 * (1 + imm_idx)) - (imm_off[imm_idx] + 9));
-		*(u64 *)(code + data_off + 8 * (1 + imm_idx)) = desc->args[i].val;
+			(s32)((data_off + 8 * (1 + imm_idx)) -
+			      (imm_off[imm_idx] + 9));
+		*(u64 *)(code + data_off + 8 * (1 + imm_idx)) =
+			desc->args[i].val;
 		imm_idx++;
 	}
 
@@ -1750,7 +1824,6 @@ int arch_uprobe_uninstall_ptwrite(struct arch_uprobe *auprobe,
 	return text_poke_5byte(auprobe, vma, vaddr, auprobe->ptwrite.orig,
 			UPROBE_SWBP_INSN, false, false, false, false, NULL);
 }
-
 
 static bool __is_optimized(struct mm_struct *mm, uprobe_opcode_t *insn, unsigned long vaddr)
 {
