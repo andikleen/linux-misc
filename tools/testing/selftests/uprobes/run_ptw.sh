@@ -46,6 +46,7 @@ PUN_V=$(objdump -d "$BIN" | awk '/^[0-9a-f]+ <punfn>:/{print $1;exit}' | tr -d '
 JCC_V=$(objdump -d "$BIN" |
 	awk '/^[0-9a-f]+ <jcc8>:/ {f=1; next} f&&/jne/{print $1; exit}' |
 	tr -d ':')
+FLT_V=$(objdump -d "$BIN" | awk '/^[0-9a-f]+ <faultfn>:/{print $1;exit}' | tr -d ':')
 NOP_V=$(objdump -d "$BIN" | awk '/^[0-9a-f]+ <nopfn_site>:/{print $1;exit}' | tr -d ':')
 NOP5_V=$(objdump -d "$BIN" | awk '/^[0-9a-f]+ <nop5>:/{print $1;exit}' | tr -d ':')
 UNOP_V=$(objdump -d "$BIN" |
@@ -59,12 +60,13 @@ if [ -z "$PUN_V" ] || [ -z "$JCC_V" ] || [ -z "$FLT_V" ] ||
 fi
 PUN_OFF=$(elf_off 0x$PUN_V)
 JCC_OFF=$(elf_off 0x$JCC_V)
+FLT_OFF=$(elf_off 0x$FLT_V)
 NOP_OFF=$(elf_off 0x$NOP_V)
 NOP5_OFF=$(elf_off 0x$NOP5_V)
 UNOP_OFF=$(elf_off 0x$UNOP_V)
 RZ_OFF=$(elf_off 0x$RZ_V)
 
-echo "1..12"
+echo "1..13"
 failures=0
 
 # baseline (unprobed)
@@ -139,7 +141,6 @@ else
 	fi
 	echo "-:pw" > "$EV" 2>/dev/null
 fi
-
 
 # 3: mini-stress (50 fork/execs survive)
 if ! echo "ptw:pw $BIN:$PUN_OFF %di %si" > "$EV" 2>/dev/null ||
@@ -240,5 +241,32 @@ else
 	fi
 fi
 echo "-:pw" > "$EV" 2>/dev/null
+
+# 13: memory faults emit a zero payload and preserve program behavior
+if ! command -v perf >/dev/null 2>&1; then
+	tap 13 skip "memory-arg fault payload (missing perf)"
+elif ! echo "ptw:pw $BIN:$FLT_OFF +8(%di) %si" > "$EV" 2>/dev/null ||
+     ! echo 1 > "$TR/events/uprobes/pw/enable" 2>/dev/null; then
+	tap 13 not "memory-arg fault payload setup failed"
+else
+	if perf record -e intel_pt/ptw=1,fup_on_ptw=1/u \
+	     -o "$TMP/fault.data" "$BIN" > "$TMP/fault.out" 2>/dev/null; then
+		run_rc=0
+	else
+		run_rc=$?
+	fi
+	echo 0 > "$TR/events/uprobes/pw/enable" 2>/dev/null
+	probe=$(sed -n 's/.*acc=\([0-9a-f]*\).*/\1/p' "$TMP/fault.out")
+	zero=$(perf script --itrace=qwe -i "$TMP/fault.data" 2>/dev/null |
+		grep -c 'payload: 0[[:space:]]')
+	if [ "$run_rc" -eq 0 ] && [ "$probe" = "$base" ] &&
+	   [ "${zero:-0}" -gt 0 ] && sites_match; then
+		tap 13 ok "memory-arg fault emitted zero and preserved execution"
+	else
+		tap 13 not "memory-arg fault rc=$run_rc acc=$probe zero-records=${zero:-0}"
+	fi
+	echo "-:pw" > "$EV" 2>/dev/null
+fi
+
 # the kselftest runner uses only the exit code
 [ "$failures" -eq 0 ] || exit 1

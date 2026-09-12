@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <unistd.h>
 
 static __attribute__((noipa)) uint64_t
 punfn(uint64_t a)
@@ -22,6 +24,13 @@ jcc8(uint64_t a)
 	asm volatile("jne 1f\n\tmovabs $0x1111111111111111, %%rax\n\t"
 		     "1:" : "+a"(a) : : "cc");
 	return a;
+}
+
+static __attribute__((noipa)) uint64_t
+faultfn(uint64_t *p)
+{
+	asm volatile("nop" ::: "memory");	/* the probe site (mem arg) */
+	return (p ? *p : 0) * 31 + 7;
 }
 
 static __attribute__((noipa)) uint64_t
@@ -118,8 +127,19 @@ static int check_installed(const char *name, const uint8_t *p, uint64_t vaddr)
 int main(int argc, char **argv)
 {
 	uint64_t acc = 0x1122334455667788ULL;
+	uint8_t *guard;
+	uint64_t *faultp;
 	int i, r, bad = 0;
 
+	guard = mmap(NULL, 2 * 4096, PROT_READ | PROT_WRITE,
+		     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	if (guard == MAP_FAILED)
+		return 2;
+	if (mprotect(guard + 4096, 4096, PROT_NONE)) {
+		perror("mprotect");
+		return 2;
+	}
+	faultp = (uint64_t *)(guard + 4096 - 8);
 
 	for (i = 0; i < 100; i++)
 		acc = nopfn(acc + i);
@@ -133,9 +153,11 @@ int main(int argc, char **argv)
 		acc = punfn(acc + i);
 	for (i = 0; i < 100; i++)
 		acc = jcc8(acc + i);
+	acc += faultfn(faultp);
 
 	dump_site("punfn", (const uint8_t *)&punfn);
 	dump_site("jcc8", (const uint8_t *)&jcc8);
+	dump_site("faultfn", (const uint8_t *)&faultfn);
 	dump_site("nopfn", nopfn_site);
 	dump_site("unaligned_nopfn", nopfn_unaligned_site);
 	dump_site("nop5", (const uint8_t *)&nop5);
