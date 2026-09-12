@@ -213,10 +213,10 @@ enum uprobe_ptwrite_src {
 
 struct uprobe_ptwrite_arg {
 	u8	src;		/* enum uprobe_ptwrite_src */
-	u8	reg;		/* x86-64 GPR index (0=rax..15=r15) for SRC_REG */
+	u8	reg;		/* x86-64 GPR index (0=rax..15=r15) for SRC_REG/SRC_MEM */
 	u8	size;		/* declared type size 1/2/4/8 (decoder hint) */
 	u8	reserved;
-	u64	val;		/* SRC_IMM: constant; SRC_REG: unused */
+	u64	val;		/* SRC_IMM: constant, SRC_MEM: disp32 (low 32 bits) */
 };
 
 struct uprobe_ptwrite_desc {
