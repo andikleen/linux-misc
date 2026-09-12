@@ -3,7 +3,11 @@
 ARCH ?= $(shell uname -m 2>/dev/null || echo not)
 CFLAGS += -O2 -Wall -no-pie
 
-TEST_PROGS := run_ptw.sh
+TEST_PROGS := run_ptw.sh run_module.sh run_perfprobe.sh run_decode.sh
+TEST_FILES := manual_ptw.c \
+	../../../../samples/uprobe-ptwrite/test_prog.c \
+	../../../../tools/perf/scripts/python/uprobe-ptwrite-decode.py
+TEST_FILES += $(wildcard ../../../../samples/uprobe-ptwrite/uprobe_ptwrite_test.ko)
 
 ifneq ($(filter x86 x86_64,$(ARCH)),)
 TEST_GEN_FILES := ptw_probe
