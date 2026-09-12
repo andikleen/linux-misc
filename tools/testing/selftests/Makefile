@@ -135,6 +135,7 @@ TARGETS += tpm2
 TARGETS += tty
 TARGETS += ublk
 TARGETS += uevent
+TARGETS += uprobes
 TARGETS += user_events
 TARGETS += vDSO
 TARGETS += mm
