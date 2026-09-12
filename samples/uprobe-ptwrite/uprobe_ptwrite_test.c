@@ -11,9 +11,11 @@
  * Usage (module params):
  *   path=/path/to/prog   file to probe
  *   offset=0xADDR        file offset of the probe site
- *   args="r0,r1,i0x42"             comma-separated;
+ *   args="r0,r1,i0x42,m3,m2:0x8,m4:0x10:4"   comma-separated;
  *                        r<N> = x86-64 GPR index 0..15,
  *                        i<hex> = immediate constant,
+ *                        m<N>[:<disp>][:<size>] = memory arg [reg + disp32],
+ *                        size 4 (u32 load) or 8 (u64 load, default)
  *   event_id=0x1234      identifier carried in the PTW header word
  */
 #include <linux/module.h>
@@ -87,6 +89,43 @@ static int parse_probe_args(void)
 			}
 			a->src = UPROBE_PTW_SRC_IMM;
 			a->val = v;
+		} else if (tok[0] == 'm') {
+			/*
+			 * m<R>[:<disp>][:<size>]: memory arg [reg + disp32],
+			 * size 4 (u32 load) or 8 (u64 load, default)
+			 */
+			char *colon = strchr(tok, ':');
+			char *szs = NULL;
+			unsigned long reg;
+			long long disp = 0;
+			unsigned long size = 8;
+
+			if (colon) {
+				*colon = '\0';
+				szs = strchr(colon + 1, ':');
+				if (szs)
+					*szs++ = '\0';
+			}
+			if (kstrtoul(tok + 1, 10, &reg) || reg > 15) {
+				pr_err("uprobe_ptwrite_test: bad mem reg '%s'\n", tok);
+				goto err;
+			}
+			if (colon && kstrtoll(colon + 1, 0, &disp)) {
+				pr_err("uprobe_ptwrite_test: bad mem disp '%s'\n",
+				       colon + 1);
+				goto err;
+			}
+			if (szs && (kstrtoul(szs, 10, &size) ||
+				   (size != 4 && size != 8))) {
+				pr_err("uprobe_ptwrite_test: bad mem size '%s'\n",
+				       szs);
+				goto err;
+			}
+			a->src = UPROBE_PTW_SRC_MEM;
+			a->reg = reg;
+			a->val = (u64)(s32)disp;
+			a->size = size;
+			desc.flags |= UPROBE_PTWRITE_FL_ALLOW_MEM;
 		} else {
 			pr_err("uprobe_ptwrite_test: bad arg '%s'\n", tok);
 			goto err;

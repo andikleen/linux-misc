@@ -44,7 +44,7 @@ struct uprobe_xol_ops;
  */
 struct uprobe_ptwrite_arch {
 	u8	stub[UPROBE_PTWRITE_STUB_SIZE];
-	u16	stub_len;	/* code + data + fault table, whole block */
+	u16	stub_len;	/* code + data, whole block */
 	u8	jmp_off;	/* offset of the final jmp's rel32 field */
 	u8	ndata;		/* number of u64 data slots */
 	u8	orig[MAX_UINSN_BYTES];	/* pristine file bytes, before generic analysis */
@@ -56,6 +56,17 @@ struct uprobe_ptwrite_page {
 	struct page		*page;		/* stub blocks written via kmap */
 	unsigned long		vaddr;		/* mapping base */
 	u16			cursor;		/* next free block offset */
+	u16			nblocks;
+	struct {
+		u16 off;	/* block offset in the page */
+		u16 len;	/* generated block length */
+		u8  orig0;	/* original site byte 0 (pun restore) */
+		u8  pun;	/* instruction-pun mechanism (single-byte poke) */
+		u8  site_len;	/* original instruction length (pun identity) */
+		s32 site_off;	/* probe site - page base (idempotent reinstall) */
+		u8  site_insn[MAX_UINSN_BYTES];	/* original bytes (pun identity) */
+	} index[PAGE_SIZE / 32];	/* exact: min block = 32 B (nargs >= 1), */
+					/* so <= 128 blocks fit a page */
 };
 
 struct arch_uprobe {
