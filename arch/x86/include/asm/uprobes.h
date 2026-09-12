@@ -59,7 +59,7 @@ struct uprobe_xol_ops;
  */
 struct uprobe_ptwrite_arch {
 	u8	stub[UPROBE_PTWRITE_STUB_SIZE];
-	u16	stub_len;	/* code + data, whole block */
+	u16	stub_len;	/* code + data + fault table, whole block */
 	u8	jmp_off;	/* offset of the final jmp's rel32 field */
 	u8	copy_off;	/* offset of the out-of-line instruction copy */
 	u8	len;		/* copy length (0 = drop); back-jmp = vaddr+len */
@@ -83,6 +83,7 @@ struct uprobe_ptwrite_page {
 	struct {
 		u16 off;	/* block offset in the page */
 		u16 len;	/* generated block length */
+		u16 ft_off;	/* fault table offset within the block */
 		u8  orig0;	/* original site byte 0 (pun restore) */
 		u8  pun;	/* instruction-pun mechanism (single-byte poke) */
 		u8  site_len;	/* original instruction length (pun identity) */
