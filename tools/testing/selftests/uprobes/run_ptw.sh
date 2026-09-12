@@ -44,16 +44,18 @@ PUN_V=$(objdump -d "$BIN" | awk '/^[0-9a-f]+ <punfn>:/{print $1;exit}' | tr -d '
 JCC_V=$(objdump -d "$BIN" |
 	awk '/^[0-9a-f]+ <jcc8>:/ {f=1; next} f&&/jne/{print $1; exit}' |
 	tr -d ':')
+FLT_V=$(objdump -d "$BIN" | awk '/^[0-9a-f]+ <faultfn>:/{print $1;exit}' | tr -d ':')
 NOP_V=$(objdump -d "$BIN" | awk '/^[0-9a-f]+ <nopfn_site>:/{print $1;exit}' | tr -d ':')
 NOP5_V=$(objdump -d "$BIN" | awk '/^[0-9a-f]+ <nop5>:/{print $1;exit}' | tr -d ':')
 RZ_V=$(objdump -d "$BIN" | awk '/^[0-9a-f]+ <rzfn>:/{print $1;exit}' | tr -d ':')
 PUN_OFF=$(elf_off 0x$PUN_V)
 JCC_OFF=$(elf_off 0x$JCC_V)
+FLT_OFF=$(elf_off 0x$FLT_V)
 NOP_OFF=$(elf_off 0x$NOP_V)
 NOP5_OFF=$(elf_off 0x$NOP5_V)
 RZ_OFF=$(elf_off 0x$RZ_V)
 
-echo "1..12"
+echo "1..13"
 failures=0
 
 # baseline (unprobed)
@@ -128,7 +130,6 @@ else
 	fi
 	echo "-:pw" > "$EV" 2>/dev/null
 fi
-
 
 # 3: mini-stress (50 fork/execs survive)
 if ! echo "ptw:pw $BIN:$PUN_OFF %di %si" > "$EV" 2>/dev/null ||
@@ -216,5 +217,10 @@ else
 	fi
 fi
 echo "-:pw" > "$EV" 2>/dev/null
+
+# 13: memory-arg fault fixup (a bad base fixes up to value 0)
+probe_run 13 "$FLT_OFF" "+8(%di) %si" \
+	"memory-arg fault fixup (child survived, acc unchanged)"
+
 # the kselftest runner uses only the exit code
 [ "$failures" -eq 0 ] || exit 1
