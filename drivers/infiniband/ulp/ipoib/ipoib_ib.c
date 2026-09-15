@@ -1227,19 +1227,17 @@ static void __ipoib_ib_dev_flush(struct ipoib_dev_priv *priv,
 	}
 
 	if (level == IPOIB_FLUSH_LIGHT) {
+		int oper_up;
 		ipoib_mark_paths_invalid(dev);
-		/* Set MCAST_FLUSH to prevent races between:
+		/* Set IPoIB operation as down to prevent races between:
 		 * the flush flow which leaves MCG and on the fly joins
 		 * which can happen during that time. mcast restart task
 		 * should deal with join requests we missed.
-		 *
-		 * Do not clear OPER_UP for this; restoring it races with
-		 * ipoib_ib_dev_down() and can leave OPER_UP set after the
-		 * device is down.
 		 */
-		set_bit(IPOIB_FLAG_MCAST_FLUSH, &priv->flags);
+		oper_up = test_and_clear_bit(IPOIB_FLAG_OPER_UP, &priv->flags);
 		ipoib_mcast_dev_flush(dev);
-		clear_bit(IPOIB_FLAG_MCAST_FLUSH, &priv->flags);
+		if (oper_up)
+			set_bit(IPOIB_FLAG_OPER_UP, &priv->flags);
 		ipoib_reap_dead_ahs(priv);
 	}
 

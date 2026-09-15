@@ -26,7 +26,6 @@ out:
 	return resources;
 
 err:
-	kfree(resources->collection);
 	kfree(resources->counters);
 	kfree(resources);
 

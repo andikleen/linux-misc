@@ -251,7 +251,7 @@ __setup("amd_smn_debugfs_enable", amd_smn_enable_dfs);
 static int __init amd_smn_init(void)
 {
 	u16 count, num_roots, roots_per_node, node, num_nodes;
-	struct pci_dev *root __free(pci_dev_put) = NULL;
+	struct pci_dev *root;
 
 	if (!cpu_feature_enabled(X86_FEATURE_ZEN))
 		return 0;
@@ -262,6 +262,7 @@ static int __init amd_smn_init(void)
 		return 0;
 
 	num_roots = 0;
+	root = NULL;
 	while ((root = get_next_root(root))) {
 		pci_dbg(root, "Reserving PCI config space\n");
 
@@ -298,13 +299,14 @@ static int __init amd_smn_init(void)
 
 	count = 0;
 	node = 0;
+	root = NULL;
 	while (node < num_nodes && (root = get_next_root(root))) {
 		/* Use one root for each node and skip the rest. */
 		if (count++ % roots_per_node)
 			continue;
 
 		pci_dbg(root, "is root for AMD node %u\n", node);
-		amd_roots[node++] = pci_dev_get(root);
+		amd_roots[node++] = root;
 	}
 
 	if (enable_dfs) {
